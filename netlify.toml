@@ -1,0 +1,14 @@
+[build]
+  command = "echo 'No build needed - single file app'"
+  publish = "."
+  functions = "functions"
+
+[dev]
+  framework = "static"
+  publish = "."
+
+# Redirect all routes to index.html for PWA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
