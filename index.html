@@ -935,6 +935,20 @@ function dedupChannels(chs){
   return Array.from(map.values());
 }
 function applyButtonSize(size){const grid=document.getElementById("grid");if(!grid)return;const base=172;const heights={compact:140,normal:172,spacious:220};const h=heights[size]||heights.normal;document.querySelectorAll(".tile").forEach(t=>{t.style.height=h+"px";});}
+
+async function showDiagnostics(){
+  const chs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
+  console.log("=== RAW IndexedDB DATA ===");
+  chs.forEach(c=>{
+    console.log(`ID: ${c.id}, Label: ${c.label}, ParentID: ${c.parentChannelId}, HasOwnProperty: ${c.hasOwnProperty('parentChannelId')}`);
+  });
+  const diag=document.createElement("div");
+  diag.style.cssText="position:fixed;top:100px;left:10px;right:10px;background:#000;color:#0f0;padding:15px;font-family:monospace;font-size:11px;max-height:300px;overflow-y:auto;z-index:9999;border:2px solid #0f0";
+  diag.innerHTML="<b>RAW IndexedDB DATA:</b><br>"+chs.map(c=>`${c.label}: parentID=${c.parentChannelId||"NULL"}`).join("<br>");
+  document.body.appendChild(diag);
+  setTimeout(()=>diag.remove(),10000);
+}
+
 function renderChannelSettings(){const list=document.getElementById("channelList");list.innerHTML="";
   console.log("renderChannelSettings: all channels=",state.channels.map(c=>({label:c.label,id:c.id,parentChannelId:c.parentChannelId})));
   
@@ -950,7 +964,12 @@ function renderChannelSettings(){const list=document.getElementById("channelList
     debugHtml+=" | ";
   });
   debugDiv.textContent=debugHtml||"(loading...)";
+  const diagBtn=document.createElement("button");
+  diagBtn.style.cssText="margin-top:10px;padding:8px;background:#0f0;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:bold";
+  diagBtn.textContent="📊 Show Raw DB";
+  diagBtn.addEventListener("click",showDiagnostics);
   list.appendChild(debugDiv);
+  list.appendChild(diagBtn);
   
   // Nuclear delete button - visible at top
   const nuclearBtn=document.createElement("button");
