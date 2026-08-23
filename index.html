@@ -483,13 +483,13 @@ async function updatePendingCount(){ const cnt=document.getElementById("pendingC
 
 function toRow(store,r){
   if(store==="profiles")return {id:r.id,name:r.name,hour_fmt:r.hourFmt||"12",confirm_end:(r.confirmEnd!=="0")};
-  if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived};
+  if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived,parent_channel_id:r.parentChannelId||null};
   if(store==="sessions")return {id:r.id,profile_id:r.profileId,channel_id:r.channelId,start_ts:new Date(r.startTs).toISOString(),end_ts:r.endTs?new Date(r.endTs).toISOString():null,duration_seconds:r.endTs?Math.round((r.endTs-r.startTs)/1000):null,business_date:r.date,voided:!!r.voided,revision:r.revision||0};
 }
 function fromRow(store,row){
   const u=row.updated_at?Date.parse(row.updated_at):now();
   if(store==="profiles")return {id:row.id,name:row.name,hourFmt:row.hour_fmt||"12",confirmEnd:row.confirm_end?"1":"0",_u:u,_dirty:false};
-  if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,_u:u,_dirty:false};
+  if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,parentChannelId:row.parent_channel_id||null,_u:u,_dirty:false};
   if(store==="sessions")return {id:row.id,profileId:row.profile_id,channelId:row.channel_id,startTs:Date.parse(row.start_ts),endTs:row.end_ts?Date.parse(row.end_ts):null,durMs:row.end_ts?(Date.parse(row.end_ts)-Date.parse(row.start_ts)):0,date:row.business_date,voided:!!row.voided,revision:row.revision||0,_u:u,_dirty:false};
 }
 async function dirtyRecords(){
