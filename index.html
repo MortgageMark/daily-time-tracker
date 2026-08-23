@@ -743,7 +743,7 @@ function openScrim(id){document.getElementById(id).classList.add("open");}
 function closeScrim(id){document.getElementById(id).classList.remove("open");}
 function initializeEventListeners(){
   // Scrim close handlers
-  document.querySelectorAll("[data-close]").forEach(b=>{if(b)b.addEventListener("click",e=>{const scrim=e.target.closest(".scrim");if(scrim){scrim.classList.remove("open");if(scrim.id==="chanScrim"){editingChanId=null;editingParentId=null;window._savedParentId=null;}}});});
+  document.querySelectorAll("[data-close]").forEach(b=>{if(b)b.addEventListener("click",e=>{const scrim=e.target.closest(".scrim");if(scrim){scrim.classList.remove("open");if(scrim.id==="chanScrim"){editingChanId=null;editingParentId=null;}}});});
   document.querySelectorAll(".scrim").forEach(s=>{if(s)s.addEventListener("click",e=>{if(e.target===s)s.classList.remove("open");});});
 
   // Top bar
@@ -767,7 +767,7 @@ function initializeEventListeners(){
   document.addEventListener("click",e=>{if(e.target.id==="addChannelBtn")openChannelEditor(null);});
   const chanColor=document.getElementById("chanColor");if(chanColor)chanColor.addEventListener("input",()=>{renderPalette(document.getElementById("chanColor").value);updateChanPreview();});
   const chanLabel=document.getElementById("chanLabel");if(chanLabel)chanLabel.addEventListener("input",updateChanPreview);
-  const chanSave=document.getElementById("chanSave");if(chanSave)chanSave.addEventListener("click",async()=>{console.log("SAVE BUTTON: editingParentId=",editingParentId,"editingChanId=",editingChanId);const label=document.getElementById("chanLabel").value.trim()||"Untitled";const color=document.getElementById("chanColor").value;const parentId=editingParentId;
+  const chanSave=document.getElementById("chanSave");if(chanSave)chanSave.addEventListener("click",async()=>{const label=document.getElementById("chanLabel").value.trim()||"Untitled";const color=document.getElementById("chanColor").value;const parentId=editingParentId;
     if(editingChanId){const c=state.channels.find(x=>x.id===editingChanId);c.label=label;c.color=color;await saveLocal("channels",c);}
     else{
       // Use editingParentId which was set by openChannelEditor
@@ -775,12 +775,12 @@ function initializeEventListeners(){
       const newId=uid();
       // Safeguard: never allow a channel to be its own parent
       if(parentIdToUse===newId){
-        console.warn("PREVENTED SELF-PARENTING: newId would equal parentId");
+        
         parentIdToUse=null;
       }
       const order=Math.max(-1,...state.channels.map(c=>!parentIdToUse||c.parentChannelId===parentIdToUse?c.order:-1))+1;
       const newCh={id:newId,profileId:state.profileId,label:label,color:color,order:order,archived:false,parentChannelId:parentIdToUse};
-      console.log("SAVING NEW CHANNEL with editingParentId=",editingParentId,"parentChannelId=",newCh.parentChannelId);
+      
       await saveLocal("channels",newCh);
       await new Promise(r=>setTimeout(r,250));
       const verify=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
@@ -795,7 +795,7 @@ function initializeEventListeners(){
     console.log("AFTER dedup:",state.channels.map(c=>({label:c.label,id:c.id,parentChannelId:c.parentChannelId})));
     state.channels=validateParentIds(state.channels);
     console.log("AFTER validate:",state.channels.map(c=>({label:c.label,id:c.id,parentChannelId:c.parentChannelId})));
-    window._savedParentId=null;closeScrim("chanScrim");renderChannelSettings();renderGrid();toast("Saved");});
+    closeScrim("chanScrim");renderChannelSettings();renderGrid();toast("Saved");});
   const chanArchive=document.getElementById("chanArchive");if(chanArchive)chanArchive.addEventListener("click",async()=>{const c=state.channels.find(x=>x.id===editingChanId);c.archived=true;await saveLocal("channels",c);if(running&&running.channelId===c.id)await stopRunning(now());state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});closeScrim("chanScrim");renderChannelSettings();renderAll();toast("Archived (history kept)");});
 
   // Navigation buttons
@@ -925,22 +925,15 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
 
 document.addEventListener("DOMContentLoaded",initializeEventListeners);
 function validateParentIds(channels){
-  console.log("validateParentIds: checking",channels.length,"channels");
   const ids=new Set(channels.map(c=>c.id));
-  console.log("validateParentIds: ids in set=",Array.from(ids));
   return channels.map(c=>{
     if(c.parentChannelId){
       // Never allow a channel to be its own parent
       if(c.parentChannelId===c.id){
-        console.warn("SELF-PARENT BUG: Channel",c.label,"has parentChannelId equal to its own ID! Clearing.");
         c.parentChannelId=null;
-      }else{
-        const exists=ids.has(c.parentChannelId);
-        console.log("  Channel",c.label,"parentId=",c.parentChannelId,"exists=",exists);
-        if(!exists){
-          console.warn("Clearing invalid parent for",c.label,"- parent ID",c.parentChannelId,"not in",Array.from(ids));
-          c.parentChannelId=null;
-        }
+      }else if(!ids.has(c.parentChannelId)){
+        // Parent doesn't exist - clear it
+        c.parentChannelId=null;
       }
     }
     return c;
@@ -967,26 +960,6 @@ function dedupChannels(chs){
 }
 function applyButtonSize(size){const grid=document.getElementById("grid");if(!grid)return;const base=172;const heights={compact:140,normal:172,spacious:220};const h=heights[size]||heights.normal;document.querySelectorAll(".tile").forEach(t=>{t.style.height=h+"px";});}
 
-async function showDiagnostics(){
-  const chs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
-  console.log("=== RAW IndexedDB DATA ===");
-  let html="<b>RAW IndexedDB DATA:</b><br>";
-  chs.forEach(c=>{
-    const hasOwn=c.hasOwnProperty('parentChannelId');
-    const val=c.parentChannelId;
-    console.log(`ID: ${c.id}, Label: ${c.label}, ParentID: ${val}, HasOwnProperty: ${hasOwn}`);
-    html+=`${c.label}: parentID=${val||"NULL"} [hasOwn:${hasOwn}]<br>`;
-  });
-  html+="<br><b>state.channels (in memory):</b><br>";
-  state.channels.forEach(c=>{
-    html+=`${c.label}: parentID=${c.parentChannelId||"NULL"}<br>`;
-  });
-  const diag=document.createElement("div");
-  diag.style.cssText="position:fixed;top:100px;left:10px;right:10px;background:#000;color:#0f0;padding:15px;font-family:monospace;font-size:10px;max-height:400px;overflow-y:auto;z-index:9999;border:2px solid #0f0";
-  diag.innerHTML=html;
-  document.body.appendChild(diag);
-  setTimeout(()=>diag.remove(),15000);
-}
 
 function renderChannelSettings(){const list=document.getElementById("channelList");list.innerHTML="";
   console.log("renderChannelSettings: all channels=",state.channels.map(c=>({label:c.label,id:c.id,parentChannelId:c.parentChannelId})));
@@ -1003,12 +976,7 @@ function renderChannelSettings(){const list=document.getElementById("channelList
     debugHtml+=" | ";
   });
   debugDiv.textContent=debugHtml||"(loading...)";
-  const diagBtn=document.createElement("button");
-  diagBtn.style.cssText="margin-top:10px;padding:8px;background:#0f0;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:bold";
-  diagBtn.textContent="📊 Show Raw DB";
-  diagBtn.addEventListener("click",showDiagnostics);
   list.appendChild(debugDiv);
-  list.appendChild(diagBtn);
   
   // Nuclear delete button - visible at top
   const nuclearBtn=document.createElement("button");
@@ -1046,7 +1014,7 @@ function renderChannelSettings(){const list=document.getElementById("channelList
     const subs=state.channels.filter(sc=>sc.parentChannelId===c.id&&!sc.archived).sort((a,b)=>a.order-b.order);
     console.log("Rendering parent",c.label,"(id=",c.id,") - found",subs.length,"subcategories:",subs.map(s=>s.label));
     subs.forEach(sub=>{const subRow=document.createElement("div");subRow.className="row";subRow.style.paddingLeft="48px";subRow.style.borderLeft="2px solid var(--line)";subRow.innerHTML=`<div class="swatch" style="background:${sub.color}"></div><div class="grow"><span style="font-size:12px">${escapeHtml(sub.label)}</span></div><button class="btn sm">Edit</button>`;const subId=sub.id;subRow.querySelector(".btn").addEventListener("click",()=>openChannelEditor(subId));list.appendChild(subRow);});
-    const addSubBtn=document.createElement("div");addSubBtn.className="row";addSubBtn.style.paddingLeft="32px";addSubBtn.innerHTML=`<button class="btn sm" style="width:100%">+ Add subcategory</button>`;const parentId=c.id;addSubBtn.querySelector(".btn").addEventListener("click",()=>{console.log("Add subcategory clicked for parent parentId=",parentId);openChannelEditor(null,parentId);});list.appendChild(addSubBtn);});
+    const addSubBtn=document.createElement("div");addSubBtn.className="row";addSubBtn.style.paddingLeft="32px";addSubBtn.innerHTML=`<button class="btn sm" style="width:100%">+ Add subcategory</button>`;const parentId=c.id;addSubBtn.querySelector(".btn").addEventListener("click",()=>{openChannelEditor(null,parentId);});list.appendChild(addSubBtn);});
   const arch=state.channels.filter(c=>c.archived);const al=document.getElementById("archivedList");
   if(!arch.length)al.innerHTML='<div class="hint">None archived.</div>';
   else{al.innerHTML="";arch.forEach(c=>{const row=document.createElement("div");row.className="row";row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b> <span class="archived-tag">Archived</span></div><button class="btn sm">Restore</button><button class="btn sm" style="background:rgba(240,68,68,.2);border-color:#f87171;color:#f87171">Delete</button>`;const restoreBtn=row.querySelector(".btn");restoreBtn.addEventListener("click",()=>restoreChannel(c.id));const deleteBtn=row.querySelectorAll(".btn")[1];deleteBtn.addEventListener("click",()=>deleteChannel(c.id));al.appendChild(row);});}
@@ -1054,7 +1022,7 @@ function renderChannelSettings(){const list=document.getElementById("channelList
 async function moveChannel(id,dir){const active=state.channels.filter(c=>!c.archived).sort((a,b)=>a.order-b.order);const idx=active.findIndex(c=>c.id===id);const sw=idx+dir;if(sw<0||sw>=active.length)return;const a=active[idx],b=active[sw];const ao=a.order;a.order=b.order;b.order=ao;await saveLocal("channels",a);await saveLocal("channels",b);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();}
 async function restoreChannel(id){const c=state.channels.find(x=>x.id===id);c.archived=false;c.order=Math.max(0,...state.channels.map(x=>x.order))+1;await saveLocal("channels",c);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();toast("Restored");}
 async function deleteChannel(id){if(!confirm("Permanently delete this channel? This cannot be undone."))return;try{await db.transaction(["channels"],"readwrite").objectStore("channels").delete(id);const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const toDelete=allSessions.filter(s=>s.channelId===id);for(const sess of toDelete){await db.transaction(["sessions"],"readwrite").objectStore("sessions").delete(sess.id);}state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();toast("Deleted permanently");}catch(e){console.error("Delete error:",e);toast("Error deleting channel");}}
-function openChannelEditor(id,parentId){console.log("EDITOR_OPEN_CALLED with id=",id,"parentId=",parentId);editingChanId=id;editingParentId=parentId||null;window._savedParentId=editingParentId;console.log("EDITOR OPEN: id=",id,"parentId=",parentId,"→ editingParentId=",editingParentId);const c=id?state.channels.find(x=>x.id===id):null;const parent=parentId?state.channels.find(x=>x.id===parentId):null;document.getElementById("chanTitle").textContent=c?"Edit channel":parent?"Add subcategory":"Add channel";document.getElementById("chanLabel").value=c?c.label:"";const col=c?c.color:parent?parent.color:PALETTE[state.channels.length%PALETTE.length];document.getElementById("chanColor").value=col;document.getElementById("chanArchive").style.display=c?"block":"none";renderPalette(col);updateChanPreview();openScrim("chanScrim");}
+function openChannelEditor(id,parentId){editingChanId=id;editingParentId=parentId||null;const c=id?state.channels.find(x=>x.id===id):null;const parent=parentId?state.channels.find(x=>x.id===parentId):null;document.getElementById("chanTitle").textContent=c?"Edit channel":parent?"Add subcategory":"Add channel";document.getElementById("chanLabel").value=c?c.label:"";const col=c?c.color:parent?parent.color:PALETTE[state.channels.length%PALETTE.length];document.getElementById("chanColor").value=col;document.getElementById("chanArchive").style.display=c?"block":"none";renderPalette(col);updateChanPreview();openScrim("chanScrim");}
 function renderPalette(sel){const p=document.getElementById("chanPalette");p.innerHTML="";PALETTE.forEach(col=>{const ch=document.createElement("div");ch.className="pchip"+(col.toLowerCase()===sel.toLowerCase()?" sel":"");ch.style.background=col;ch.addEventListener("click",()=>{document.getElementById("chanColor").value=col;renderPalette(col);updateChanPreview();});p.appendChild(ch);});}
 function updateChanPreview(){const col=document.getElementById("chanColor").value;const lbl=document.getElementById("chanLabel").value||"Preview";const prev=document.getElementById("chanPreview");prev.style.background=`linear-gradient(160deg,${col},${shade(col,.22)})`;prev.style.color=contrastInk(col);document.getElementById("cpLabel").textContent=lbl;document.getElementById("chanPreviewSw").style.background=col;}
 
