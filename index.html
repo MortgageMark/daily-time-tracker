@@ -348,32 +348,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 </script>
 <script>
 /* ===== Config ===== */
-const SUPA_URL = "https://vybypyeyzfgakenkotbw.supabase.co";
+const SUPA_URL = "https://vvybypeyzfgakenkotbw.supabase.co";
 const SUPA_KEY = "sb_publishable_-aDVEq7DzlUz7hlvpgkUhw_i6yXO2SU";
-// Memory-based storage for incognito mode
-const memoryStorage = (() => {
-  let store = {};
-  return {
-    getItem: (key) => store[key] || null,
-    setItem: (key, value) => { store[key] = value; },
-    removeItem: (key) => { delete store[key]; }
-  };
-})();
-
-const getStorage = () => {
-  try {
-    const test = '__incognito_test__';
-    localStorage.setItem(test, test);
-    localStorage.removeItem(test);
-    return localStorage;
-  } catch(e) {
-    console.warn('Incognito mode detected - using memory storage');
-    return memoryStorage;
-  }
-};
-
-const storage = getStorage();
-const SB = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth:{ persistSession:true, autoRefreshToken:true, storageKey:"dtt-auth", storage: storage }});
+const SB = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth:{ persistSession:true, autoRefreshToken:true, storageKey:"dtt-auth" }});
 
 const PALETTE = ["#22c55e","#ec4899","#3b82f6","#f97316","#a855f7","#14b8a6","#eab308","#ef4444","#06b6d4","#84cc16","#f43f5e","#8b5cf6","#0ea5e9","#f59e0b","#10b981","#d946ef"];
 
