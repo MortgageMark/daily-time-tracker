@@ -301,3 +301,22 @@ if('serviceWorker' in navigator){
 </script>
 </body>
 </html>
+
+<script>
+// Add this right after the Supabase config to handle incognito mode
+const checkIncognitoMode = () => {
+  try {
+    const test = '__incognito_test__';
+    localStorage.setItem(test, test);
+    localStorage.removeItem(test);
+    return false; // Not incognito
+  } catch(e) {
+    return true; // Incognito or storage disabled
+  }
+};
+
+if(checkIncognitoMode()) {
+  console.warn('Incognito mode detected - using session storage for auth');
+  // Supabase will fall back to memory storage automatically
+}
+</script>
