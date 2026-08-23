@@ -770,7 +770,7 @@ function initializeEventListeners(){
     console.log("After idbAll - raw channels from DB:", state.channels.map(c=>({label:c.label, id:c.id, parentChannelId:c.parentChannelId, hasOwnProperty:c.hasOwnProperty('parentChannelId')})));
     state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});
     console.log("After normalization:", state.channels.map(c=>({label:c.label, id:c.id, parentChannelId:c.parentChannelId})));
-    closeScrim("chanScrim");renderChannelSettings();renderGrid();toast("Saved");});
+    closeScrim("chanScrim");const savedMsg=parentId?"Saved as subcategory (parent: "+parentId+")":"Saved as channel";toast(savedMsg);renderChannelSettings();renderGrid();});
   const chanArchive=document.getElementById("chanArchive");if(chanArchive)chanArchive.addEventListener("click",async()=>{const c=state.channels.find(x=>x.id===editingChanId);c.archived=true;await saveLocal("channels",c);if(running&&running.channelId===c.id)await stopRunning(now());state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));closeScrim("chanScrim");renderChannelSettings();renderAll();toast("Archived (history kept)");});
 
   // Navigation buttons
@@ -902,6 +902,17 @@ document.addEventListener("DOMContentLoaded",initializeEventListeners);
 function applyButtonSize(size){const grid=document.getElementById("grid");if(!grid)return;const base=172;const heights={compact:140,normal:172,spacious:220};const h=heights[size]||heights.normal;document.querySelectorAll(".tile").forEach(t=>{t.style.height=h+"px";});}
 function renderChannelSettings(){const list=document.getElementById("channelList");list.innerHTML="";
   console.log("renderChannelSettings: all channels=",state.channels.map(c=>({label:c.label,id:c.id,parentChannelId:c.parentChannelId})));
+  
+  // DEBUG DISPLAY
+  const debugPanel=document.createElement("div");
+  debugPanel.style.cssText="background:#1a1a2e;border:2px solid #ffd700;border-radius:8px;padding:12px;margin-bottom:16px;font-family:monospace;font-size:11px;color:#ffd700;max-height:200px;overflow-y:auto";
+  debugPanel.innerHTML="<div style='font-weight:bold;margin-bottom:8px'>🔍 DEBUG: Channel Structure</div>";
+  state.channels.forEach(ch=>{
+    const parentLabel=ch.parentChannelId?state.channels.find(p=>p.id===ch.parentChannelId)?.label:"(none)":"(none)";
+    const archived=ch.archived?"🗑️ ARCHIVED":"✓";
+    debugPanel.innerHTML+=`<div style='margin:4px 0;padding:4px;background:#0f0f1e;border-radius:3px'>${archived} "${ch.label}" → parent: ${parentLabel}</div>`;
+  });
+  list.appendChild(debugPanel);
   const active=state.channels.filter(c=>!c.archived&&!c.parentChannelId).sort((a,b)=>a.order-b.order);
   active.forEach((c,i)=>{const row=document.createElement("div");row.className="row";
     row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b><div style="font-size:11px;color:var(--muted);margin-top:4px">↕ Drag to reorder</div></div><button class="btn sm">Edit</button>`;
