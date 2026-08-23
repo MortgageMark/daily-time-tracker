@@ -551,6 +551,7 @@ async function reloadFromLocal(){
   console.log("reloadFromLocal: Found profile:", state.profile?.name || "none");
   if(!state.profile){ console.log("No profile, rendering empty grid"); renderGrid(); return; }
   let chs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
+  chs.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});
   console.log("reloadFromLocal: Found", chs.length, "channels");
   chs.sort((a,b)=>a.order-b.order); state.channels=chs;
   const sess=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
@@ -765,7 +766,10 @@ function initializeEventListeners(){
   const chanSave=document.getElementById("chanSave");if(chanSave)chanSave.addEventListener("click",async()=>{const label=document.getElementById("chanLabel").value.trim()||"Untitled";const color=document.getElementById("chanColor").value;
     if(editingChanId){const c=state.channels.find(x=>x.id===editingChanId);c.label=label;c.color=color;await saveLocal("channels",c);}
     else{const order=Math.max(-1,...state.channels.map(c=>!editingParentId||c.parentChannelId===editingParentId?c.order:-1))+1;const newCh={id:uid(),profileId:state.profileId,label,color,order,archived:false};if(editingParentId)newCh.parentChannelId=editingParentId;await saveLocal("channels",newCh);}
-    state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));editingParentId=null;closeScrim("chanScrim");renderChannelSettings();renderGrid();toast("Saved");});
+    state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
+    // Ensure parentChannelId is preserved (set to undefined if not present for consistent filtering)
+    state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});
+    editingParentId=null;closeScrim("chanScrim");renderChannelSettings();renderGrid();toast("Saved");});
   const chanArchive=document.getElementById("chanArchive");if(chanArchive)chanArchive.addEventListener("click",async()=>{const c=state.channels.find(x=>x.id===editingChanId);c.archived=true;await saveLocal("channels",c);if(running&&running.channelId===c.id)await stopRunning(now());state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));closeScrim("chanScrim");renderChannelSettings();renderAll();toast("Archived (history kept)");});
 
   // Navigation buttons
