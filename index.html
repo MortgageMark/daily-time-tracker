@@ -906,18 +906,23 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
 document.addEventListener("DOMContentLoaded",initializeEventListeners);
 function dedupChannels(chs){
   const seen=new Map();
-  return chs.filter(c=>{
+  const result=[];
+  for(const c of chs){
     if(!seen.has(c.id)){
       seen.set(c.id,c);
-      return true;
+      result.push(c);
+    }else{
+      const existing=seen.get(c.id);
+      // If this one has a parent and existing doesn't, REPLACE existing
+      if(c.parentChannelId&&!existing.parentChannelId){
+        seen.set(c.id,c);
+        const idx=result.indexOf(existing);
+        if(idx>=0)result[idx]=c;
+      }
+      // If this one doesn't have parent but existing does, KEEP existing (do nothing)
     }
-    const existing=seen.get(c.id);
-    if(c.parentChannelId&&!existing.parentChannelId){
-      seen.set(c.id,c);
-      return true;
-    }
-    return false;
-  });
+  }
+  return result;
 }
 function applyButtonSize(size){const grid=document.getElementById("grid");if(!grid)return;const base=172;const heights={compact:140,normal:172,spacious:220};const h=heights[size]||heights.normal;document.querySelectorAll(".tile").forEach(t=>{t.style.height=h+"px";});}
 function renderChannelSettings(){const list=document.getElementById("channelList");list.innerHTML="";
