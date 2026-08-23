@@ -118,7 +118,39 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const SUPA_URL = "https://vvybypeyzfgakenkotbw.supabase.co";
 const SUPA_KEY = "sb_publishable_-aDVEq7DzlUz7hlvpgkUhw_i6yXO2SU";
-const SB = createClient(SUPA_URL, SUPA_KEY, { auth:{ persistSession:true, autoRefreshToken:true, storageKey:"dtt-auth" }});
+
+// Memory-based storage for incognito mode
+const memoryStorage = (() => {
+  let store = {};
+  return {
+    getItem: (key) => store[key] || null,
+    setItem: (key, value) => { store[key] = value; },
+    removeItem: (key) => { delete store[key]; }
+  };
+})();
+
+// Detect incognito and use appropriate storage
+const getStorage = () => {
+  try {
+    const test = '__incognito_test__';
+    localStorage.setItem(test, test);
+    localStorage.removeItem(test);
+    return localStorage;
+  } catch(e) {
+    console.warn('Incognito mode detected - using memory storage');
+    return memoryStorage;
+  }
+};
+
+const storage = getStorage();
+const SB = createClient(SUPA_URL, SUPA_KEY, { 
+  auth:{ 
+    persistSession: true, 
+    autoRefreshToken: true, 
+    storageKey: "dtt-auth",
+    storage: storage
+  }
+});
 
 const DB_NAME = "DailyTimeTrackerDB";
 let DB_VER = 1;
