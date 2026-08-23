@@ -15,12 +15,27 @@
     .subtitle { font-size: 14px; color: #94a3b8; margin-bottom: 24px; text-align: center; }
     .form-group { margin-bottom: 16px; }
     label { display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; text-transform: uppercase; margin-bottom: 6px; }
-    input { width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 6px; color: #e0e7ff; font-size: 14px; }
-    input:focus { outline: none; border-color: #3b82f6; }
+    input, select { width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 6px; color: #e0e7ff; font-size: 14px; font-family: inherit; }
+    input:focus, select:focus { outline: none; border-color: #3b82f6; }
     button { width: 100%; padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; margin-top: 8px; }
     button:hover { background: #2563eb; }
     .error { color: #f87171; font-size: 13px; margin-top: 12px; text-align: center; }
-    #app { display: none; padding: 20px; }
+    #app { display: none; padding: 20px; max-width: 900px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid rgba(148, 163, 184, 0.1); padding-bottom: 12px; }
+    .header h1 { font-size: 24px; }
+    .header button { width: auto; padding: 10px 20px; }
+    .entry { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(148, 163, 184, 0.1); border-radius: 8px; padding: 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .entry-info { flex: 1; }
+    .entry-title { font-weight: 600; margin-bottom: 4px; }
+    .entry-time { font-size: 12px; color: #94a3b8; }
+    .entry-duration { font-size: 18px; font-weight: 600; color: #60a5fa; }
+    .stats { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(148, 163, 184, 0.1); border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: center; }
+    .stats-value { font-size: 32px; font-weight: 600; color: #60a5fa; }
+    .stats-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; margin-top: 4px; }
+    .add-entry { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(148, 163, 184, 0.1); border-radius: 8px; padding: 16px; margin-bottom: 24px; }
+    .add-entry input, .add-entry select { margin-bottom: 12px; }
+    .add-entry button { margin-bottom: 0; }
+    .btn-small { width: auto; padding: 6px 12px; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -43,9 +58,33 @@
 </div>
 
 <div id="app">
-  <h1>⏱️ Daily Time Tracker</h1>
-  <p>Welcome, <span id="userEmail"></span>!</p>
-  <button id="logoutBtn">Sign Out</button>
+  <div class="header">
+    <h1>⏱️ Daily Time Tracker</h1>
+    <div style="display: flex; gap: 10px;">
+      <span id="userDisplay" style="color: #94a3b8; font-size: 14px; align-self: center;"></span>
+      <button class="btn-small" id="logoutBtn">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stats-value" id="totalHours">0h 0m</div>
+    <div class="stats-label">Total time today</div>
+  </div>
+
+  <div class="add-entry">
+    <h3 style="margin-bottom: 12px;">Add Time Entry</h3>
+    <div class="form-group">
+      <label>Activity</label>
+      <input type="text" id="activityName" placeholder="e.g., Development, Meetings">
+    </div>
+    <div class="form-group">
+      <label>Hours</label>
+      <input type="number" id="activityHours" placeholder="1.5" step="0.5" min="0">
+    </div>
+    <button id="addEntryBtn">Add Entry</button>
+  </div>
+
+  <div id="entriesContainer"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -56,6 +95,51 @@ window.addEventListener('load', async function() {
     'sb_publishable_-aDVEq7DzlUz7hlvpgkUhw_i6yXO2SU',
     { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'dtt-auth' } }
   );
+
+  let currentUser = null;
+  let entries = [];
+
+  function formatDuration(hours) {
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return h + 'h ' + m + 'm';
+  }
+
+  function updateTotal() {
+    const total = entries.reduce((sum, e) => sum + e.hours, 0);
+    document.getElementById('totalHours').textContent = formatDuration(total);
+  }
+
+  function renderEntries() {
+    const container = document.getElementById('entriesContainer');
+    container.innerHTML = '';
+    entries.forEach((entry, idx) => {
+      const el = document.createElement('div');
+      el.className = 'entry';
+      el.innerHTML = `
+        <div class="entry-info">
+          <div class="entry-title">${entry.name}</div>
+          <div class="entry-time">${entry.date}</div>
+        </div>
+        <div style="text-align: right;">
+          <div class="entry-duration">${formatDuration(entry.hours)}</div>
+          <button class="btn-small" onclick="deleteEntry(${idx})">Delete</button>
+        </div>
+      `;
+      container.appendChild(el);
+    });
+  }
+
+  window.deleteEntry = function(idx) {
+    entries.splice(idx, 1);
+    renderEntries();
+    updateTotal();
+  };
+
+  function getToday() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
 
   document.getElementById('loginBtn').addEventListener('click', async function() {
     const email = document.getElementById('email').value.trim();
@@ -74,9 +158,13 @@ window.addEventListener('load', async function() {
         errorEl.textContent = error.message;
         return;
       }
-      document.getElementById('userEmail').textContent = data.user.email;
+      currentUser = data.user;
+      document.getElementById('userDisplay').textContent = data.user.email;
       document.getElementById('login').style.display = 'none';
       document.getElementById('app').style.display = 'block';
+      entries = [];
+      renderEntries();
+      updateTotal();
     } catch (err) {
       errorEl.textContent = 'Error: ' + (err.message || 'Login failed');
     }
@@ -84,17 +172,44 @@ window.addEventListener('load', async function() {
 
   document.getElementById('logoutBtn').addEventListener('click', async function() {
     await sb.auth.signOut();
+    currentUser = null;
+    entries = [];
     document.getElementById('login').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
     document.getElementById('email').value = '';
     document.getElementById('password').value = '';
   });
 
+  document.getElementById('addEntryBtn').addEventListener('click', function() {
+    const name = document.getElementById('activityName').value.trim();
+    const hours = parseFloat(document.getElementById('activityHours').value);
+    
+    if (!name || !hours || hours <= 0) {
+      alert('Please enter a valid activity and hours');
+      return;
+    }
+
+    entries.push({
+      name: name,
+      hours: hours,
+      date: getToday()
+    });
+
+    document.getElementById('activityName').value = '';
+    document.getElementById('activityHours').value = '';
+    renderEntries();
+    updateTotal();
+  });
+
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
-    document.getElementById('userEmail').textContent = session.user.email;
+    currentUser = session.user;
+    document.getElementById('userDisplay').textContent = session.user.email;
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = 'block';
+    entries = [];
+    renderEntries();
+    updateTotal();
   }
 });
 </script>
