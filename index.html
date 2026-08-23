@@ -769,9 +769,17 @@ function initializeEventListeners(){
   const chanLabel=document.getElementById("chanLabel");if(chanLabel)chanLabel.addEventListener("input",updateChanPreview);
   const chanSave=document.getElementById("chanSave");if(chanSave)chanSave.addEventListener("click",async()=>{const label=document.getElementById("chanLabel").value.trim()||"Untitled";const color=document.getElementById("chanColor").value;const parentId=editingParentId;
     if(editingChanId){const c=state.channels.find(x=>x.id===editingChanId);c.label=label;c.color=color;await saveLocal("channels",c);}
-    else{console.log("Creating new channel. editingParentId=",parentId);const order=Math.max(-1,...state.channels.map(c=>!parentId||c.parentChannelId===parentId?c.order:-1))+1;const newCh={id:uid(),profileId:state.profileId,label,color,order,archived:false};if(parentId)newCh.parentChannelId=parentId;await saveLocal("channels",newCh);if(parentId){await new Promise(r=>setTimeout(r,100));newCh.parentChannelId=parentId;await saveLocal("channels",newCh);}}
-    // Wait a bit longer to ensure double-save completes
-    if(parentId)await new Promise(r=>setTimeout(r,200));
+    else{
+      const order=Math.max(-1,...state.channels.map(c=>!parentId||c.parentChannelId===parentId?c.order:-1))+1;
+      const newCh={id:uid(),profileId:state.profileId,label:label,color:color,order:order,archived:false};
+      if(parentId){newCh.parentChannelId=parentId;}
+      console.log("SAVING NEW CHANNEL:",{label:newCh.label,id:newCh.id,parentId:newCh.parentChannelId});
+      await saveLocal("channels",newCh);
+      await new Promise(r=>setTimeout(r,250));
+      const verify=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
+      const saved=verify.find(c=>c.id===newCh.id);
+      console.log("VERIFIED IN DB:",{label:saved?.label,id:saved?.id,parentId:saved?.parentChannelId});
+    }
     state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
     state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});
     state.channels=dedupChannels(state.channels);
