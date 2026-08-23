@@ -929,7 +929,16 @@ function renderChannelSettings(){const list=document.getElementById("channelList
     row.querySelector(".btn").addEventListener("click",()=>openChannelEditor(c.id));list.appendChild(row);
     const subs=state.channels.filter(sc=>sc.parentChannelId===c.id&&!sc.archived).sort((a,b)=>a.order-b.order);
     console.log("Rendering parent",c.label,"(id=",c.id,") - found",subs.length,"subcategories:",subs.map(s=>s.label));
-    subs.forEach(sub=>{const subRow=document.createElement("div");subRow.className="row";subRow.style.paddingLeft="48px";subRow.style.borderLeft="2px solid var(--line)";subRow.innerHTML=`<div class="swatch" style="background:${sub.color}"></div><div class="grow"><span style="font-size:12px">${escapeHtml(sub.label)}</span></div><button class="btn sm">Edit</button>`;subRow.querySelector(".btn").addEventListener("click",()=>openChannelEditor(sub.id));list.appendChild(subRow);});
+    for(const sub of subs){
+      // DATA INTEGRITY CHECK: Ensure subcategory has correct parentChannelId
+      if(!sub.parentChannelId||sub.parentChannelId!==c.id){
+        console.log("FIXING: sub",sub.label,"should have parent",c.id,"but has",sub.parentChannelId);
+        sub.parentChannelId=c.id;
+        saveLocal("channels",sub);  // fire-and-forget
+      }
+    }
+    subs.forEach(sub=>{
+      const subRow=document.createElement("div");subRow.className="row";subRow.style.paddingLeft="48px";subRow.style.borderLeft="2px solid var(--line)";subRow.innerHTML=`<div class="swatch" style="background:${sub.color}"></div><div class="grow"><span style="font-size:12px">${escapeHtml(sub.label)}</span></div><button class="btn sm">Edit</button>`;subRow.querySelector(".btn").addEventListener("click",()=>openChannelEditor(sub.id));list.appendChild(subRow);};
     const addSubBtn=document.createElement("div");addSubBtn.className="row";addSubBtn.style.paddingLeft="32px";addSubBtn.innerHTML=`<button class="btn sm" style="width:100%">+ Add subcategory</button>`;addSubBtn.querySelector(".btn").addEventListener("click",()=>{console.log("Add subcategory clicked for parent c.id=",c.id);openChannelEditor(null,c.id);});list.appendChild(addSubBtn);});
   const arch=state.channels.filter(c=>c.archived);const al=document.getElementById("archivedList");
   if(!arch.length)al.innerHTML='<div class="hint">None archived.</div>';
