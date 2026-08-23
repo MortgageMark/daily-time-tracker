@@ -1438,7 +1438,178 @@ let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selected
       </div>
     </div>
   </div>
-`;window.closeDayPlanner=()=>{stage.innerHTML=origStage;renderGrid();};await initializePlanPage();}async function initializePlanPage(){await loadPlans();await renderPlanPageUI();}async function loadPlans(){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));if(!plans||plans.length===0){const defaultPlans=["Monday","Tuesday","Wednesday","Thursday","Friday","Custom"].map((name,idx)=>({id:uid(),profileId:state.profileId,name,schedule:{},order:idx}));for(const p of defaultPlans)await saveLocal("plans",p);planState.plans=defaultPlans;}else{planState.plans=plans.sort((a,b)=>a.order-b.order);}}async function renderPlanPageUI(){const timeCol=document.getElementById("timeColumn");const plansWrapper=document.getElementById("plansWrapper");const channelsCol=document.getElementById("channelsColumn");const planSelect=document.getElementById("planSelect");timeCol.innerHTML="";plansWrapper.innerHTML="";channelsCol.innerHTML="";const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const hours=[];for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const startHr=h%12||12;const ampm=h<12?"AM":"PM";const timeStr=startHr+":"+(m===0?"00":m)+" "+ampm;hours.push({h,m,display:timeStr});}}for(const {display} of hours){const slot=document.createElement("div");slot.style.cssText="padding:8px 4px;text-align:center;font-size:10px;font-weight:600;color:var(--ink2);border-bottom:1px solid var(--line);min-height:44px;display:flex;align-items:center;justify-content:center";slot.textContent=display;timeCol.appendChild(slot);}planState.plans.forEach((plan,idx)=>{const col=document.createElement("div");col.style.cssText="flex:0 0 140px;display:flex;flex-direction:column;border-right:1px solid var(--line)";const header=document.createElement("div");header.style.cssText="padding:8px 4px;background:linear-gradient(180deg,rgba(79,140,255,.15),rgba(79,140,255,.05));border-bottom:1px solid var(--line);text-align:center;flex-shrink:0;min-height:44px;display:flex;align-items:center;justify-content:center;gap:4px";const input=document.createElement("input");input.type="text";input.value=plan.name;input.style.cssText="flex:1;background:none;border:1px solid var(--line);color:var(--ink);font-weight:700;font-size:11px;padding:4px 4px;border-radius:3px;text-align:center;outline:none";input.addEventListener("change",async e=>{plan.name=e.target.value;await saveLocal("plans",plan);renderPlanSelect();});input.addEventListener("focus",e=>e.target.style.borderColor="var(--accent)");input.addEventListener("blur",e=>e.target.style.borderColor="var(--line)");header.appendChild(input);const delBtn=document.createElement("button");delBtn.className="deletePlanBtn";delBtn.dataset.idx=idx;delBtn.textContent="✕";delBtn.style.cssText="background:none;border:1px solid var(--line);color:var(--warn);font-size:10px;padding:2px 4px;border-radius:3px;cursor:pointer;transition:all .15s";delBtn.style.width="18px";delBtn.style.height="18px";header.appendChild(delBtn);col.appendChild(header);const slots=document.createElement("div");slots.style.cssText="flex:1;display:flex;flex-direction:column;overflow-y:hidden";slots.className="plan-slots";slots.dataset.planIdx=idx;for(const {h,m} of hours){const slot=document.createElement("div");slot.className="plan-slot";slot.dataset.slot=h+":"+String(m).padStart(2,"0");slot.style.cssText="padding:8px 4px;border-bottom:1px solid var(--line);min-height:44px;position:relative;background:var(--panel);display:flex;align-items:center;justify-content:center";if(plan.schedule&&plan.schedule[slot.dataset.slot]){const chId=plan.schedule[slot.dataset.slot];const ch=state.channels.find(x=>x.id===chId);if(ch){const block=document.createElement("div");block.className="scheduled-block";block.style.cssText=`position:absolute;left:2px;right:2px;top:2px;bottom:2px;background:rgba(79,140,255,.2);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--accent);font-weight:700;cursor:grab;border-radius:3px;background:${ch.color}33;border-color:${ch.color};color:${ch.color}`;block.textContent=ch.label;block.dataset.chId=chId;slot.appendChild(block);}}slot.addEventListener("dragover",e=>{e.preventDefault();e.dataTransfer.dropEffect="copy";slot.style.background="rgba(79,140,255,.1)"});slot.addEventListener("dragleave",()=>{slot.style.background="var(--panel)"});slot.addEventListener("drop",async e=>{e.preventDefault();slot.style.background="var(--panel)";const chId=draggedChannel;if(!chId)return;plan.schedule[slot.dataset.slot]=chId;await saveLocal("plans",plan);renderPlanPageUI();});slots.appendChild(slot);}col.appendChild(slots);plansWrapper.appendChild(col);});const addCol=document.createElement("div");addCol.style.cssText="flex:0 0 140px;display:flex;flex-direction:column;border-right:1px solid var(--line);align-items:center;justify-content:center;gap:8px;padding:12px;background:var(--panel)";const addBtn=document.createElement("button");addBtn.id="addPlanBtn";addBtn.textContent="+ Add Plan";addBtn.style.cssText="padding:6px 12px;background:linear-gradient(180deg,rgba(34,197,94,.2),rgba(34,197,94,.1));border:1px solid var(--good);color:var(--good);border-radius:4px;font-size:10px;font-weight:600;cursor:pointer";addCol.appendChild(addBtn);plansWrapper.appendChild(addCol);planSelect.innerHTML="";planState.plans.forEach((p,i)=>{const opt=document.createElement("option");opt.value=i;opt.textContent=p.name;planSelect.appendChild(opt);});planSelect.value=planState.selectedPlanIdx;const filteredChs=(state.channels||[]).filter(c=>!c.archived&&!c.parentChannelId);filteredChs.forEach(ch=>{const btn=document.createElement("div");btn.className="channel-btn";btn.textContent=ch.label;btn.draggable=true;btn.style.cssText=`padding:6px 8px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink2);font-size:10px;font-weight:600;cursor:grab;transition:all .15s;text-align:center;white-space:nowrap;border-color:${ch.color};color:${ch.color}`;btn.addEventListener("dragstart",e=>{draggedChannel=ch.id;e.dataTransfer.effectAllowed="copy"});btn.addEventListener("dragend",()=>{draggedChannel=null});channelsCol.appendChild(btn);});}function renderPlanSelect(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const curVal=planSelect.value;planSelect.innerHTML="";planState.plans.forEach((p,i)=>{const opt=document.createElement("option");opt.value=i;opt.textContent=p.name;planSelect.appendChild(opt);});planSelect.value=curVal;}async function setForTodayPlan(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const idx=parseInt(planSelect.value);if(idx<0||!planState.plans[idx])return;const plan=planState.plans[idx];planState.selectedPlanIdx=idx;const dayKey=todayKey();await saveLocal("selected_plan",{date:dayKey,profileId:state.profileId,planId:plan.id});toast("Plan '"+plan.name+"' set for today");}async function addPlan(){const newPlan={id:uid(),profileId:state.profileId,name:"New Plan",schedule:{},order:planState.plans.length};await saveLocal("plans",newPlan);planState.plans.push(newPlan);await renderPlanPageUI();toast("Plan added");}async function deletePlan(idx){if(planState.plans.length<=1){toast("Cannot delete the last plan");return;}const plan=planState.plans[idx];await db.transaction(["plans"],"readwrite").objectStore("plans").delete(plan.id);planState.plans.splice(idx,1);if(planState.selectedPlanIdx>=planState.plans.length)planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Plan deleted");}
+`;window.closeDayPlanner=()=>{stage.innerHTML=origStage;renderGrid();};await initializePlanPage();}async function initializePlanPage(){await loadPlans();await renderPlanPageUI();}async function loadPlans(){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));if(!plans||plans.length===0){const defaultPlans=["Monday","Tuesday","Wednesday","Thursday","Friday","Custom"].map((name,idx)=>({id:uid(),profileId:state.profileId,name,schedule:{},order:idx}));for(const p of defaultPlans)await saveLocal("plans",p);planState.plans=defaultPlans;}else{planState.plans=plans.sort((a,b)=>a.order-b.order);}}async function renderPlanPageUI(){
+  const stage=document.getElementById("stage");
+  const isMobile=window.innerWidth<768;
+  
+  const startHour=planState.startHour;
+  const endHour=planState.endHour;
+  const increment=planState.increment;
+  
+  const hours=[];
+  for(let h=startHour;h<endHour;h++){
+    for(let m=0;m<60;m+=increment){
+      const startHr=h%12||12;
+      const ampm=h<12?"AM":"PM";
+      const timeStr=startHr+":"+(m===0?"00":m)+" "+ampm;
+      hours.push({h,m,display:timeStr});
+    }
+  }
+  
+  let html=`<div style="display:flex;flex-direction:column;gap:16px;padding:16px">`;
+  
+  // Plan selector
+  html+=`<div>
+    <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Active Plan</label>
+    <select id="planSelect" style="width:100%;padding:10px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:14px">`;
+  
+  planState.plans.forEach((p,i)=>{
+    html+=`<option value="${i}">${p.name}</option>`;
+  });
+  
+  html+=`</select>
+    <button onclick="setForTodayPlan()" style="width:100%;margin-top:8px;padding:10px;background:rgba(34,197,94,.2);border:1px solid var(--good);color:var(--good);border-radius:6px;font-weight:600;cursor:pointer">Set for Today</button>
+  </div>`;
+  
+  // Mobile: vertical layout, one column at a time
+  if(isMobile){
+    html+=`<div>
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Select Time Block</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+    
+    hours.forEach(({h,m,display},idx)=>{
+      const slot=h+":"+(m===0?"00":m);
+      const chId=planState.plans[planState.selectedPlanIdx]?.schedule?.[slot];
+      const ch=chId?state.channels.find(x=>x.id===chId):null;
+      
+      html+=`<button onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" 
+        style="padding:12px;background:${ch?ch.color+'33':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:6px;font-weight:600;font-size:12px;cursor:pointer;min-height:48px;display:flex;align-items:center;justify-content:center;text-align:center;transition:all .15s">
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">${display}</div>
+          <div style="font-weight:700">${ch?ch.label.substring(0,10):'Empty'}</div>
+        </div>
+      </button>`;
+    });
+    
+    html+=`</div></div>`;
+  }else{
+    // Desktop: side-by-side with drag-drop
+    html+=`<div style="display:grid;grid-template-columns:140px 1fr 140px;gap:16px;overflow-x:auto;padding-bottom:20px">`;
+    html+=`<div style="font-size:11px;font-weight:600;text-align:center;color:var(--muted)">Time</div>`;
+    html+=`<div style="font-size:11px;font-weight:600;text-align:center;color:var(--muted)">Channel</div>`;
+    html+=`<div></div>`;
+    
+    hours.forEach(({h,m,display},idx)=>{
+      const slot=h+":"+(m===0?"00":m);
+      const chId=planState.plans[planState.selectedPlanIdx]?.schedule?.[slot];
+      const ch=chId?state.channels.find(x=>x.id===chId):null;
+      
+      html+=`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--ink2)">${display}</div>`;
+      html+=`<div style="display:flex;gap:8px">
+        <div onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" 
+          style="flex:1;padding:8px;background:${ch?ch.color+'22':'var(--panel2)'};border:1px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s">${ch?ch.label:'—'}</div>
+      </div>`;
+      html+=`<button onclick="clearPlanSlot(${planState.selectedPlanIdx},'${slot}')" style="background:none;border:1px solid var(--line);color:var(--muted);padding:4px 8px;border-radius:3px;cursor:pointer;font-size:10px">Clear</button>`;
+    });
+    
+    html+=`</div>`;
+  }
+  
+  // Channel selector
+  html+=`<div>
+    <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Channels</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+  
+  (state.channels||[]).filter(c=>!c.archived&&!c.parentChannelId).forEach(ch=>{
+    html+=`<div draggable="true" data-ch-id="${ch.id}" 
+      style="padding:10px;background:${ch.color}33;border:1px solid ${ch.color};color:${ch.color};border-radius:6px;font-weight:600;font-size:11px;text-align:center;cursor:grab;transition:all .15s;user-select:none"
+      ondragstart="event.dataTransfer.effectAllowed='copy';event.dataTransfer.setData('text/plain',this.dataset.chId)">${ch.label}</div>`;
+  });
+  
+  html+=`</div></div>`;
+  html+=`</div>`;
+  
+  stage.innerHTML=html;
+  document.getElementById("planSelect").value=planState.selectedPlanIdx;
+  document.getElementById("planSelect").addEventListener("change",e=>{
+    planState.selectedPlanIdx=parseInt(e.target.value);
+    renderPlanPageUI();
+  });
+}
+
+function openPlanSlotModal(planIdx,slot){
+  const plan=planState.plans[planIdx];
+  if(!plan)return;
+  
+  const modal=document.createElement("div");
+  modal.className="scrim";
+  modal.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.66);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px";
+  
+  const card=document.createElement("div");
+  card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:320px;width:100%";
+  
+  const header=document.createElement("div");
+  header.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px";
+  header.innerHTML=`<h3 style="margin:0;font-size:16px">${slot}</h3><button onclick="this.closest('.scrim').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">✕</button>`;
+  card.appendChild(header);
+  
+  const options=document.createElement("div");
+  options.style.cssText="display:flex;flex-direction:column;gap:8px;margin-bottom:16px";
+  
+  (state.channels||[]).filter(c=>!c.archived&&!c.parentChannelId).forEach(ch=>{
+    const btn=document.createElement("button");
+    btn.style.cssText=`padding:12px;background:${ch.color}33;border:1px solid ${ch.color};color:${ch.color};border-radius:6px;font-weight:600;cursor:pointer;transition:all .15s`;
+    btn.textContent=ch.label;
+    btn.onclick=async ()=>{
+      plan.schedule[slot]=ch.id;
+      await saveLocal("plans",plan);
+      modal.remove();
+      renderPlanPageUI();
+    };
+    options.appendChild(btn);
+  });
+  
+  card.appendChild(options);
+  
+  const clearBtn=document.createElement("button");
+  clearBtn.style.cssText="width:100%;padding:10px;background:rgba(240,68,68,.15);border:1px solid rgba(240,68,68,.5);color:#f87171;border-radius:6px;font-weight:600;cursor:pointer";
+  clearBtn.textContent="Clear Slot";
+  clearBtn.onclick=async ()=>{
+    delete plan.schedule[slot];
+    await saveLocal("plans",plan);
+    modal.remove();
+    renderPlanPageUI();
+  };
+  card.appendChild(clearBtn);
+  
+  modal.appendChild(card);
+  modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  
+  document.body.appendChild(modal);
+}
+
+function clearPlanSlot(planIdx,slot){
+  const plan=planState.plans[planIdx];
+  if(!plan)return;
+  delete plan.schedule[slot];
+  saveLocal("plans",plan);
+  renderPlanPageUI();
+}
+
+function renderPlanSelect(){
+  const planSelect=document.getElementById("planSelect");
+  if(!planSelect)return;
+  const curVal=planSelect.value;
+  planSelect.innerHTML="";
+  planState.plans.forEach((p,i)=>{
+    const opt=document.createElement("option");
+    opt.value=i;
+    opt.textContent=p.name;
+    planSelect.appendChild(opt);
+  });
+  planSelect.value=curVal;
+}
+function renderPlanSelect(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const curVal=planSelect.value;planSelect.innerHTML="";planState.plans.forEach((p,i)=>{const opt=document.createElement("option");opt.value=i;opt.textContent=p.name;planSelect.appendChild(opt);});planSelect.value=curVal;}async function setForTodayPlan(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const idx=parseInt(planSelect.value);if(idx<0||!planState.plans[idx])return;const plan=planState.plans[idx];planState.selectedPlanIdx=idx;const dayKey=todayKey();await saveLocal("selected_plan",{date:dayKey,profileId:state.profileId,planId:plan.id});toast("Plan '"+plan.name+"' set for today");}async function addPlan(){const newPlan={id:uid(),profileId:state.profileId,name:"New Plan",schedule:{},order:planState.plans.length};await saveLocal("plans",newPlan);planState.plans.push(newPlan);await renderPlanPageUI();toast("Plan added");}async function deletePlan(idx){if(planState.plans.length<=1){toast("Cannot delete the last plan");return;}const plan=planState.plans[idx];await db.transaction(["plans"],"readwrite").objectStore("plans").delete(plan.id);planState.plans.splice(idx,1);if(planState.selectedPlanIdx>=planState.plans.length)planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Plan deleted");}
 function renderPlanSlots(){const times=document.getElementById("planSlots");const schedules=document.getElementById("planSchedule");let timesHtml='';let schedHtml='';for(let h=planState.startHour;h<planState.endHour;h++){for(let m=0;m<60;m+=planState.increment){const slot=h+':'+(m===0?'00':m);const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+planState.increment>=60?h+1:h)%12||12;const endMin=String((m+planState.increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;const scheduled=planState.schedule[slot];const ch=scheduled?state.channels.find(x=>x.id===scheduled):null;timesHtml+=`<div style="padding:8px 4px;text-align:center;font-size:11px;font-weight:600;color:var(--ink2);flex-shrink:0;border-bottom:1px solid var(--line)">${timeStr}</div>`;schedHtml+=`<div class="time-block-target" data-slot="${slot}" style="padding:8px;min-height:42px;background:${ch?ch.color+'15':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};border-radius:6px;display:flex;align-items:center;justify-content:center;text-align:center;color:${ch?ch.color:'var(--ink2)'};font-size:11px;font-weight:${ch?'700':'500'};cursor:move;flex-shrink:0;transition:all .15s;word-break:break-word">${ch?ch.label:''}</div>`;}}times.innerHTML=timesHtml;schedules.innerHTML=schedHtml;}
 function renderPlanChannels(){const ch=document.getElementById("planChannels");let html='';if(state.channels){state.channels.filter(c=>!c.archived).forEach(c=>{html+=`<div draggable="true" data-ch="${c.id}" style="padding:6px 4px;border:2px solid ${c.color};background:${c.color}15;color:${c.color};border-radius:5px;cursor:move;font-weight:700;font-size:11px;text-align:center;flex-shrink:0;transition:all .15s;word-break:break-word">${escapeHtml(c.label)}</div>`;});}ch.innerHTML=html;ch.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',el.dataset.ch);});el.addEventListener('dragend',e=>{el.style.opacity='1';});});}
 async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();const selPlan=await idbGet("selected_plan",dayKey);let plan=null;if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId);}const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",openEditsModal);}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;flex-wrap:wrap;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;min-height:36px;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
