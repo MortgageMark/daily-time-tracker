@@ -772,30 +772,6 @@ function initializeEventListeners(){
     // DEDUP: Remove any duplicate IDs, keeping the one with parentChannelId if conflict
     state.channels=dedupChannels(state.channels);
     closeScrim("chanScrim");renderChannelSettings();renderGrid();toast("Saved");});
-  // Add nuclear delete button
-  const nuclearBtn=document.createElement("button");
-  nuclearBtn.className="btn";
-  nuclearBtn.style.cssText="background:#ff4444;color:white;margin-top:20px;width:100%;padding:12px;border-radius:6px;font-weight:bold;border:none;cursor:pointer";
-  nuclearBtn.textContent="🔥 Delete ALL Channels (Start Fresh)";
-  nuclearBtn.addEventListener("click",async()=>{
-    if(!confirm("DELETE ALL CHANNELS? This cannot be undone. Your history will be preserved.")) return;
-    if(!confirm("Really? This will delete EVERYTHING. Last chance to cancel.")) return;
-    try{
-      const allChs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
-      for(const ch of allChs){
-        await db.transaction(["channels"],"readwrite").objectStore("channels").delete(ch.id);
-      }
-      state.channels=[];
-      renderChannelSettings();
-      renderGrid();
-      toast("All channels deleted!");
-    }catch(e){
-      console.error("Error:",e);
-      toast("Error deleting channels");
-    }
-  });
-  document.getElementById("archivedList").parentElement.appendChild(nuclearBtn);
-
   const chanArchive=document.getElementById("chanArchive");if(chanArchive)chanArchive.addEventListener("click",async()=>{const c=state.channels.find(x=>x.id===editingChanId);c.archived=true;await saveLocal("channels",c);if(running&&running.channelId===c.id)await stopRunning(now());state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});closeScrim("chanScrim");renderChannelSettings();renderAll();toast("Archived (history kept)");});
 
   // Navigation buttons
@@ -956,6 +932,28 @@ function renderChannelSettings(){const list=document.getElementById("channelList
   });
   debugDiv.textContent=debugHtml||"(loading...)";
   list.appendChild(debugDiv);
+  
+  // Nuclear delete button - visible at top
+  const nuclearBtn=document.createElement("button");
+  nuclearBtn.style.cssText="width:100%;padding:12px;margin:12px 0;background:#ff4444;color:white;border:none;border-radius:6px;font-weight:bold;font-size:14px;cursor:pointer";
+  nuclearBtn.textContent="🔥 DELETE ALL CHANNELS - Start Fresh";
+  nuclearBtn.addEventListener("click",async()=>{
+    if(!confirm("DELETE ALL CHANNELS? This will remove everything. Last chance!")) return;
+    try{
+      const allChs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
+      for(const ch of allChs){
+        await db.transaction(["channels"],"readwrite").objectStore("channels").delete(ch.id);
+      }
+      state.channels=[];
+      renderChannelSettings();
+      renderGrid();
+      toast("All channels deleted!");
+    }catch(e){
+      console.error("Error:",e);
+      toast("Error deleting channels");
+    }
+  });
+  list.appendChild(nuclearBtn);
   
   const active=state.channels.filter(c=>!c.archived&&!c.parentChannelId).sort((a,b)=>a.order-b.order);
   active.forEach((c,i)=>{const row=document.createElement("div");row.className="row";
