@@ -675,7 +675,7 @@ async function renderGrid(){ const grid=document.getElementById("grid");
   if(!grid)return console.warn("grid element not found");
   const channels=state.channels||[];
   const active=channels.filter(c=>!c.archived&&!c.parentChannelId).sort((a,b)=>a.order-b.order);
-  if(!active.length){grid.innerHTML=`<div class="empty"><h2>No channels yet</h2><p>Go to Settings to create your first channel.</p><button class="btn pri" onclick="openSettings()">Create Channel</button></div>`;return;}
+  if(!active.length){grid.innerHTML=`<div class="empty"><h2>No channels yet</h2><p>Go to Settings and click Channels to create your first one.</p><button class="btn pri" onclick="openSettings()">Go to Channels</button></div>`;return;}
   if(!state.todayMap){state.todayMap={};}const map=state.todayMap; const dayTotal=Object.values(map).reduce((a,b)=>a+b,0); grid.innerHTML="";
   for(const c of active){
     const runningCh=running?state.channels.find(ch=>ch.id===running.channelId):null;
@@ -768,7 +768,9 @@ function initializeEventListeners(){
   const chanLabel=document.getElementById("chanLabel");if(chanLabel)chanLabel.addEventListener("input",updateChanPreview);
   const chanSave=document.getElementById("chanSave");if(chanSave)chanSave.addEventListener("click",async()=>{const label=document.getElementById("chanLabel").value.trim()||"Untitled";const color=document.getElementById("chanColor").value;const parentId=editingParentId;
     if(editingChanId){const c=state.channels.find(x=>x.id===editingChanId);c.label=label;c.color=color;await saveLocal("channels",c);}
-    else{console.log("Creating new channel. editingParentId=",parentId);const order=Math.max(-1,...state.channels.map(c=>!parentId||c.parentChannelId===parentId?c.order:-1))+1;const newCh={id:uid(),profileId:state.profileId,label,color,order,archived:false};if(parentId){newCh.parentChannelId=parentId;console.log("Channel has parentChannelId set to:",parentId);}await saveLocal("channels",newCh);if(parentId){await new Promise(r=>setTimeout(r,50));await saveLocal("channels",newCh);}}
+    else{console.log("Creating new channel. editingParentId=",parentId);const order=Math.max(-1,...state.channels.map(c=>!parentId||c.parentChannelId===parentId?c.order:-1))+1;const newCh={id:uid(),profileId:state.profileId,label,color,order,archived:false};if(parentId)newCh.parentChannelId=parentId;await saveLocal("channels",newCh);if(parentId){await new Promise(r=>setTimeout(r,100));newCh.parentChannelId=parentId;await saveLocal("channels",newCh);}}
+    // Wait a bit longer to ensure double-save completes
+    if(parentId)await new Promise(r=>setTimeout(r,200));
     state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
     state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});
     // DEDUP: Remove any duplicate IDs, keeping the one with parentChannelId if conflict
