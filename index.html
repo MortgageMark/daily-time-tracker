@@ -16,13 +16,11 @@
     .form-group { margin-bottom: 16px; }
     label { display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; text-transform: uppercase; margin-bottom: 6px; }
     input { width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 6px; color: #e0e7ff; font-size: 14px; }
-    input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+    input:focus { outline: none; border-color: #3b82f6; }
     button { width: 100%; padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; margin-top: 8px; }
     button:hover { background: #2563eb; }
     .error { color: #f87171; font-size: 13px; margin-top: 12px; text-align: center; }
     #app { display: none; padding: 20px; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(148, 163, 184, 0.1); padding-bottom: 12px; }
-    .content { margin-bottom: 20px; color: #cbd5e1; }
   </style>
 </head>
 <body>
@@ -39,81 +37,66 @@
       <label>Password</label>
       <input type="password" id="password" placeholder="••••••">
     </div>
-    <button onclick="login()">Sign In</button>
+    <button id="loginBtn">Sign In</button>
     <div id="error" class="error"></div>
   </div>
 </div>
 
 <div id="app">
-  <div class="header">
-    <h1>⏱️ Daily Time Tracker</h1>
-    <button onclick="signOut()">Sign Out</button>
-  </div>
-  <div class="content">
-    <p>Welcome, <span id="userEmail"></span>!</p>
-    <p>Your time tracking app is ready. Core functionality coming soon.</p>
-  </div>
+  <h1>⏱️ Daily Time Tracker</h1>
+  <p>Welcome, <span id="userEmail"></span>!</p>
+  <button id="logoutBtn">Sign Out</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPA_URL = "https://vybypyeyzfgakenkotbw.supabase.co";
-const SUPA_KEY = "sb_publishable_-aDVEq7DzlUz7hlvpgkUhw_i6yXO2SU";
+window.addEventListener('load', async function() {
+  const sb = window.supabase.createClient(
+    'https://vybypyeyzfgakenkotbw.supabase.co',
+    'sb_publishable_-aDVEq7DzlUz7hlvpgkUhw_i6yXO2SU',
+    { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'dtt-auth' } }
+  );
 
-const supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    storageKey: "dtt-auth"
-  }
-});
+  document.getElementById('loginBtn').addEventListener('click', async function() {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const errorEl = document.getElementById('error');
+    errorEl.textContent = '';
 
-async function login() {
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value;
-  const errorEl = document.getElementById("error");
-  errorEl.textContent = "";
-
-  if (!email || !password) {
-    errorEl.textContent = "Please enter email and password";
-    return;
-  }
-
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      errorEl.textContent = error.message;
+    if (!email || !password) {
+      errorEl.textContent = 'Please enter email and password';
       return;
     }
-    
-    document.getElementById("userEmail").textContent = data.user.email;
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display = "block";
-  } catch (err) {
-    errorEl.textContent = "Login failed: " + err.message;
-  }
-}
 
-async function signOut() {
-  await supabase.auth.signOut();
-  document.getElementById("login").style.display = "flex";
-  document.getElementById("app").style.display = "none";
-  document.getElementById("email").value = "";
-  document.getElementById("password").value = "";
-  document.getElementById("error").textContent = "";
-}
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        errorEl.textContent = error.message;
+        return;
+      }
+      document.getElementById('userEmail').textContent = data.user.email;
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+    } catch (err) {
+      errorEl.textContent = 'Error: ' + (err.message || 'Login failed');
+    }
+  });
 
-// Check if user is already logged in
-async function checkAuth() {
-  const { data: { session } } = await supabase.auth.getSession();
+  document.getElementById('logoutBtn').addEventListener('click', async function() {
+    await sb.auth.signOut();
+    document.getElementById('login').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('email').value = '';
+    document.getElementById('password').value = '';
+  });
+
+  const { data: { session } } = await sb.auth.getSession();
   if (session) {
-    document.getElementById("userEmail").textContent = session.user.email;
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display = "block";
+    document.getElementById('userEmail').textContent = session.user.email;
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
   }
-}
-
-checkAuth();
+});
 </script>
 
 </body>
