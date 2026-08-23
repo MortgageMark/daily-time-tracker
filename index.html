@@ -899,178 +899,25 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
 
 document.addEventListener("DOMContentLoaded",initializeEventListeners);
 function applyButtonSize(size){const grid=document.getElementById("grid");if(!grid)return;const base=172;const heights={compact:140,normal:172,spacious:220};const h=heights[size]||heights.normal;document.querySelectorAll(".tile").forEach(t=>{t.style.height=h+"px";});}
-function renderChannelSettings(){
-  const list=document.getElementById("channelList");
-  list.innerHTML="";
-  const isMobile=window.innerWidth<768;
+function renderChannelSettings(){const list=document.getElementById("channelList");list.innerHTML="";
   const active=state.channels.filter(c=>!c.archived&&!c.parentChannelId).sort((a,b)=>a.order-b.order);
-  
-  active.forEach((c,i)=>{
-    const row=document.createElement("div");
-    row.className="row";
-    
-    if(isMobile){
-      // Mobile: vertical stack with buttons
-      row.innerHTML=`
-        <div class="swatch" style="background:${c.color}"></div>
-        <div class="grow"><b>${escapeHtml(c.label)}</b></div>
-        <div style="display:flex;gap:4px">
-          <button class="btn sm" onclick="moveChannelMobile('${c.id}',-1)" ${i===0?'disabled':''}>↑</button>
-          <button class="btn sm" onclick="moveChannelMobile('${c.id}',1)" ${i===active.length-1?'disabled':''}>↓</button>
-          <button class="btn sm">Edit</button>
-        </div>
-      `;
-    }else{
-      // Desktop: drag to reorder
-      row.style.cursor="grab";
-      row.draggable=true;
-      row.dataset.channelId=c.id;
-      row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b><div style="font-size:11px;color:var(--muted);margin-top:4px">↕ Drag to reorder</div></div><button class="btn sm">Edit</button>`;
-      
-      row.addEventListener("dragstart",e=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",c.id);row.style.opacity="0.5"});
-      row.addEventListener("dragend",e=>{row.style.opacity="1"});
-      row.addEventListener("dragover",e=>{e.preventDefault();e.dataTransfer.dropEffect="move";row.style.borderTop="2px solid var(--accent)"});
-      row.addEventListener("dragleave",e=>{row.style.borderTop=""});
-      row.addEventListener("drop",async e=>{
-        e.preventDefault();
-        row.style.borderTop="";
-        const draggedId=e.dataTransfer.getData("text/plain");
-        if(draggedId!==c.id){
-          const draggedCh=state.channels.find(x=>x.id===draggedId);
-          const targetCh=c;
-          const tempOrder=draggedCh.order;
-          draggedCh.order=targetCh.order;
-          targetCh.order=tempOrder;
-          
-          // If dragged channel is a parent, move its children too
-          if(!draggedCh.parentChannelId){
-            const children=state.channels.filter(x=>x.parentChannelId===draggedCh.id);
-            children.forEach(child=>child.order+=0); // Keep relative order
-          }
-          
-          await saveLocal("channels",draggedCh);
-          await saveLocal("channels",targetCh);
-          state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
-          state.channels.forEach(ch=>{if(!ch.hasOwnProperty('parentChannelId'))ch.parentChannelId=null;});
-          renderChannelSettings();
-          renderGrid();
-        }
-      });
-    }
-    
-    row.querySelector(".btn").addEventListener("click",()=>openChannelEditor(c.id));
-    list.appendChild(row);
-    
-    // Subcategories
+  active.forEach((c,i)=>{const row=document.createElement("div");row.className="row";
+    row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b><div style="font-size:11px;color:var(--muted);margin-top:4px">↕ Drag to reorder</div></div><button class="btn sm">Edit</button>`;
+    row.style.cursor="grab";row.draggable=true;row.dataset.channelId=c.id;
+    row.addEventListener("dragstart",e=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",c.id);row.style.opacity="0.5"});
+    row.addEventListener("dragend",e=>{row.style.opacity="1"});
+    row.addEventListener("dragover",e=>{e.preventDefault();e.dataTransfer.dropEffect="move";row.style.borderTop="2px solid var(--accent)"});
+    row.addEventListener("dragleave",e=>{row.style.borderTop=""});
+    row.addEventListener("drop",async e=>{e.preventDefault();row.style.borderTop="";const draggedId=e.dataTransfer.getData("text/plain");if(draggedId!==c.id){const draggedCh=state.channels.find(x=>x.id===draggedId);const targetCh=c;const tempOrder=draggedCh.order;draggedCh.order=targetCh.order;targetCh.order=tempOrder;await saveLocal("channels",draggedCh);await saveLocal("channels",targetCh);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));renderChannelSettings();renderGrid()}});
+    row.querySelector(".btn").addEventListener("click",()=>openChannelEditor(c.id));list.appendChild(row);
     const subs=state.channels.filter(sc=>sc.parentChannelId===c.id&&!sc.archived).sort((a,b)=>a.order-b.order);
-    subs.forEach((sub,subIdx)=>{
-      const subRow=document.createElement("div");
-      subRow.className="row";
-      subRow.style.paddingLeft="48px";
-      subRow.style.borderLeft="2px solid var(--line)";
-      
-      if(isMobile){
-        subRow.innerHTML=`
-          <div class="swatch" style="background:${sub.color}"></div>
-          <div class="grow"><span style="font-size:12px">${escapeHtml(sub.label)}</span></div>
-          <div style="display:flex;gap:4px">
-            <button class="btn sm" onclick="moveSubMobile('${c.id}','${sub.id}',-1)" ${subIdx===0?'disabled':''}>↑</button>
-            <button class="btn sm" onclick="moveSubMobile('${c.id}','${sub.id}',1)" ${subIdx===subs.length-1?'disabled':''}>↓</button>
-            <button class="btn sm">Edit</button>
-          </div>
-        `;
-      }else{
-        subRow.innerHTML=`<div class="swatch" style="background:${sub.color}"></div><div class="grow"><span style="font-size:12px">${escapeHtml(sub.label)}</span></div><button class="btn sm">Edit</button>`;
-      }
-      
-      subRow.querySelector(".btn").addEventListener("click",()=>openChannelEditor(sub.id));
-      list.appendChild(subRow);
-    });
-    
-    // Add subcategory button
-    const addSubBtn=document.createElement("div");
-    addSubBtn.className="row";
-    addSubBtn.style.paddingLeft="32px";
-    addSubBtn.innerHTML=`<button class="btn sm" style="width:100%">+ Add subcategory</button>`;
-    addSubBtn.querySelector(".btn").addEventListener("click",()=>openChannelEditor(null,c.id));
-    list.appendChild(addSubBtn);
-  });
-  
-  // Archived section
-  const arch=state.channels.filter(c=>c.archived);
-  const al=document.getElementById("archivedList");
+    subs.forEach(sub=>{const subRow=document.createElement("div");subRow.className="row";subRow.style.paddingLeft="48px";subRow.style.borderLeft="2px solid var(--line)";subRow.innerHTML=`<div class="swatch" style="background:${sub.color}"></div><div class="grow"><span style="font-size:12px">${escapeHtml(sub.label)}</span></div><button class="btn sm">Edit</button>`;subRow.querySelector(".btn").addEventListener("click",()=>openChannelEditor(sub.id));list.appendChild(subRow);});
+    const addSubBtn=document.createElement("div");addSubBtn.className="row";addSubBtn.style.paddingLeft="32px";addSubBtn.innerHTML=`<button class="btn sm" style="width:100%">+ Add subcategory</button>`;addSubBtn.querySelector(".btn").addEventListener("click",()=>openChannelEditor(null,c.id));list.appendChild(addSubBtn);});
+  const arch=state.channels.filter(c=>c.archived);const al=document.getElementById("archivedList");
   if(!arch.length)al.innerHTML='<div class="hint">None archived.</div>';
-  else{
-    al.innerHTML="";
-    arch.forEach(c=>{
-      const row=document.createElement("div");
-      row.className="row";
-      row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b> <span class="archived-tag">Archived</span></div><button class="btn sm">Restore</button><button class="btn sm" style="background:rgba(240,68,68,.2);color:#f87171;border-color:#f87171">Delete</button>`;
-      row.querySelector(".btn").addEventListener("click",()=>restoreChannel(c.id));
-      const delBtn=row.querySelectorAll(".btn")[1];
-      if(delBtn)delBtn.addEventListener("click",()=>confirmDeleteChannel(c.id));
-      al.appendChild(row);
-    });
-  }
-  
-  document.getElementById("acctEmail").textContent=(window._acctEmail||"");
-}
-
-async function moveChannelMobile(id,dir){
-  const active=state.channels.filter(c=>!c.archived&&!c.parentChannelId).sort((a,b)=>a.order-b.order);
-  const idx=active.findIndex(c=>c.id===id);
-  const sw=idx+dir;
-  if(sw<0||sw>=active.length)return;
-  const a=active[idx],b=active[sw];
-  const ao=a.order;
-  a.order=b.order;
-  b.order=ao;
-  await saveLocal("channels",a);
-  await saveLocal("channels",b);
-  state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
-  state.channels.forEach(ch=>{if(!ch.hasOwnProperty('parentChannelId'))ch.parentChannelId=null;});
-  renderChannelSettings();
-  renderGrid();
-}
-
-async function moveSubMobile(parentId,subId,dir){
-  const subs=state.channels.filter(sc=>sc.parentChannelId===parentId&&!sc.archived).sort((a,b)=>a.order-b.order);
-  const idx=subs.findIndex(c=>c.id===subId);
-  const sw=idx+dir;
-  if(sw<0||sw>=subs.length)return;
-  const a=subs[idx],b=subs[sw];
-  const ao=a.order;
-  a.order=b.order;
-  b.order=ao;
-  await saveLocal("channels",a);
-  await saveLocal("channels",b);
-  state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
-  state.channels.forEach(ch=>{if(!ch.hasOwnProperty('parentChannelId'))ch.parentChannelId=null;});
-  renderChannelSettings();
-  renderGrid();
-}
-
-async function confirmDeleteChannel(id){
-  if(!confirm("Permanently delete this channel? This cannot be undone."))return;
-  const c=state.channels.find(x=>x.id===id);
-  if(c){
-    // Delete the channel
-    await db.transaction(["channels"],"readwrite").objectStore("channels").delete(c.id);
-    // Delete all sessions for this channel
-    const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
-    const toDelete=allSessions.filter(s=>s.channelId===c.id);
-    for(const sess of toDelete){
-      await db.transaction(["sessions"],"readwrite").objectStore("sessions").delete(sess.id);
-    }
-    state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
-    state.channels.forEach(ch=>{if(!ch.hasOwnProperty('parentChannelId'))ch.parentChannelId=null;});
-    renderChannelSettings();
-    renderGrid();
-    toast("Deleted permanently");
-  }
-}
-
-function moveChannel(id,dir){
+  else{al.innerHTML="";arch.forEach(c=>{const row=document.createElement("div");row.className="row";row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b> <span class="archived-tag">Archived</span></div><button class="btn sm">Restore</button>`;row.querySelector(".btn").addEventListener("click",()=>restoreChannel(c.id));al.appendChild(row);});}
+  document.getElementById("acctEmail").textContent=(window._acctEmail||"");}
+async function moveChannel(id,dir){const active=state.channels.filter(c=>!c.archived).sort((a,b)=>a.order-b.order);const idx=active.findIndex(c=>c.id===id);const sw=idx+dir;if(sw<0||sw>=active.length)return;const a=active[idx],b=active[sw];const ao=a.order;a.order=b.order;b.order=ao;await saveLocal("channels",a);await saveLocal("channels",b);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));renderChannelSettings();renderGrid();}
 async function restoreChannel(id){const c=state.channels.find(x=>x.id===id);c.archived=false;c.order=Math.max(0,...state.channels.map(x=>x.order))+1;await saveLocal("channels",c);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));renderChannelSettings();renderGrid();toast("Restored");}
 function openChannelEditor(id,parentId){editingChanId=id;editingParentId=parentId||null;const c=id?state.channels.find(x=>x.id===id):null;const parent=parentId?state.channels.find(x=>x.id===parentId):null;document.getElementById("chanTitle").textContent=c?"Edit channel":parent?"Add subcategory":"Add channel";document.getElementById("chanLabel").value=c?c.label:"";const col=c?c.color:parent?parent.color:PALETTE[state.channels.length%PALETTE.length];document.getElementById("chanColor").value=col;document.getElementById("chanArchive").style.display=c?"block":"none";renderPalette(col);updateChanPreview();openScrim("chanScrim");}
 function renderPalette(sel){const p=document.getElementById("chanPalette");p.innerHTML="";PALETTE.forEach(col=>{const ch=document.createElement("div");ch.className="pchip"+(col.toLowerCase()===sel.toLowerCase()?" sel":"");ch.style.background=col;ch.addEventListener("click",()=>{document.getElementById("chanColor").value=col;renderPalette(col);updateChanPreview();});p.appendChild(ch);});}
