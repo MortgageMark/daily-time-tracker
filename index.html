@@ -938,16 +938,17 @@ function renderChannelSettings(){const list=document.getElementById("channelList
   nuclearBtn.style.cssText="width:100%;padding:12px;margin:12px 0;background:#ff4444;color:white;border:none;border-radius:6px;font-weight:bold;font-size:14px;cursor:pointer";
   nuclearBtn.textContent="🔥 DELETE ALL CHANNELS - Start Fresh";
   nuclearBtn.addEventListener("click",async()=>{
-    if(!confirm("DELETE ALL CHANNELS? This will remove everything. Last chance!")) return;
+    if(!confirm("DELETE ALL CHANNELS? This will remove everything from everywhere. Last chance!")) return;
     try{
       const allChs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
       for(const ch of allChs){
         await db.transaction(["channels"],"readwrite").objectStore("channels").delete(ch.id);
+        try{await SB.from("channels").delete().eq("id",ch.id);}catch(e){}
       }
       state.channels=[];
       renderChannelSettings();
       renderGrid();
-      toast("All channels deleted!");
+      toast("All channels permanently deleted!");
     }catch(e){
       console.error("Error:",e);
       toast("Error deleting channels");
