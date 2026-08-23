@@ -788,13 +788,25 @@ function initializeEventListeners(){
       console.log("VERIFIED IN DB:",{label:saved?.label,id:saved?.id,parentChannelId:saved?.parentChannelId});
     }
     state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
-    console.log("AFTER idbAll - raw from DB:",state.channels.map(c=>({label:c.label,id:c.id,has_parentId:c.hasOwnProperty('parentChannelId'),parentChannelId:c.parentChannelId})));
+    console.group("SAVE RELOAD SEQUENCE");
+    console.log("1. AFTER idbAll - raw from DB:",state.channels.length,"channels");
+    state.channels.forEach(c=>{
+      console.log(`   ${c.label}: parentChannelId="${c.parentChannelId}" hasOwn=${c.hasOwnProperty('parentChannelId')}`);
+    });
     state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});
-    console.log("AFTER forEach - after normalization:",state.channels.map(c=>({label:c.label,id:c.id,parentChannelId:c.parentChannelId})));
+    console.log("2. AFTER forEach - normalized");
+    const beforeDedup=JSON.parse(JSON.stringify(state.channels));
     state.channels=dedupChannels(state.channels);
-    console.log("AFTER dedup:",state.channels.map(c=>({label:c.label,id:c.id,parentChannelId:c.parentChannelId})));
-    
-    console.log("AFTER validate:",state.channels.map(c=>({label:c.label,id:c.id,parentChannelId:c.parentChannelId})));
+    console.log("3. AFTER dedup:");
+    state.channels.forEach((c,i)=>{
+      const was=beforeDedup[i];
+      if(!was || was.parentChannelId !== c.parentChannelId){
+        console.warn(`   ${c.label}: parentChannelId changed from "${was?.parentChannelId}" to "${c.parentChannelId}"`);
+      } else {
+        console.log(`   ${c.label}: parentChannelId="${c.parentChannelId}" (unchanged)`);
+      }
+    });
+    console.groupEnd();
     closeScrim("chanScrim");renderChannelSettings();renderGrid();toast("Saved");});
   const chanArchive=document.getElementById("chanArchive");if(chanArchive)chanArchive.addEventListener("click",async()=>{const c=state.channels.find(x=>x.id===editingChanId);c.archived=true;await saveLocal("channels",c);if(running&&running.channelId===c.id)await stopRunning(now());state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});closeScrim("chanScrim");renderChannelSettings();renderAll();toast("Archived (history kept)");});
 
@@ -950,9 +962,11 @@ function dedupChannels(chs){
       const existingHasParent=existing.parentChannelId&&existing.parentChannelId!=='';
       const cHasParent=c.parentChannelId&&c.parentChannelId!=='';
       if(cHasParent&&!existingHasParent){
+        console.warn(`dedupChannels: ${c.label} - keeping version WITH parent (was "${existing.parentChannelId}", now "${c.parentChannelId}")`);
         map.set(c.id,c);
+      }else if(existingHasParent && !cHasParent){
+        console.warn(`dedupChannels: ${c.label} - keeping existing version WITH parent, discarding "${c.parentChannelId}"`);
       }
-      // If existing has parent and c doesn't, keep existing
       // If both have or both don't have, keep first one
     }
   }
