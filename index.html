@@ -553,6 +553,7 @@ async function reloadFromLocal(){
   let chs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
   chs=dedupChannels(chs);
   chs.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});
+  chs=validateParentIds(chs);
   console.log("reloadFromLocal: Found", chs.length, "channels");
   chs.sort((a,b)=>a.order-b.order); state.channels=chs;
   const sess=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
@@ -675,7 +676,7 @@ async function renderGrid(){ const grid=document.getElementById("grid");
   if(!grid)return console.warn("grid element not found");
   const channels=state.channels||[];
   const active=channels.filter(c=>!c.archived&&!c.parentChannelId).sort((a,b)=>a.order-b.order);
-  if(!active.length){grid.innerHTML=`<div class="empty"><h2>No channels yet</h2><p>Go to Settings and click Channels to create your first one.</p><button class="btn pri" onclick="openSettings()">Go to Channels</button></div>`;return;}
+  if(!active.length){grid.innerHTML=`<div class="empty"><h2>No channels yet</h2><p>Create your first channel to get started.</p><button class="btn pri" onclick="openChannelEditor(null)">Create Channel</button></div>`;return;}
   if(!state.todayMap){state.todayMap={};}const map=state.todayMap; const dayTotal=Object.values(map).reduce((a,b)=>a+b,0); grid.innerHTML="";
   for(const c of active){
     const runningCh=running?state.channels.find(ch=>ch.id===running.channelId):null;
@@ -773,8 +774,8 @@ function initializeEventListeners(){
     if(parentId)await new Promise(r=>setTimeout(r,200));
     state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
     state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});
-    // DEDUP: Remove any duplicate IDs, keeping the one with parentChannelId if conflict
     state.channels=dedupChannels(state.channels);
+    state.channels=validateParentIds(state.channels);
     closeScrim("chanScrim");renderChannelSettings();renderGrid();toast("Saved");});
   const chanArchive=document.getElementById("chanArchive");if(chanArchive)chanArchive.addEventListener("click",async()=>{const c=state.channels.find(x=>x.id===editingChanId);c.archived=true;await saveLocal("channels",c);if(running&&running.channelId===c.id)await stopRunning(now());state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});closeScrim("chanScrim");renderChannelSettings();renderAll();toast("Archived (history kept)");});
 
@@ -904,25 +905,34 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
 }
 
 document.addEventListener("DOMContentLoaded",initializeEventListeners);
+function validateParentIds(channels){
+  const ids=new Set(channels.map(c=>c.id));
+  return channels.map(c=>{
+    if(c.parentChannelId&&!ids.has(c.parentChannelId)){
+      console.warn("Clearing invalid parent for",c.label,"- parent not found");
+      c.parentChannelId=null;
+    }
+    return c;
+  });
+}
 function dedupChannels(chs){
-  const seen=new Map();
-  const result=[];
+  const map=new Map();
   for(const c of chs){
-    if(!seen.has(c.id)){
-      seen.set(c.id,c);
-      result.push(c);
+    if(!map.has(c.id)){
+      map.set(c.id,c);
     }else{
-      const existing=seen.get(c.id);
-      // If this one has a parent and existing doesn't, REPLACE existing
-      if(c.parentChannelId&&!existing.parentChannelId){
-        seen.set(c.id,c);
-        const idx=result.indexOf(existing);
-        if(idx>=0)result[idx]=c;
+      const existing=map.get(c.id);
+      // ALWAYS prefer the one that has parentChannelId set
+      const existingHasParent=existing.parentChannelId&&existing.parentChannelId!=='';
+      const cHasParent=c.parentChannelId&&c.parentChannelId!=='';
+      if(cHasParent&&!existingHasParent){
+        map.set(c.id,c);
       }
-      // If this one doesn't have parent but existing does, KEEP existing (do nothing)
+      // If existing has parent and c doesn't, keep existing
+      // If both have or both don't have, keep first one
     }
   }
-  return result;
+  return Array.from(map.values());
 }
 function applyButtonSize(size){const grid=document.getElementById("grid");if(!grid)return;const base=172;const heights={compact:140,normal:172,spacious:220};const h=heights[size]||heights.normal;document.querySelectorAll(".tile").forEach(t=>{t.style.height=h+"px";});}
 function renderChannelSettings(){const list=document.getElementById("channelList");list.innerHTML="";
@@ -973,7 +983,7 @@ function renderChannelSettings(){const list=document.getElementById("channelList
     row.addEventListener("dragend",e=>{row.style.opacity="1"});
     row.addEventListener("dragover",e=>{e.preventDefault();e.dataTransfer.dropEffect="move";row.style.borderTop="2px solid var(--accent)"});
     row.addEventListener("dragleave",e=>{row.style.borderTop=""});
-    row.addEventListener("drop",async e=>{e.preventDefault();row.style.borderTop="";const draggedId=e.dataTransfer.getData("text/plain");if(draggedId!==c.id){const draggedCh=state.channels.find(x=>x.id===draggedId);const targetCh=c;const tempOrder=draggedCh.order;draggedCh.order=targetCh.order;targetCh.order=tempOrder;await saveLocal("channels",draggedCh);await saveLocal("channels",targetCh);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid()}});
+    row.addEventListener("drop",async e=>{e.preventDefault();row.style.borderTop="";const draggedId=e.dataTransfer.getData("text/plain");if(draggedId!==c.id){const draggedCh=state.channels.find(x=>x.id===draggedId);const targetCh=c;const tempOrder=draggedCh.order;draggedCh.order=targetCh.order;targetCh.order=tempOrder;await saveLocal("channels",draggedCh);await saveLocal("channels",targetCh);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});state.channels=validateParentIds(state.channels);renderChannelSettings();renderGrid()}});
     row.querySelector(".btn").addEventListener("click",()=>openChannelEditor(c.id));list.appendChild(row);
     const subs=state.channels.filter(sc=>sc.parentChannelId===c.id&&!sc.archived).sort((a,b)=>a.order-b.order);
     console.log("Rendering parent",c.label,"(id=",c.id,") - found",subs.length,"subcategories:",subs.map(s=>s.label));
