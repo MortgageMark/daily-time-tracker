@@ -771,9 +771,15 @@ function initializeEventListeners(){
     if(editingChanId){const c=state.channels.find(x=>x.id===editingChanId);c.label=label;c.color=color;await saveLocal("channels",c);}
     else{
       // Use editingParentId which was set by openChannelEditor
-      const parentIdToUse=editingParentId;
+      let parentIdToUse=editingParentId;
+      const newId=uid();
+      // Safeguard: never allow a channel to be its own parent
+      if(parentIdToUse===newId){
+        console.warn("PREVENTED SELF-PARENTING: newId would equal parentId");
+        parentIdToUse=null;
+      }
       const order=Math.max(-1,...state.channels.map(c=>!parentIdToUse||c.parentChannelId===parentIdToUse?c.order:-1))+1;
-      const newCh={id:uid(),profileId:state.profileId,label:label,color:color,order:order,archived:false,parentChannelId:parentIdToUse};
+      const newCh={id:newId,profileId:state.profileId,label:label,color:color,order:order,archived:false,parentChannelId:parentIdToUse};
       console.log("SAVING NEW CHANNEL with editingParentId=",editingParentId,"parentChannelId=",newCh.parentChannelId);
       await saveLocal("channels",newCh);
       await new Promise(r=>setTimeout(r,250));
@@ -924,11 +930,17 @@ function validateParentIds(channels){
   console.log("validateParentIds: ids in set=",Array.from(ids));
   return channels.map(c=>{
     if(c.parentChannelId){
-      const exists=ids.has(c.parentChannelId);
-      console.log("  Channel",c.label,"parentId=",c.parentChannelId,"exists=",exists);
-      if(!exists){
-        console.warn("Clearing invalid parent for",c.label,"- parent ID",c.parentChannelId,"not in",Array.from(ids));
+      // Never allow a channel to be its own parent
+      if(c.parentChannelId===c.id){
+        console.warn("SELF-PARENT BUG: Channel",c.label,"has parentChannelId equal to its own ID! Clearing.");
         c.parentChannelId=null;
+      }else{
+        const exists=ids.has(c.parentChannelId);
+        console.log("  Channel",c.label,"parentId=",c.parentChannelId,"exists=",exists);
+        if(!exists){
+          console.warn("Clearing invalid parent for",c.label,"- parent ID",c.parentChannelId,"not in",Array.from(ids));
+          c.parentChannelId=null;
+        }
       }
     }
     return c;
