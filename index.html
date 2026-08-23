@@ -1440,11 +1440,17 @@ let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selected
   </div>
 `;window.closeDayPlanner=()=>{stage.innerHTML=origStage;renderGrid();};await initializePlanPage();}async function initializePlanPage(){await loadPlans();await renderPlanPageUI();}async function loadPlans(){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));if(!plans||plans.length===0){const defaultPlans=["Monday","Tuesday","Wednesday","Thursday","Friday","Custom"].map((name,idx)=>({id:uid(),profileId:state.profileId,name,schedule:{},order:idx}));for(const p of defaultPlans)await saveLocal("plans",p);planState.plans=defaultPlans;}else{planState.plans=plans.sort((a,b)=>a.order-b.order);}}async function renderPlanPageUI(){
   const stage=document.getElementById("stage");
-  const isMobile=window.innerWidth<768;
+  if(!stage)return;
   
-  const startHour=planState.startHour;
-  const endHour=planState.endHour;
-  const increment=planState.increment;
+  const isMobile=window.innerWidth<768;
+  const startHour=planState.startHour||8;
+  const endHour=planState.endHour||18;
+  const increment=planState.increment||30;
+  
+  if(!planState.plans||planState.plans.length===0){
+    stage.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted)">Loading plans...</div>';
+    return;
+  }
   
   const hours=[];
   for(let h=startHour;h<endHour;h++){
@@ -1456,69 +1462,72 @@ let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selected
     }
   }
   
-  let html=`<div style="display:flex;flex-direction:column;gap:16px;padding:16px">`;
+  let html=`<div style="display:flex;flex-direction:column;gap:16px;padding:16px;max-width:800px;margin:0 auto">`;
   
   // Plan selector
   html+=`<div>
-    <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Active Plan</label>
-    <select id="planSelect" style="width:100%;padding:10px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:14px">`;
+    <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Active Plan</label>
+    <div style="display:flex;gap:8px">
+      <select id="planSelect" style="flex:1;padding:10px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:14px">`;
   
   planState.plans.forEach((p,i)=>{
     html+=`<option value="${i}">${p.name}</option>`;
   });
   
   html+=`</select>
-    <button onclick="setForTodayPlan()" style="width:100%;margin-top:8px;padding:10px;background:rgba(34,197,94,.2);border:1px solid var(--good);color:var(--good);border-radius:6px;font-weight:600;cursor:pointer">Set for Today</button>
+      <button onclick="setForTodayPlan()" style="padding:10px 16px;background:var(--accent);border:none;color:white;border-radius:6px;font-weight:600;cursor:pointer;white-space:nowrap">Set for Today</button>
+    </div>
   </div>`;
   
-  // Mobile: vertical layout, one column at a time
+  const plan=planState.plans[planState.selectedPlanIdx];
+  
   if(isMobile){
+    // Mobile: 2-column grid
     html+=`<div>
-      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Select Time Block</label>
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Time Blocks</label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
     
-    hours.forEach(({h,m,display},idx)=>{
+    hours.forEach(({h,m,display})=>{
       const slot=h+":"+(m===0?"00":m);
-      const chId=planState.plans[planState.selectedPlanIdx]?.schedule?.[slot];
+      const chId=plan?.schedule?.[slot];
       const ch=chId?state.channels.find(x=>x.id===chId):null;
       
       html+=`<button onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" 
-        style="padding:12px;background:${ch?ch.color+'33':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:6px;font-weight:600;font-size:12px;cursor:pointer;min-height:48px;display:flex;align-items:center;justify-content:center;text-align:center;transition:all .15s">
-        <div>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">${display}</div>
-          <div style="font-weight:700">${ch?ch.label.substring(0,10):'Empty'}</div>
-        </div>
+        style="padding:12px;background:${ch?ch.color+'33':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:6px;font-weight:600;font-size:12px;cursor:pointer;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;transition:all .15s">
+        <div style="font-size:10px;opacity:0.7">${display}</div>
+        <div style="font-weight:700;margin-top:2px">${ch?ch.label.substring(0,12):'—'}</div>
       </button>`;
     });
     
     html+=`</div></div>`;
   }else{
-    // Desktop: side-by-side with drag-drop
-    html+=`<div style="display:grid;grid-template-columns:140px 1fr 140px;gap:16px;overflow-x:auto;padding-bottom:20px">`;
-    html+=`<div style="font-size:11px;font-weight:600;text-align:center;color:var(--muted)">Time</div>`;
-    html+=`<div style="font-size:11px;font-weight:600;text-align:center;color:var(--muted)">Channel</div>`;
+    // Desktop: table view
+    html+=`<div style="overflow-x:auto">
+      <div style="display:grid;grid-template-columns:80px 1fr 60px;gap:8px;min-width:400px">`;
+    
+    // Headers
+    html+=`<div style="font-size:11px;font-weight:600;color:var(--muted);padding:8px;text-align:center">Time</div>`;
+    html+=`<div style="font-size:11px;font-weight:600;color:var(--muted);padding:8px">Channel</div>`;
     html+=`<div></div>`;
     
-    hours.forEach(({h,m,display},idx)=>{
+    hours.forEach(({h,m,display})=>{
       const slot=h+":"+(m===0?"00":m);
-      const chId=planState.plans[planState.selectedPlanIdx]?.schedule?.[slot];
+      const chId=plan?.schedule?.[slot];
       const ch=chId?state.channels.find(x=>x.id===chId):null;
       
-      html+=`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--ink2)">${display}</div>`;
-      html+=`<div style="display:flex;gap:8px">
-        <div onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" 
-          style="flex:1;padding:8px;background:${ch?ch.color+'22':'var(--panel2)'};border:1px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s">${ch?ch.label:'—'}</div>
-      </div>`;
-      html+=`<button onclick="clearPlanSlot(${planState.selectedPlanIdx},'${slot}')" style="background:none;border:1px solid var(--line);color:var(--muted);padding:4px 8px;border-radius:3px;cursor:pointer;font-size:10px">Clear</button>`;
+      html+=`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--ink2);padding:8px">${display}</div>`;
+      html+=`<div onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" 
+        style="padding:8px;background:${ch?ch.color+'22':'var(--panel2)'};border:1px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center">${ch?ch.label:'—'}</div>`;
+      html+=`<button onclick="clearPlanSlot(${planState.selectedPlanIdx},'${slot}')" style="background:none;border:1px solid var(--line);color:var(--muted);padding:4px 6px;border-radius:3px;cursor:pointer;font-size:9px;height:fit-content">✕</button>`;
     });
     
-    html+=`</div>`;
+    html+=`</div></div>`;
   }
   
-  // Channel selector
+  // Channels section
   html+=`<div>
-    <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Channels</label>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+    <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Channels (drag on desktop)</label>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px">`;
   
   (state.channels||[]).filter(c=>!c.archived&&!c.parentChannelId).forEach(ch=>{
     html+=`<div draggable="true" data-ch-id="${ch.id}" 
@@ -1526,15 +1535,19 @@ let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selected
       ondragstart="event.dataTransfer.effectAllowed='copy';event.dataTransfer.setData('text/plain',this.dataset.chId)">${ch.label}</div>`;
   });
   
-  html+=`</div></div>`;
-  html+=`</div>`;
+  html+=`</div></div></div>`;
   
   stage.innerHTML=html;
-  document.getElementById("planSelect").value=planState.selectedPlanIdx;
-  document.getElementById("planSelect").addEventListener("change",e=>{
-    planState.selectedPlanIdx=parseInt(e.target.value);
-    renderPlanPageUI();
-  });
+  
+  // Setup plan select listener
+  const planSelect=document.getElementById("planSelect");
+  if(planSelect){
+    planSelect.value=planState.selectedPlanIdx;
+    planSelect.addEventListener("change",e=>{
+      planState.selectedPlanIdx=parseInt(e.target.value);
+      renderPlanPageUI();
+    });
+  }
 }
 
 function openPlanSlotModal(planIdx,slot){
