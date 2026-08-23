@@ -1409,37 +1409,15 @@ function openAdjustModal(session){editingSession=session;const c=state.channels.
 
 /* Day Planner */
 const timeBlocks=[{start:8,end:12,label:"8am—12pm"},{start:12,end:17,label:"12pm—5pm"},{start:17,end:21,label:"5pm—9pm"}];
-let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selectedPlanIdx:0,nextPlanId:1};let draggedChannel=null;async function openDayPlanner(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;stage.innerHTML=`
-  <div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">
-    <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap">
-      <div style="display:flex;gap:8px;align-items:center">
-        <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted)">Use plan:</label>
-        <select id="planSelect" style="padding:6px 10px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:8px;font-size:12px;cursor:pointer"></select>
-        <button class="btn pri sm" id="setForTodayBtn">Set for Today</button>
-      </div>
-    </div>
-
-    <div style="display:flex;flex:1;overflow:hidden;border-top:1px solid var(--line)">
-      <!-- Time column (fixed left) -->
-      <div style="flex:0 0 60px;display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto;overflow:hidden">
-        <div style="padding:8px 4px;font-size:10px;font-weight:600;color:var(--ink2);text-align:center;min-height:44px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line);flex-shrink:0">Time</div>
-        <div id="timeColumn" style="display:flex;flex-direction:column"></div>
-      </div>
-
-      <!-- Plans scroll (middle) -->
-      <div style="flex:1;overflow-x:auto;overflow-y:auto;border-right:1px solid var(--line)">
-        <div style="display:flex;gap:0;height:min-content" id="plansWrapper"></div>
-      </div>
-
-      <!-- Channels column (fixed right) -->
-      <div style="flex:0 0 120px;display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel);overflow-y:auto">
-        <div style="padding:8px 4px;font-size:10px;font-weight:600;color:var(--ink2);text-align:center;min-height:44px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line);flex-shrink:0">Channels</div>
-        <div id="channelsColumn" style="display:flex;flex-direction:column;gap:4px;padding:8px;overflow-y:hidden"></div>
-      </div>
-    </div>
-  </div>
-`;window.closeDayPlanner=()=>{stage.innerHTML=origStage;renderGrid();};await initializePlanPage();}async function initializePlanPage(){await loadPlans();await renderPlanPageUI();}async function loadPlans(){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));if(!plans||plans.length===0){const defaultPlans=["Monday","Tuesday","Wednesday","Thursday","Friday","Custom"].map((name,idx)=>({id:uid(),profileId:state.profileId,name,schedule:{},order:idx}));for(const p of defaultPlans)await saveLocal("plans",p);planState.plans=defaultPlans;}else{planState.plans=plans.sort((a,b)=>a.order-b.order);}}async function renderPlanPageUI(){
-  const stage=document.getElementById("stage");
+let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selectedPlanIdx:0,nextPlanId:1};let draggedChannel=null;async function openDayPlanner(){
+  const app=document.querySelector('.app');
+  const stage=app.querySelector('.stage');
+  const origStage=stage.innerHTML;
+  stage.innerHTML='<div style="display:flex;flex-direction:column;height:100%;background:var(--bg)"></div>';
+  window.closeDayPlanner=()=>{stage.innerHTML=origStage;renderGrid();};
+  await initializePlanPage();
+}async function initializePlanPage(){await loadPlans();await renderPlanPageUI();}async function loadPlans(){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));if(!plans||plans.length===0){const defaultPlans=["Monday","Tuesday","Wednesday","Thursday","Friday","Custom"].map((name,idx)=>({id:uid(),profileId:state.profileId,name,schedule:{},order:idx}));for(const p of defaultPlans)await saveLocal("plans",p);planState.plans=defaultPlans;}else{planState.plans=plans.sort((a,b)=>a.order-b.order);}}async function renderPlanPageUI(){
+  const app=document.querySelector(".app");const stage=app?app.querySelector(".stage"):document.getElementById("stage");
   if(!stage)return;
   
   const isMobile=window.innerWidth<768;
