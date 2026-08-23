@@ -918,11 +918,17 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
 
 document.addEventListener("DOMContentLoaded",initializeEventListeners);
 function validateParentIds(channels){
+  console.log("validateParentIds: checking",channels.length,"channels");
   const ids=new Set(channels.map(c=>c.id));
+  console.log("validateParentIds: ids in set=",Array.from(ids));
   return channels.map(c=>{
-    if(c.parentChannelId&&!ids.has(c.parentChannelId)){
-      console.warn("Clearing invalid parent for",c.label,"- parent not found");
-      c.parentChannelId=null;
+    if(c.parentChannelId){
+      const exists=ids.has(c.parentChannelId);
+      console.log("  Channel",c.label,"parentId=",c.parentChannelId,"exists=",exists);
+      if(!exists){
+        console.warn("Clearing invalid parent for",c.label,"- parent ID",c.parentChannelId,"not in",Array.from(ids));
+        c.parentChannelId=null;
+      }
     }
     return c;
   });
