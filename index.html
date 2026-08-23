@@ -315,8 +315,17 @@ window.addEventListener("offline", () => setSync("offline"));
 setInterval(() => { if(navigator.onLine) runSync(); }, 15000);
 document.addEventListener("visibilitychange", () => { if(!document.hidden){ document.getElementById("gridContainer").innerHTML = ""; setSync("synced"); if(navigator.onLine) runSync(); }});
 
+// Service worker disabled - clear old caches
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('data:application/javascript;base64,Y29uc3Qgdmlyc2lvbj0idjY4Ijtjb25zdCBjYWNoZU5hbWU9ImR0dC12NjgiO2NvbnN0IGFzc2V0cz1bIi8iXTtzZWxmLmFkZEV2ZW50TGlzdGVuZXIoImluc3RhbGwiLGU9Pntjb25zb2xlLmxvZyhcIlNXIGluc3RhbGxpbmdcIik7ZS53YWl0VW50aWwoY2FjaGVzLm9wZW4oY2FjaGVOYW1lKS50aGVuKGM9PntjLmFkZEFsbChhc3NldHMpfSkpfSk7c2VsZi5hZGRFdmVudExpc3RlbmVyKCJhY3RpdmF0ZSIsZT0+e2Uud2FpdFVudGlsKGNhY2hlcy5kZWxldGUoXCJkdHQtdjY3XCIpKX0pO3NlbGYuYWRkRXZlbnRMaXN0ZW5lcihcImZldGNoXCIsZT0+e2lmKGUucmVxdWVzdC5tZXRob2QhPT1cIkdFVFwiKXJldHVybjtlLnJlc3BvbmRXaXRoKGNhY2hlcy5tYXRjaChlLnJlcXVlc3QpLnRoZW4ocj0+cnx8ZmV0Y2goZS5yZXF1ZXN0KSkpfSk=').catch(e => console.warn('SW registration failed:', e));
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(r => r.unregister());
+  });
+}
+// Clear all caches
+if('caches' in window){
+  caches.keys().then(names => {
+    names.forEach(name => caches.delete(name));
+  });
 }
 
 (async function() {
