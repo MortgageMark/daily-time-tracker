@@ -26,7 +26,7 @@
   button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
   .app{display:flex; flex-direction:column; height:100vh; height:100dvh}
 
-  .topbar{display:flex; align-items:center; gap:16px; padding:14px 20px; border-bottom:1px solid var(--line); background:rgba(10,16,28,.55); backdrop-filter:blur(8px)}
+  .topbar{display:flex; align-items:center; gap:16px; padding:max(14px, env(safe-area-inset-top)) 20px 14px 20px; border-bottom:1px solid var(--line); background:rgba(10,16,28,.55); backdrop-filter:blur(8px)}
   .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.2px}
   .brand .dot{width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 14px var(--accent)}
   .topmeta{display:flex; align-items:center; gap:22px; margin-left:auto; flex-wrap:wrap}
@@ -63,7 +63,7 @@
   .empty{max-width:520px; margin:8vh auto; text-align:center; color:var(--ink2)}
   .empty h2{color:var(--ink)}
 
-  .bottombar{display:flex; align-items:center; gap:10px; padding:12px 18px; border-top:1px solid var(--line); background:rgba(10,16,28,.6); backdrop-filter:blur(8px)}
+  .bottombar{display:flex; align-items:center; gap:10px; padding:12px 18px max(12px, env(safe-area-inset-bottom)) 18px; border-top:1px solid var(--line); background:rgba(10,16,28,.6); backdrop-filter:blur(8px)}
   .ctl{display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 14px; border-radius:14px; border:1px solid var(--line); background:var(--panel); font-size:12px; font-weight:700; min-width:76px; color:var(--ink2)}
   .ctl svg{width:22px;height:22px}
   .ctl:active{transform:scale(.96)}
