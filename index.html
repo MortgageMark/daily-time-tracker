@@ -112,9 +112,8 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.40.0/+esm"></script>
-<script type="module">
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.40.0/+esm';
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
 
 const SUPA_URL = "https://vvybypeyzfgakenkotbw.supabase.co";
 const SUPA_KEY = "sb_publishable_-aDVEq7DzlUz7hlvpgkUhw_i6yXO2SU";
@@ -143,7 +142,7 @@ const getStorage = () => {
 };
 
 const storage = getStorage();
-const SB = createClient(SUPA_URL, SUPA_KEY, { 
+const SB = window.supabase.createClient(SUPA_URL, SUPA_KEY, { 
   auth:{ 
     persistSession: true, 
     autoRefreshToken: true, 
