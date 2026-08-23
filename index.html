@@ -743,7 +743,7 @@ function openScrim(id){document.getElementById(id).classList.add("open");}
 function closeScrim(id){document.getElementById(id).classList.remove("open");}
 function initializeEventListeners(){
   // Scrim close handlers
-  document.querySelectorAll("[data-close]").forEach(b=>{if(b)b.addEventListener("click",e=>e.target.closest(".scrim")?.classList.remove("open"));});
+  document.querySelectorAll("[data-close]").forEach(b=>{if(b)b.addEventListener("click",e=>{const scrim=e.target.closest(".scrim");if(scrim){scrim.classList.remove("open");if(scrim.id==="chanScrim"){editingChanId=null;editingParentId=null;window._savedParentId=null;}}});});
   document.querySelectorAll(".scrim").forEach(s=>{if(s)s.addEventListener("click",e=>{if(e.target===s)s.classList.remove("open");});});
 
   // Top bar
@@ -767,7 +767,7 @@ function initializeEventListeners(){
   document.addEventListener("click",e=>{if(e.target.id==="addChannelBtn")openChannelEditor(null);});
   const chanColor=document.getElementById("chanColor");if(chanColor)chanColor.addEventListener("input",()=>{renderPalette(document.getElementById("chanColor").value);updateChanPreview();});
   const chanLabel=document.getElementById("chanLabel");if(chanLabel)chanLabel.addEventListener("input",updateChanPreview);
-  const chanSave=document.getElementById("chanSave");if(chanSave)chanSave.addEventListener("click",async()=>{const label=document.getElementById("chanLabel").value.trim()||"Untitled";const color=document.getElementById("chanColor").value;const parentId=editingParentId;
+  const chanSave=document.getElementById("chanSave");if(chanSave)chanSave.addEventListener("click",async()=>{console.log("SAVE BUTTON: editingParentId=",editingParentId,"editingChanId=",editingChanId);const label=document.getElementById("chanLabel").value.trim()||"Untitled";const color=document.getElementById("chanColor").value;const parentId=editingParentId;
     if(editingChanId){const c=state.channels.find(x=>x.id===editingChanId);c.label=label;c.color=color;await saveLocal("channels",c);}
     else{
       // Use editingParentId which was set by openChannelEditor
