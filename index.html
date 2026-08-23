@@ -763,15 +763,14 @@ function initializeEventListeners(){
   const addChannelBtn=document.getElementById("addChannelBtn");if(addChannelBtn)addChannelBtn.addEventListener("click",()=>openChannelEditor(null));
   const chanColor=document.getElementById("chanColor");if(chanColor)chanColor.addEventListener("input",()=>{renderPalette(document.getElementById("chanColor").value);updateChanPreview();});
   const chanLabel=document.getElementById("chanLabel");if(chanLabel)chanLabel.addEventListener("input",updateChanPreview);
-  const chanSave=document.getElementById("chanSave");if(chanSave)chanSave.addEventListener("click",async()=>{const label=document.getElementById("chanLabel").value.trim()||"Untitled";const color=document.getElementById("chanColor").value;
+  const chanSave=document.getElementById("chanSave");if(chanSave)chanSave.addEventListener("click",async()=>{const label=document.getElementById("chanLabel").value.trim()||"Untitled";const color=document.getElementById("chanColor").value;const parentId=editingParentId;
     if(editingChanId){const c=state.channels.find(x=>x.id===editingChanId);c.label=label;c.color=color;await saveLocal("channels",c);}
-    else{console.log("Creating new channel. editingParentId=",editingParentId);const order=Math.max(-1,...state.channels.map(c=>!editingParentId||c.parentChannelId===editingParentId?c.order:-1))+1;const newCh={id:uid(),profileId:state.profileId,label,color,order,archived:false};if(editingParentId){newCh.parentChannelId=editingParentId;console.log("Channel has parentChannelId set to:",editingParentId);}await saveLocal("channels",newCh);}
+    else{console.log("Creating new channel. editingParentId=",parentId);const order=Math.max(-1,...state.channels.map(c=>!parentId||c.parentChannelId===parentId?c.order:-1))+1;const newCh={id:uid(),profileId:state.profileId,label,color,order,archived:false};if(parentId){newCh.parentChannelId=parentId;console.log("Channel has parentChannelId set to:",parentId);}await saveLocal("channels",newCh);}
     state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
     console.log("After idbAll - raw channels from DB:", state.channels.map(c=>({label:c.label, id:c.id, parentChannelId:c.parentChannelId, hasOwnProperty:c.hasOwnProperty('parentChannelId')})));
-    // Ensure parentChannelId is preserved (set to undefined if not present for consistent filtering)
     state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});
     console.log("After normalization:", state.channels.map(c=>({label:c.label, id:c.id, parentChannelId:c.parentChannelId})));
-    editingParentId=null;closeScrim("chanScrim");renderChannelSettings();renderGrid();toast("Saved");});
+    closeScrim("chanScrim");renderChannelSettings();renderGrid();toast("Saved");});
   const chanArchive=document.getElementById("chanArchive");if(chanArchive)chanArchive.addEventListener("click",async()=>{const c=state.channels.find(x=>x.id===editingChanId);c.archived=true;await saveLocal("channels",c);if(running&&running.channelId===c.id)await stopRunning(now());state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));closeScrim("chanScrim");renderChannelSettings();renderAll();toast("Archived (history kept)");});
 
   // Navigation buttons
