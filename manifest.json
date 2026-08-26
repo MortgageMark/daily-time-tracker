@@ -1,6 +1,6 @@
 {
-  "name": "Daily Time Tracker",
-  "short_name": "TimeTracker",
+  "name": "Time Tracker",
+  "short_name": "Time Tracker",
   "description": "Track time across activities with daily insights and adherence tracking",
   "start_url": "/",
   "scope": "/",

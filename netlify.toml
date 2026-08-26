@@ -1,8 +1,8 @@
 [build]
-  # Stamps the build into index.html and writes version.json, so the running
-  # app can tell whether a newer deploy exists. COMMIT_REF is provided by
-  # Netlify. Times are UTC, format YYYYMMDDHHMM-<short commit>.
-  command = "BUILD_ID=\"$(date -u +%Y%m%d%H%M)-$(echo ${COMMIT_REF:-nocommit} | cut -c1-7)\"; echo \"Build: $BUILD_ID\"; sed -i \"s/__BUILD_ID__/$BUILD_ID/g\" index.html; printf '{\"build\":\"%s\"}' \"$BUILD_ID\" > version.json; grep -c \"$BUILD_ID\" index.html"
+  # On every deploy: stamp the build id into index.html and write version.json
+  # (build id + release number) so the running app can detect a newer deploy.
+  # COMMIT_REF is provided by Netlify. Times are UTC: YYYYMMDDHHMM-<short commit>.
+  command = "BUILD_ID=\"$(date -u +%Y%m%d%H%M)-$(echo ${COMMIT_REF:-nocommit} | cut -c1-7)\"; RELEASE=$(grep -o 'const APP_RELEASE=[0-9]*' index.html | grep -o '[0-9]*' | head -1); RELEASE=${RELEASE:-0}; echo \"Build: $BUILD_ID  release v$RELEASE\"; sed -i \"s/__BUILD_ID__/$BUILD_ID/g\" index.html; printf '{\"build\":\"%s\",\"release\":%s}' \"$BUILD_ID\" \"$RELEASE\" > version.json; cat version.json; echo; grep -c \"$BUILD_ID\" index.html"
   publish = "."
   functions = "functions"
 
@@ -30,7 +30,7 @@
 
 # Redirect all routes to index.html for PWA.
 # Netlify serves a real file before applying a non-forced rewrite, so
-# /version.json and /manifest.json are unaffected by this rule.
+# /version.json, /manifest.json and the icons are unaffected by this rule.
 [[redirects]]
   from = "/*"
   to = "/index.html"

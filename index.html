@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="DailyTimeTracker">
+<meta name="apple-mobile-web-app-title" content="Time Tracker">
 <meta name="theme-color" content="#0f172a">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -825,6 +825,10 @@ let toastT; /* ===== build version + update detection =====
    cause of someone running an old version is simply that they never reload:
    an installed PWA or a long-lived tab keeps executing whatever it loaded.
    So the running app polls a tiny version.json and offers a reload. */
+/* Human-facing release number. Bump this when cutting a release; the
+   build stamp below is filled in automatically at deploy time. Together
+   they read as "v3 - 2026.08.26 03:45". */
+const APP_RELEASE=1;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -840,16 +844,16 @@ async function checkForUpdate(){
     const r=await fetch("/version.json?t="+Date.now(),{cache:"no-store"});
     if(!r.ok) return;
     const j=await r.json();
-    if(j&&j.build&&j.build!==BUILD_ID){ updateReady=true; showUpdateBanner(j.build); }
+    if(j&&j.build&&j.build!==BUILD_ID){ updateReady=true; showUpdateBanner(j.build,j.release); }
   }catch(e){ /* offline, blocked, or file missing - stay quiet */ }
 }
-function showUpdateBanner(newBuild){
+function showUpdateBanner(newBuild,newRelease){
   if(document.getElementById("updateBanner")) return;
   const bar=document.createElement("div");
   bar.id="updateBanner";
   bar.style.cssText="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));z-index:300;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--accent);box-shadow:var(--shadow);max-width:calc(100vw - 24px);flex-wrap:wrap;justify-content:center";
   bar.innerHTML='<span style="font-size:13px;font-weight:700;color:var(--ink)">New version available</span>'+
-                '<span style="font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums">'+fmtBuild(newBuild)+'</span>'+
+                '<span style="font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums">'+(newRelease?('v'+newRelease+' '):'')+fmtBuild(newBuild)+'</span>'+
                 '<button class="btn sm pri" id="updateReloadBtn">Reload</button>'+
                 '<button class="btn sm" id="updateLaterBtn">Later</button>';
   document.body.appendChild(bar);
@@ -973,8 +977,8 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
 
   const ver=document.createElement("div");
   ver.style="padding:8px 12px 10px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:6px";
-  ver.innerHTML='<span>Version</span><span style="font-variant-numeric:tabular-nums;color:var(--ink2)">'+fmtBuild(BUILD_ID)+'</span>';
-  ver.title=String(BUILD_ID);
+  ver.innerHTML='<span>Version</span><span style="font-variant-numeric:tabular-nums;color:var(--ink2)">v'+APP_RELEASE+'</span><span style="font-variant-numeric:tabular-nums;opacity:.75">'+fmtBuild(BUILD_ID)+'</span>';
+  ver.title="Release v"+APP_RELEASE+"  build "+String(BUILD_ID);
   m.appendChild(ver);
 }
 
