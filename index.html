@@ -583,6 +583,7 @@ async function dirtyRecords(){
 function scheduleSync(){ if(syncTimer)return; syncTimer=setTimeout(()=>{syncTimer=null;runSync();},400); }
 
 async function runSync(){
+  if(!db){ return; }   /* 15s timer can fire before openDB() resolves */
   if(!navigator.onLine){ setSync("offline"); return; }
   const { data:sess } = await SB.auth.getSession();
   if(!sess || !sess.session){ setSync("offline"); return; }
@@ -808,7 +809,87 @@ setInterval(async()=>{ if(!db||!state.profileId||!state.profile)return; await up
 },1000);
 
 /* ===== toast ===== */
-let toastT; function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1500);}
+let toastT; /* ===== in-app dialogs =====
+   Native confirm()/prompt() are unreliable outside a plain top-level page:
+   sandboxed frames return false without showing anything, and prompt() can
+   throw outright. Every destructive or naming action routes through these
+   instead, so the answer never depends on the host environment. */
+function uiDialog(opts){
+  return new Promise(resolve=>{
+    const o=opts||{};
+    const wantsInput=o.kind==="prompt";
+    let settled=false;
+    const done=v=>{ if(settled) return; settled=true; cleanup(); resolve(v); };
+
+    const scrim=document.createElement("div");
+    scrim.className="scrim";
+    scrim.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.7);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px";
+
+    const card=document.createElement("div");
+    card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:400px;width:100%;box-shadow:var(--shadow)";
+
+    if(o.title){
+      const h=document.createElement("div");
+      h.style.cssText="font-size:16px;font-weight:800;margin-bottom:8px;color:var(--ink)";
+      h.textContent=o.title;
+      card.appendChild(h);
+    }
+    const msg=document.createElement("div");
+    msg.style.cssText="font-size:14px;line-height:1.55;color:var(--ink2);white-space:pre-wrap";
+    msg.textContent=o.message||"";
+    card.appendChild(msg);
+
+    let input=null;
+    if(wantsInput){
+      input=document.createElement("input");
+      input.type="text";
+      input.value=o.value||"";
+      input.style.cssText="width:100%;margin-top:14px;padding:11px;background:#0a1424;border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:14px;outline:none";
+      card.appendChild(input);
+    }
+
+    const row=document.createElement("div");
+    row.style.cssText="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap";
+    const cancel=document.createElement("button");
+    cancel.className="btn sm";
+    cancel.textContent=o.cancelLabel||"Cancel";
+    const ok=document.createElement("button");
+    ok.className="btn sm "+(o.danger?"warn":"pri");
+    ok.textContent=o.okLabel||"OK";
+    if(o.danger) ok.style.cssText="background:#dc2626;border-color:#dc2626;color:#fff";
+    row.appendChild(cancel); row.appendChild(ok);
+    card.appendChild(row);
+    scrim.appendChild(card);
+
+    const onKey=e=>{
+      if(e.key==="Escape"){ e.preventDefault(); done(wantsInput?null:false); }
+      else if(e.key==="Enter"&&(!wantsInput||document.activeElement===input)){
+        e.preventDefault(); done(wantsInput?(input.value||""):true);
+      }
+    };
+    function cleanup(){
+      document.removeEventListener("keydown",onKey,true);
+      if(scrim.parentNode) scrim.parentNode.removeChild(scrim);
+    }
+    cancel.addEventListener("click",()=>done(wantsInput?null:false));
+    ok.addEventListener("click",()=>done(wantsInput?(input.value||""):true));
+    scrim.addEventListener("click",e=>{ if(e.target===scrim) done(wantsInput?null:false); });
+    document.addEventListener("keydown",onKey,true);
+
+    document.body.appendChild(scrim);
+    setTimeout(()=>{ if(wantsInput){ input.focus(); input.select(); } else { ok.focus(); } },30);
+  });
+}
+function uiConfirm(message,opts){
+  const o=opts||{};
+  return uiDialog({kind:"confirm",message:message,title:o.title||"Are you sure?",okLabel:o.okLabel||"Confirm",cancelLabel:o.cancelLabel||"Cancel",danger:!!o.danger});
+}
+function uiPrompt(message,value,opts){
+  const o=opts||{};
+  return uiDialog({kind:"prompt",message:message,value:value||"",title:o.title||"",okLabel:o.okLabel||"Save",cancelLabel:o.cancelLabel||"Cancel"});
+}
+
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1500);}
 
 /* ===== avatar menu ===== */
 function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.innerHTML="";
@@ -1212,8 +1293,8 @@ function renderChannelSettings(){
 
 /* Delete-all lives at the very bottom of Channels, under Archived. */
 async function deleteAllChannels(){
-  if(!confirm("Delete ALL channels and start fresh?\n\nThis removes every channel and subcategory from this device and from the cloud. It cannot be undone.")) return;
-  if(!confirm("Last chance — permanently delete all channels?")) return;
+  if(!await uiConfirm("Delete ALL channels and start fresh?\n\nThis removes every channel and subcategory from this device and from the cloud. It cannot be undone.")) return;
+  if(!await uiConfirm("Last chance — permanently delete all channels?")) return;
   try{
     const allChs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
     for(const ch of allChs){
@@ -1254,7 +1335,7 @@ async function restoreChannel(id){
   await refreshChannels();
   toast("Restored");
 }
-async function deleteChannel(id){if(!confirm("Permanently delete this channel? This cannot be undone."))return;try{await db.transaction(["channels"],"readwrite").objectStore("channels").delete(id);const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const toDelete=allSessions.filter(s=>s.channelId===id);for(const sess of toDelete){await db.transaction(["sessions"],"readwrite").objectStore("sessions").delete(sess.id);}state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();toast("Deleted permanently");}catch(e){console.error("Delete error:",e);toast("Error deleting channel");}}
+async function deleteChannel(id){if(!await uiConfirm("Permanently delete this channel? This cannot be undone."))return;try{await db.transaction(["channels"],"readwrite").objectStore("channels").delete(id);const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const toDelete=allSessions.filter(s=>s.channelId===id);for(const sess of toDelete){await db.transaction(["sessions"],"readwrite").objectStore("sessions").delete(sess.id);}state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();toast("Deleted permanently");}catch(e){console.error("Delete error:",e);toast("Error deleting channel");}}
 function openChannelEditor(id,parentId){editingChanId=id;editingParentId=parentId||null;const c=id?state.channels.find(x=>x.id===id):null;const parent=parentId?state.channels.find(x=>x.id===parentId):null;document.getElementById("chanTitle").textContent=c?"Edit channel":parent?"Add subcategory":"Add channel";document.getElementById("chanLabel").value=c?c.label:"";const col=c?c.color:parent?parent.color:PALETTE[state.channels.length%PALETTE.length];document.getElementById("chanColor").value=col;document.getElementById("chanArchive").style.display=c?"block":"none";renderPalette(col);updateChanPreview();openScrim("chanScrim");}
 function renderPalette(sel){const p=document.getElementById("chanPalette");p.innerHTML="";PALETTE.forEach(col=>{const ch=document.createElement("div");ch.className="pchip"+(col.toLowerCase()===sel.toLowerCase()?" sel":"");ch.style.background=col;ch.addEventListener("click",()=>{document.getElementById("chanColor").value=col;renderPalette(col);updateChanPreview();});p.appendChild(ch);});}
 function updateChanPreview(){const col=document.getElementById("chanColor").value;const lbl=document.getElementById("chanLabel").value||"Preview";const prev=document.getElementById("chanPreview");prev.style.background=`linear-gradient(160deg,${col},${shade(col,.22)})`;prev.style.color=contrastInk(col);document.getElementById("cpLabel").textContent=lbl;document.getElementById("chanPreviewSw").style.background=col;}
@@ -1495,7 +1576,7 @@ async function openCombinedSummary(){
     
     window.editHistoryNotes=async(dateKey)=>{
       const currentNotes=document.querySelector(`[data-history-notes="${dateKey}"]`)?.textContent||"";
-      const newNotes=prompt("Edit notes:",currentNotes);
+      const newNotes=await uiPrompt("Edit notes:",currentNotes);
       if(newNotes!==null){
         const ratingSpan=document.querySelector(`[data-history-star="${dateKey}"]`);
         const rating=parseInt(ratingSpan?.dataset.rating||0);
@@ -1553,7 +1634,7 @@ async function openCombinedSummary(){
       const notesArea=document.querySelector('[data-edit-notes][data-week-date="'+date+'"]');
       if(notesArea){
         const currentNotes=notesArea.textContent;
-        const newNotes=prompt("Edit notes:",currentNotes);
+        const newNotes=await uiPrompt("Edit notes:",currentNotes);
         if(newNotes!==null){
           const ratingSpan=document.querySelector('[data-edit-star][data-week-date="'+date+'"]');
           const rating=parseInt(ratingSpan?.dataset.rating||0);
@@ -1791,7 +1872,7 @@ async function applyTemplateToToday(planId){
   if(!src) return;
   const date=todayKey();
   const cur=await idbGet("dayplans",dayPlanKey(date));
-  if(cur&&cur.edited&&!confirm("Today has edits that are not saved to any template. Replacing it with "+src.name+" will discard them. Continue?")) return;
+  if(cur&&cur.edited&&!await uiConfirm("Today has edits that are not saved to any template. Replacing it with "+src.name+" will discard them. Continue?")) return;
   const fresh={ id:dayPlanKey(date), profileId:state.profileId, date:date,
                 planId:src.id, planName:src.name,
                 schedule:JSON.parse(JSON.stringify(src.schedule||{})), edited:false };
@@ -1805,7 +1886,7 @@ async function saveTodayToTemplate(){
   const dp=planState.today; if(!dp) return;
   const tpl=(planState.plans||[]).find(p=>p.id===dp.planId);
   if(!tpl){ toast("Today is not linked to a template"); return; }
-  if(!confirm("Save today into the template "+tpl.name+"? Every future day that uses it will change.")) return;
+  if(!await uiConfirm("Save today into the template "+tpl.name+"? Every future day that uses it will change.")) return;
   tpl.schedule=JSON.parse(JSON.stringify(dp.schedule||{}));
   await saveLocal("plans",tpl);
   dp.edited=false; await saveLocal("dayplans",dp);
@@ -1814,7 +1895,7 @@ async function saveTodayToTemplate(){
 }
 async function resetTodayToTemplate(){
   const dp=planState.today; if(!dp||!dp.planId) return;
-  if(!confirm("Discard today's edits and reload it from its template?")) return;
+  if(!await uiConfirm("Discard today's edits and reload it from its template?")) return;
   const src=(planState.plans||[]).find(p=>p.id===dp.planId); if(!src) return;
   const fresh={ id:dayPlanKey(dp.date), profileId:state.profileId, date:dp.date,
                 planId:src.id, planName:src.name,
@@ -1852,7 +1933,7 @@ async function setPlanMode(mode){
 }
 async function renamePlan(idx){
   const plan=(planState.plans||[])[idx]; if(!plan) return;
-  const name=prompt("Template name:",plan.name);
+  const name=await uiPrompt("Template name:",plan.name);
   if(name===null) return;
   const clean=String(name).trim(); if(!clean) return;
   plan.name=clean;
@@ -2151,7 +2232,7 @@ async function checkDeletedDaysCount(){
 }
 
 async function restoreDeletedDays(){
-  if(!confirm("Restore all deleted days to your history?"))return;
+  if(!await uiConfirm("Restore all deleted days to your history?"))return;
   const allNotes=await idbAll("day_notes","profile",IDBKeyRange.only(state.profileId));
   const deletedNotes=allNotes.filter(n=>n.deleted);
   for(const note of deletedNotes){
@@ -2163,9 +2244,9 @@ async function restoreDeletedDays(){
 }
 
 async function showDeleteRangePrompt(){
-  const startDateStr=prompt("Delete from (YYYY-MM-DD):");
+  const startDateStr=await uiPrompt("Delete from (YYYY-MM-DD):");
   if(!startDateStr)return;
-  const endDateStr=prompt("Delete to (YYYY-MM-DD):");
+  const endDateStr=await uiPrompt("Delete to (YYYY-MM-DD):");
   if(!endDateStr)return;
   
   const startDate=new Date(startDateStr);
@@ -2191,7 +2272,7 @@ async function showDeleteRangePrompt(){
     }
   }
   
-  if(!confirm("This will soft-delete "+deleteCount+" day(s). You can restore them later. Continue?"))return;
+  if(!await uiConfirm("This will soft-delete "+deleteCount+" day(s). You can restore them later. Continue?"))return;
   
   for(const note of allNotes){
     const noteDate=new Date(note.dateKey.replace(/(\d{4})-(\d{2})-(\d{2})/,"$1/$2/$3"));
@@ -2206,13 +2287,13 @@ async function showDeleteRangePrompt(){
 }
 
 async function showCompleteResetConfirm(){
-  const step1=confirm("⚠️ WARNING: You are about to delete ALL your data.\n\nClick OK to go to step 2.");
+  const step1=await uiConfirm("⚠️ WARNING: You are about to delete ALL your data.\n\nClick OK to go to step 2.");
   if(!step1)return;
   
-  const step2=confirm("This will delete:\n- All sessions\n- All ratings and notes\n- All settings\n\nThis CANNOT be undone. Are you absolutely sure?");
+  const step2=await uiConfirm("This will delete:\n- All sessions\n- All ratings and notes\n- All settings\n\nThis CANNOT be undone. Are you absolutely sure?");
   if(!step2)return;
   
-  const step3=prompt("Type 'RESET ALL' to confirm permanent deletion:");
+  const step3=await uiPrompt("Type 'RESET ALL' to confirm permanent deletion:");
   if(step3!=="RESET ALL")return;
   
   toast("Resetting your data...");
@@ -2481,14 +2562,14 @@ async function wipeLocalData(){
   for(const n of names){ try{ await idbClear(n); }catch(e){ console.warn("wipeLocalData:",n,e); } }
 }
 async function doSignOut(){
-  if(!confirm("Sign out of this account?")) return;
+  if(!await uiConfirm("Sign out of this account?")) return;
   /* Sign-out clears local data, so push anything unsynced first. */
   try{
     if(navigator.onLine){ await runSync(); }
     const dirty=await dirtyRecords();
     if(dirty.length){
       const msg="Warning: "+dirty.length+" change(s) have not synced to the cloud yet.\n\nSigning out clears local data and those changes will be lost. Sign out anyway?";
-      if(!confirm(msg)) return;
+      if(!await uiConfirm(msg)) return;
     }
   }catch(e){ console.warn("pre-sign-out sync check failed",e); }
   try{ await wipeLocalData(); }catch(e){ console.warn("sign-out wipe failed",e); }
