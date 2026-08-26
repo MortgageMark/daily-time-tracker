@@ -44,7 +44,15 @@
     color:var(--ink); overflow:hidden; user-select:none; -webkit-user-select:none;
   }
   button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
-  .app{display:flex; flex-direction:column; height:100vh; height:100dvh}
+  /* position:fixed + inset:0 pins the app to the layout viewport, which with
+     viewport-fit=cover is the entire screen including the home-indicator strip.
+     height:100dvh alone was not enough in the installed iOS PWA: dvh can
+     resolve shorter than the screen there, leaving a band below the bottom bar
+     that showed whatever was behind it. inset:0 cannot do that. The bottom
+     bar keeps its env(safe-area-inset-bottom) padding, so the buttons still
+     sit clear of the home indicator - but that padding is now INSIDE the bar
+     rather than empty space beneath it. */
+  .app{display:flex; flex-direction:column; position:fixed; inset:0}
 
   .topbar{display:flex; align-items:center; gap:16px; padding:max(14px, env(safe-area-inset-top)) 20px 14px 20px; border-bottom:1px solid var(--line); background:rgba(10,16,28,.55); backdrop-filter:blur(8px)}
   .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.2px}
@@ -84,7 +92,7 @@
   .empty{max-width:520px; margin:8vh auto; text-align:center; color:var(--ink2)}
   .empty h2{color:var(--ink)}
 
-  .bottombar{display:flex; align-items:center; gap:10px; padding:12px 18px max(12px, env(safe-area-inset-bottom)) 18px; border-top:1px solid var(--line); background:rgba(10,16,28,.6); backdrop-filter:blur(8px)}
+  .bottombar{display:flex; align-items:center; gap:10px; padding:12px 18px max(12px, env(safe-area-inset-bottom)) 18px; border-top:1px solid var(--line); background:#0a101c; backdrop-filter:blur(8px)}
   .ctl{display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 14px; border-radius:14px; border:1px solid var(--line); background:var(--panel); font-size:12px; font-weight:700; min-width:76px; color:var(--ink2)}
   .ctl svg{width:22px;height:22px}
   .ctl:active{transform:scale(.96)}
@@ -1594,7 +1602,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=4;
+const APP_RELEASE=5;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -2452,19 +2460,18 @@ async function openCombinedSummary(){
         const ch=state.channels.find(x=>x.id===chId)||{label:"(deleted)",color:"#64748b"};
         return`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:10px"><div style="width:6px;height:6px;border-radius:50%;background:${ch.color}"></div><div style="flex:1;min-width:0;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ch.label)}</div><div style="font-weight:600;color:var(--ink2);min-width:40px;text-align:right">${fmtDur(dur)}</div></div>`
       }).join('');
-      const starHtml=Array.from({length:5}).map((_,i)=>{
-        const filled=i<dRating;
-        const star=filled?'★':'☆';
-        const color=filled?'#fbbf24':'#9ca3af';
-        return `<span style="cursor:pointer;color:${color};transition:all .1s;font-size:24px;font-weight:800" onclick="window.editWeekStar('${dKey}',${i+1})" data-edit-star data-week-date="${dKey}" data-rating="${dRating}" title="Click to rate ${i+1}/5">${star}</span>`;
-      }).join('');
+      /* The wrapper carries the data-* attributes because editWeekNotes()
+         reads the current rating back off [data-edit-star][data-week-date]. */
+      const starHtml='<span data-edit-star data-week-date="'+dKey+'" data-rating="'+dRating+'">'+
+                     starCellHtml(dKey,dRating,"editWeekStar",24)+'</span>';
+      const dTypeSelCard=dayTypeSelectHtml(dKey,await getDayType(dKey));
       
       const notesDisplay=dNotes?`<div style="font-size:10px;color:var(--ink2);margin:6px 0;font-style:italic;cursor:pointer" onclick="window.editWeekNotes('${dKey}')" data-edit-notes data-week-date="${dKey}" data-rating="${dRating}" title="Click to edit notes">"${escapeHtml(dNotes)}"</div>`:`<div style='font-size:10px;color:var(--muted);cursor:pointer' onclick="window.editWeekNotes('${dKey}')" data-edit-notes data-week-date="${dKey}" data-rating="${dRating}" title="Click to add notes">No notes</div>`;
       
       const adhStr=adhCellHtml(dayNote.matchScore,dayNote.budgetScore?dayNote.budgetScore.pct:undefined);
       
       weekTotal+=day.total;
-      content+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)">${dName}</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">${fmtDur(day.total)}</div><div style="font-size:11px;color:var(--ink2);margin-bottom:6px">${adhStr}</div><div style="margin:8px 0">${starHtml}</div>${notesDisplay}<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:9px">${chRows||'<div style="color:var(--muted)">No sessions</div>'}</div></div>`;
+      content+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)">${dName}</div><div style="margin-bottom:6px">${dTypeSelCard}</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">${fmtDur(day.total)}</div><div style="font-size:11px;color:var(--ink2);margin-bottom:6px">${adhStr}</div><div style="margin:8px 0">${starHtml}</div>${notesDisplay}<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:9px">${chRows||'<div style="color:var(--muted)">No sessions</div>'}</div></div>`;
     }
     content+='</div>';
     content+=`<div style="margin-top:14px;padding:12px;background:linear-gradient(180deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.3);border-radius:12px"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Total</div><div style="font-size:22px;font-weight:800;color:var(--good)">${fmtDur(weekTotal)}</div></div>`;
@@ -2483,18 +2490,14 @@ async function openCombinedSummary(){
       const isWeekend=dayOfWeek===0||dayOfWeek===6;
       const rowBg=isWeekend?'rgba(100,116,139,.15)':'transparent';
       
-      const starHtml=Array.from({length:5}).map((_,i)=>{
-        const filled=i<dRating;
-        const star=filled?'★':'☆';
-        const color=filled?'#fbbf24':'#9ca3af';
-        return `<span style="cursor:pointer;color:${color};transition:all .1s;font-size:20px;font-weight:800;margin:0 2px" onclick="window.editWeekStar('${dKey}',${i+1})" title="Rate ${i+1}/5">${star}</span>`;
-      }).join('');
+      const starHtml=starCellHtml(dKey,dRating,"editWeekStar");
+      const dTypeSel=dayTypeSelectHtml(dKey,await getDayType(dKey));
       
       const adhData=await idbGet("day_notes",dKey);
       const adhStr=adhCellHtml(adhData&&adhData.matchScore,adhData&&adhData.budgetScore?adhData.budgetScore.pct:undefined);
       
       weekTotal+=day.total;
-      content+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink)">${dName}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editWeekNotes('${dKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
+      content+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink)">${dName}${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editWeekNotes('${dKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
     }
     content+='</tbody></table></div></div>';
     
@@ -2562,14 +2565,10 @@ async function openCombinedSummary(){
         const rowBg=isWeekend?'rgba(100,116,139,.15)':'transparent';
         const dName=dayDate.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
         
-        const starHtml=Array.from({length:5}).map((_,i)=>{
-          const filled=i<dRating;
-          const star=filled?'★':'☆';
-          const color=filled?'#fbbf24':'#9ca3af';
-          return `<span style="cursor:pointer;color:${color};transition:all .1s;font-size:20px;font-weight:800;margin:0 2px" onclick="window.editHistoryStar('${dateKey}',${i+1})" title="Rate ${i+1}/5">${star}</span>`;
-        }).join('');
+        const starHtml=starCellHtml(dateKey,dRating,"editHistoryStar");
+        const dTypeSel=dayTypeSelectHtml(dateKey,await getDayType(dateKey));
         
-        historyHtml+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink)">${dName}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editHistoryNotes('${dateKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
+        historyHtml+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink)">${dName}${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editHistoryNotes('${dateKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
       }
       
       const historyBody=document.getElementById("historyTableBody");
@@ -2600,13 +2599,7 @@ async function openCombinedSummary(){
     setTimeout(()=>{
       const todayStarsDiv=document.getElementById("todayStars");
       if(todayStarsDiv){
-        let starHtml='';
-        for(let i=1;i<=5;i++){
-          const star=i<=rating?'★':'☆';
-          const color=i<=rating?'#fbbf24':'#9ca3af';
-          starHtml+='<span style="cursor:pointer;color:'+color+';transition:all .1s;font-size:28px;font-weight:800" onclick="window.todayRateStar('+i+')" title="Rate '+i+'/5">'+star+'</span>';
-        }
-        todayStarsDiv.innerHTML=starHtml;
+        todayStarsDiv.innerHTML=starCellHtml(dayKey,rating,"todayRateStar",28);
       }
       const todayNotesArea=document.getElementById("todayNotes");
       if(todayNotesArea){
@@ -2627,11 +2620,11 @@ async function openCombinedSummary(){
       });
     },0);
     
-    window.todayRateStar=async(r)=>{
+    /* Takes (date,rating) now so it matches the shared starCellHtml contract. */
+    window.todayRateStar=async(d,r)=>{
       const todayNotesArea=document.getElementById("todayNotes");
       const n=todayNotesArea?todayNotesArea.value:"";
-      await saveDayRatingAndNotes(dayKey,r,n);
-      await openCombinedSummary();
+      if(await saveDayRatingAndNotes(d||dayKey,r,n)) await openCombinedSummary();
     };
     
     window.editWeekStar=async(date,rating)=>{
@@ -3488,11 +3481,55 @@ let dashRange="day";
 async function openDashboard(){document.getElementById("dashProfName").textContent=state.profile.name;await renderDashboard();openScrim("dashScrim");}
 
 async function saveDayRatingAndNotes(date,rating,notes){
+  /* A star rating is a retrospective judgement, so a day that has not happened
+     cannot be rated. Guarded HERE rather than at each star renderer - there
+     are four of them and they had drifted apart, which is how future days
+     stayed rateable in the Summary. No caller can bypass this one.
+     Passing notes as undefined leaves the stored notes alone. */
+  if(String(date)>todayKey()){ toast("That day hasn't happened yet"); return false; }
   const existing=await idbGet("day_notes",date)||{date,profileId:state.profileId};
   existing.rating=rating;
-  existing.notes=notes;
+  if(notes!==undefined) existing.notes=notes;
   await saveLocal("day_notes",existing);
+  return true;
 }
+
+/* One place that decides how a day's stars render, so the four copies cannot
+   drift again. Future days render dimmed and inert; a day with a rating gets
+   a "clear" control, which previously did not exist at all - once a star was
+   set there was no way to unset it. */
+function starCellHtml(dateKey,rating,fnName,size){
+  const px=size||20;
+  const future=String(dateKey)>todayKey();
+  const stars=Array.from({length:5}).map((_,i)=>{
+    const filled=i<rating;
+    const star=filled?"\u2605":"\u2606";
+    if(future) return '<span style="color:var(--muted);opacity:.4;font-size:'+px+'px;font-weight:800;margin:0 2px" title="This day hasn\u2019t happened yet">'+star+'</span>';
+    return '<span style="cursor:pointer;color:'+(filled?"#fbbf24":"#9ca3af")+';transition:all .1s;font-size:'+px+'px;font-weight:800;margin:0 2px" onclick="window.'+fnName+'(\''+dateKey+'\','+(i+1)+')" title="Rate '+(i+1)+'/5">'+star+'</span>';
+  }).join("");
+  if(future) return stars+'<div style="font-size:10px;color:var(--muted);margin-top:2px">upcoming</div>';
+  if(!rating) return stars;
+  return stars+'<span style="cursor:pointer;color:var(--muted);font-size:11px;margin-left:8px;text-decoration:underline" onclick="window.'+fnName+'(\''+dateKey+'\',0)" title="Clear this rating">clear</span>';
+}
+
+/* Compact day-type picker for the Summary rows. Deliberately placed inside the
+   existing date cell rather than as a new column: the Summary tables are read
+   on a phone, and a fifth column would push them into horizontal scrolling.
+   It also avoids the header/body column-count trap documented in Landmines. */
+function dayTypeSelectHtml(dateKey,current){
+  const opts=[{v:"",label:"Working"}].concat(DAY_TYPES.map(d=>({v:d.v,label:d.label})));
+  const cur=current||"";
+  const def=dayTypeDef(cur);
+  return '<select onchange="window.setDayTypeFromSummary(\''+dateKey+'\',this.value)" '+
+    'style="margin-top:5px;font-size:16px;padding:3px 5px;border-radius:8px;background:#0a1424;color:'+(def?def.color:"var(--ink2)")+';border:1px solid '+(def?def.color:"var(--line)")+'">'+
+    opts.map(o=>'<option value="'+o.v+'"'+(o.v===cur?" selected":"")+'>'+escapeHtml(o.label)+'</option>').join("")+
+    '</select>';
+}
+window.setDayTypeFromSummary=async(date,value)=>{
+  await setDayType(date,value||null);
+  toast(value?dayTypeLabel(value):"Marked as a working day");
+  await openCombinedSummary();
+};
 // Star rating system
 function renderStars(rating){
   const stars=["☆","☆","☆","☆","☆"];
@@ -3518,7 +3555,8 @@ async function getDayRating(date){
   return notes?.rating||0;
 }
 
-window.rateToday=async(rating)=>{const tk=todayKey();const notesArea=document.getElementById("dayNotes");const notes=notesArea?notesArea.value:"";await saveDayRatingAndNotes(tk,rating,notes);await renderTodaySummary();};
+/* (date,rating) to match the shared starCellHtml contract. */
+window.rateToday=async(d,rating)=>{const tk=d||todayKey();const notesArea=document.getElementById("dayNotes");const notes=notesArea?notesArea.value:"";if(await saveDayRatingAndNotes(tk,rating,notes))await renderTodaySummary();};
 
 async function renderTodaySummary(){
   const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
@@ -3541,14 +3579,7 @@ async function renderTodaySummary(){
   setTimeout(()=>{
     const sr=document.getElementById("starRating");
     if(sr){
-      let starHtml='';
-      for(let i=1;i<=5;i++){
-        const star=i<=rating?'★':'☆';
-        const color=i<=rating?'#fbbf24':'#d1d5db';
-        const onclick="window.rateToday("+i+")";
-        starHtml+='<span style="cursor:pointer;color:'+color+';transition:all .1s;font-size:28px;font-weight:800" onclick="'+onclick+'" title="Rate '+i+'/5">'+star+'</span>';
-      }
-      sr.innerHTML=starHtml;
+      sr.innerHTML=starCellHtml(tk,rating,"rateToday",28);
     }
     const notesArea=document.getElementById("dayNotes");
     if(notesArea){
