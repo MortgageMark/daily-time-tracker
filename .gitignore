@@ -1,0 +1,8 @@
+# Written by the Netlify build command on every deploy — never commit it.
+# A committed copy would pin the update check to a stale build id.
+version.json
+
+# scratch files
+_*.txt
+_*.sh
+_*.py

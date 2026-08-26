@@ -809,7 +809,55 @@ setInterval(async()=>{ if(!db||!state.profileId||!state.profile)return; await up
 },1000);
 
 /* ===== toast ===== */
-let toastT; /* ===== in-app dialogs =====
+let toastT; /* ===== build version + update detection =====
+   BUILD_ID is rewritten at deploy time by the Netlify build command in
+   netlify.toml (see there). Format: YYYYMMDDHHMM-<short commit>, UTC.
+
+   Netlify already serves index.html with must-revalidate + ETag and there is
+   no service worker, so a reload always fetches the newest build. The real
+   cause of someone running an old version is simply that they never reload:
+   an installed PWA or a long-lived tab keeps executing whatever it loaded.
+   So the running app polls a tiny version.json and offers a reload. */
+const BUILD_ID="__BUILD_ID__";
+function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
+function fmtBuild(id){
+  const s=String(id||"");
+  if(!s||s.indexOf("__BUILD")===0) return "dev build";
+  if(s.length<12) return s;
+  return s.slice(0,4)+"."+s.slice(4,6)+"."+s.slice(6,8)+" "+s.slice(8,10)+":"+s.slice(10,12);
+}
+let updateReady=false;
+async function checkForUpdate(){
+  if(updateReady||!buildIsStamped()||!navigator.onLine) return;
+  try{
+    const r=await fetch("/version.json?t="+Date.now(),{cache:"no-store"});
+    if(!r.ok) return;
+    const j=await r.json();
+    if(j&&j.build&&j.build!==BUILD_ID){ updateReady=true; showUpdateBanner(j.build); }
+  }catch(e){ /* offline, blocked, or file missing - stay quiet */ }
+}
+function showUpdateBanner(newBuild){
+  if(document.getElementById("updateBanner")) return;
+  const bar=document.createElement("div");
+  bar.id="updateBanner";
+  bar.style.cssText="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));z-index:300;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--accent);box-shadow:var(--shadow);max-width:calc(100vw - 24px);flex-wrap:wrap;justify-content:center";
+  bar.innerHTML='<span style="font-size:13px;font-weight:700;color:var(--ink)">New version available</span>'+
+                '<span style="font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums">'+fmtBuild(newBuild)+'</span>'+
+                '<button class="btn sm pri" id="updateReloadBtn">Reload</button>'+
+                '<button class="btn sm" id="updateLaterBtn">Later</button>';
+  document.body.appendChild(bar);
+  const rb=document.getElementById("updateReloadBtn");
+  const lb=document.getElementById("updateLaterBtn");
+  /* A reload is safe mid-session: a running timer lives as an open session in
+     IndexedDB and is restored by reloadFromLocal() on boot. */
+  if(rb) rb.addEventListener("click",()=>{ location.reload(); });
+  if(lb) lb.addEventListener("click",()=>{ bar.remove(); });
+}
+setInterval(checkForUpdate,15*60*1000);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkForUpdate(); });
+setTimeout(checkForUpdate,8000);
+
+/* ===== in-app dialogs =====
    Native confirm()/prompt() are unreliable outside a plain top-level page:
    sandboxed frames return false without showing anything, and prompt() can
    throw outright. Every destructive or naming action routes through these
@@ -915,6 +963,12 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
   const signOutItem=document.createElement("div");signOutItem.className="menu-item";signOutItem.style="padding:10px 12px;cursor:pointer;font-size:12px;color:var(--warn)";signOutItem.textContent="🚪 Sign out";
   signOutItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";doSignOut();});
   m.appendChild(signOutItem);
+
+  const ver=document.createElement("div");
+  ver.style="padding:8px 12px 10px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:6px";
+  ver.innerHTML='<span>Version</span><span style="font-variant-numeric:tabular-nums;color:var(--ink2)">'+fmtBuild(BUILD_ID)+'</span>';
+  ver.title=String(BUILD_ID);
+  m.appendChild(ver);
 }
 
 /* ===== scrims ===== */

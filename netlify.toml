@@ -1,5 +1,8 @@
 [build]
-  command = "echo 'No build needed - single file app'"
+  # Stamps the build into index.html and writes version.json, so the running
+  # app can tell whether a newer deploy exists. COMMIT_REF is provided by
+  # Netlify. Times are UTC, format YYYYMMDDHHMM-<short commit>.
+  command = "BUILD_ID=\"$(date -u +%Y%m%d%H%M)-$(echo ${COMMIT_REF:-nocommit} | cut -c1-7)\"; echo \"Build: $BUILD_ID\"; sed -i \"s/__BUILD_ID__/$BUILD_ID/g\" index.html; printf '{\"build\":\"%s\"}' \"$BUILD_ID\" > version.json; grep -c \"$BUILD_ID\" index.html"
   publish = "."
   functions = "functions"
 
@@ -7,7 +10,27 @@
   framework = "static"
   publish = "."
 
-# Redirect all routes to index.html for PWA
+# version.json must never be cached, or the update check reads a stale answer.
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-store, max-age=0"
+
+# Belt and braces: this matches Netlify's default for HTML, stated explicitly
+# so a future config change cannot silently start caching the app shell.
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Redirect all routes to index.html for PWA.
+# Netlify serves a real file before applying a non-forced rewrite, so
+# /version.json and /manifest.json are unaffected by this rule.
 [[redirects]]
   from = "/*"
   to = "/index.html"
