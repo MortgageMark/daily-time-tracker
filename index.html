@@ -348,6 +348,9 @@
       <div class="grow"><div class="tile" id="chanPreview" style="min-height:70px; padding:12px"><div class="label" style="font-size:16px" id="cpLabel">Preview</div></div></div>
     </div>
     <div class="palette" id="chanPalette"></div>
+    <div class="sect-title">Priority &amp; intent</div>
+    <div class="hint" style="margin:-4px 0 12px">All optional. A subcategory inherits its parent unless you set its own.</div>
+    <div id="chanAttrs"></div>
     <div style="display:flex; gap:10px; margin-top:22px"><button class="btn pri grow" id="chanSave">Save</button><button class="btn warn" id="chanArchive" style="display:none">Archive</button></div>
   </div></div></div>
 
@@ -659,7 +662,7 @@ async function updatePendingCount(){ const cnt=document.getElementById("pendingC
 
 function toRow(store,r){
   if(store==="profiles")return {id:r.id,name:r.name,hour_fmt:r.hourFmt||"12",confirm_end:(r.confirmEnd!=="0")};
-  if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived,parent_channel_id:r.parentChannelId||null};
+  if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived,parent_channel_id:r.parentChannelId||null,tier:r.tier||null,drip:r.drip||null,urgency:r.urgency||null,importance:r.importance||null};
   if(store==="sessions")return {id:r.id,profile_id:r.profileId,channel_id:r.channelId,start_ts:new Date(r.startTs).toISOString(),end_ts:r.endTs?new Date(r.endTs).toISOString():null,duration_seconds:r.endTs?Math.round((r.endTs-r.startTs)/1000):null,business_date:r.date,voided:!!r.voided,revision:r.revision||0};
   if(store==="plans")return {id:r.id,profile_id:r.profileId,name:r.name,schedule:r.schedule||{},sort_order:r.order||0};
   if(store==="dayplans")return {id:r.id,profile_id:r.profileId,date:r.date,plan_id:r.planId||null,plan_name:r.planName||null,schedule:r.schedule||{},edited:!!r.edited};
@@ -667,7 +670,7 @@ function toRow(store,r){
 function fromRow(store,row){
   const u=row.updated_at?Date.parse(row.updated_at):now();
   if(store==="profiles")return {id:row.id,name:row.name,hourFmt:row.hour_fmt||"12",confirmEnd:row.confirm_end?"1":"0",_u:u,_dirty:false};
-  if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,parentChannelId:row.parent_channel_id||null,_u:u,_dirty:false};
+  if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,parentChannelId:row.parent_channel_id||null,tier:row.tier||null,drip:row.drip||null,urgency:row.urgency||null,importance:row.importance||null,_u:u,_dirty:false};
   if(store==="plans")return {id:row.id,profileId:row.profile_id,name:row.name,schedule:row.schedule||{},order:row.sort_order||0,_u:u,_dirty:false};
   if(store==="dayplans")return {id:row.id,profileId:row.profile_id,date:row.date,planId:row.plan_id||null,planName:row.plan_name||null,schedule:row.schedule||{},edited:!!row.edited,_u:u,_dirty:false};
   if(store==="sessions")return {id:row.id,profileId:row.profile_id,channelId:row.channel_id,startTs:Date.parse(row.start_ts),endTs:row.end_ts?Date.parse(row.end_ts):null,durMs:row.end_ts?(Date.parse(row.end_ts)-Date.parse(row.start_ts)):0,date:row.business_date,voided:!!row.voided,revision:row.revision||0,_u:u,_dirty:false};
@@ -688,13 +691,53 @@ function tableSkipped(store){
   return true;
 }
 function isMissingTable(error){
-  return !!error&&(error.code==="PGRST205"||/schema cache|does not exist/i.test(error.message||""));
+  if(!error) return false;
+  /* A missing COLUMN (PGRST204) reports "...in the schema cache" too, so it
+     matches the pattern below. This check runs before the column check in the
+     push loop, so without this guard a missing column would be misread as a
+     missing table and stop the entire store syncing for 10 minutes - the exact
+     failure the column fallback exists to prevent. */
+  if(isMissingColumn(error)) return false;
+  return error.code==="PGRST205"||/schema cache|does not exist/i.test(error.message||"");
 }
 function noteMissingTable(store,error){
   if(!missingRemoteTables.has(store)){
     console.warn("sync: table '"+store+"' is missing in Supabase - will retry periodically. Run supabase-plans-migration.sql.");
   }
   missingRemoteTables.set(store,now());
+}
+/* Columns added after the original schema was created. If the migration has
+   not been run yet Supabase rejects the WHOLE upsert with PGRST204, which
+   would stop channels syncing at all - a much worse failure than losing the
+   new fields. So on that error the new columns are stripped and the push is
+   retried, and the full set is retried periodically in case the migration
+   lands later. Same shape as the missing-table handling above. */
+const OPTIONAL_COLUMNS={channels:["tier","drip","urgency","importance"]};
+const missingRemoteColumns=new Map();
+const MISSING_COLUMN_RETRY_MS=10*60*1000;
+function columnsSkipped(store){
+  const at=missingRemoteColumns.get(store);
+  if(at===undefined) return false;
+  if(now()-at>MISSING_COLUMN_RETRY_MS){ missingRemoteColumns.delete(store); return false; }
+  return true;
+}
+function isMissingColumn(error){
+  return !!error&&(error.code==="PGRST204"||/could not find the .* column|column .* does not exist/i.test(error.message||""));
+}
+function noteMissingColumn(store){
+  if(!missingRemoteColumns.has(store)){
+    console.warn("sync: '"+store+"' is missing its newer columns in Supabase - syncing without them. Run supabase-channel-attributes-migration.sql.");
+  }
+  missingRemoteColumns.set(store,now());
+}
+function stripOptional(store,row){
+  const cols=OPTIONAL_COLUMNS[store]; if(!cols) return row;
+  const out={}; for(const k in row) if(cols.indexOf(k)<0) out[k]=row[k];
+  return out;
+}
+function rowForPush(store,rec){
+  const row=toRow(store,rec);
+  return columnsSkipped(store)?stripOptional(store,row):row;
 }
 function syncableStores(){ return SYNC_STORES.filter(s=>!tableSkipped(s)); }
 async function dirtyRecords(){
@@ -717,8 +760,12 @@ async function runSync(){
   for(const {store,rec} of dirty){
     if(tableSkipped(store)) continue;
     try{
-      const { data, error } = await SB.from(store).upsert(toRow(store,rec)).select().single();
+      let { data, error } = await SB.from(store).upsert(rowForPush(store,rec)).select().single();
       if(isMissingTable(error)){ noteMissingTable(store,error); continue; }
+      if(isMissingColumn(error)&&OPTIONAL_COLUMNS[store]&&!columnsSkipped(store)){
+        noteMissingColumn(store);
+        ({ data, error } = await SB.from(store).upsert(stripOptional(store,toRow(store,rec))).select().single());
+      }
       if(error) throw error;
       rec._dirty=false; if(data&&data.updated_at) rec._u=Date.parse(data.updated_at);
       await idbPut(store,rec);
@@ -1038,6 +1085,54 @@ setInterval(async()=>{ if(!db||!state.profileId||!state.profile)return;
 },1000);
 
 /* =====================================================================
+   CHANNEL ATTRIBUTES
+   Must/Will/Want, DRIP and the two Eisenhower axes are all the same shape:
+   one tagged value per channel, plus a report that groups time by it. They
+   are declared as data here and every picker and every report is generated
+   from this table, so a fourth scheme is a few lines rather than a feature.
+   ===================================================================== */
+const CHANNEL_ATTRS=[
+  {key:"tier",label:"Commitment",hint:"How negotiable is this work?",
+   options:[{v:"must",label:"Must",hint:"Non-negotiable",color:"#ef4444"},
+            {v:"will",label:"Will",hint:"Committed to it",color:"#4f8cff"},
+            {v:"want",label:"Want",hint:"Only if time allows",color:"#22c55e"}]},
+  {key:"drip",label:"DRIP",hint:"What should happen to this work over time?",
+   options:[{v:"D",label:"Delegate",color:"#f59e0b"},
+            {v:"R",label:"Replace",color:"#a855f7"},
+            {v:"I",label:"Invest",color:"#22c55e"},
+            {v:"P",label:"Produce",color:"#4f8cff"}]},
+  {key:"urgency",label:"Urgency",hint:"1 = can wait, 5 = needs doing now",scale:true},
+  {key:"importance",label:"Importance",hint:"1 = low impact, 5 = high impact",scale:true}
+];
+const HIGH_SCALE=4;   /* 4-5 counts as urgent / important on the quadrant */
+
+/* A subcategory inherits whatever its parent is tagged with unless it carries
+   its own value, so tagging a parent covers its children for free. The depth
+   guard is defensive: a channel that somehow became its own ancestor would
+   otherwise recurse forever. */
+function channelAttr(ch,key,depth){
+  depth=depth||0;
+  if(!ch||depth>10) return null;
+  const v=ch[key];
+  if(v!==undefined&&v!==null&&v!=="") return v;
+  if(ch.parentChannelId) return channelAttr(state.channels.find(c=>c.id===ch.parentChannelId),key,depth+1);
+  return null;
+}
+function attrDef(key){ return CHANNEL_ATTRS.find(a=>a.key===key); }
+function attrOption(key,v){ const d=attrDef(key); return d&&d.options?d.options.find(o=>o.v===v):null; }
+function attrLabel(key,v){
+  if(v===null||v===undefined||v==="") return "Untagged";
+  const o=attrOption(key,v); return o?o.label:String(v);
+}
+function attrColor(key,v){
+  if(v===null||v===undefined||v==="") return "#475569";
+  const o=attrOption(key,v); if(o) return o.color;
+  const n=parseInt(v,10);
+  if(!isNaN(n)) return ["#475569","#22c55e","#84cc16","#f59e0b","#f97316","#ef4444"][Math.max(1,Math.min(5,n))];
+  return "#475569";
+}
+
+/* =====================================================================
    DAY EDITOR  (backfill and retroactive correction)
    The tracker is otherwise live-timer only: if a day was not tracked as it
    happened there was no way to enter it afterwards. This view walks any date,
@@ -1154,6 +1249,164 @@ async function renderDayEditor(){
 }
 
 function tsToTimeInput(ts){ const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
+
+/* =====================================================================
+   PRIORITIES REPORT
+   Groups tracked time by each channel attribute, and plots urgency against
+   importance as the four Eisenhower quadrants. Every section is generated
+   from CHANNEL_ATTRS, so it grows automatically with that table.
+   ===================================================================== */
+let prioRange="week";
+const QUADRANTS=[
+  {k:"do",       label:"Do",        hint:"Urgent + important",         color:"#ef4444"},
+  {k:"schedule", label:"Schedule",  hint:"Important, not urgent",      color:"#22c55e"},
+  {k:"delegate", label:"Delegate",  hint:"Urgent, not important",      color:"#f59e0b"},
+  {k:"eliminate",label:"Eliminate", hint:"Neither urgent nor important",color:"#64748b"}
+];
+
+async function attrTotals(rangeKey){
+  const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
+  const start=rangeStart(rangeKey), nowTs=now();
+  const res={total:0,by:{},quad:{do:0,schedule:0,delegate:0,eliminate:0,untagged:0}};
+  CHANNEL_ATTRS.forEach(d=>{ res.by[d.key]={}; });
+  liveSessions(all).forEach(sn=>{
+    const end=sn.endTs||nowTs;
+    if(end<start) return;
+    const dur=sn.endTs?(sn.durMs||0):(nowTs-sn.startTs);
+    if(dur<=0) return;
+    const ch=state.channels.find(c=>c.id===sn.channelId);
+    res.total+=dur;
+    CHANNEL_ATTRS.forEach(d=>{
+      const v=channelAttr(ch,d.key);
+      const k=(v===null||v===undefined||v==="")?"":String(v);
+      res.by[d.key][k]=(res.by[d.key][k]||0)+dur;
+    });
+    const u=parseInt(channelAttr(ch,"urgency"),10), im=parseInt(channelAttr(ch,"importance"),10);
+    if(isNaN(u)||isNaN(im)) res.quad.untagged+=dur;
+    else if(u>=HIGH_SCALE&&im>=HIGH_SCALE) res.quad.do+=dur;
+    else if(u<HIGH_SCALE&&im>=HIGH_SCALE) res.quad.schedule+=dur;
+    else if(u>=HIGH_SCALE&&im<HIGH_SCALE) res.quad.delegate+=dur;
+    else res.quad.eliminate+=dur;
+  });
+  return res;
+}
+
+async function openPriorities(){
+  const stage=document.querySelector(".app .stage");
+  stage.innerHTML='<div id="prioRoot" style="display:flex;flex-direction:column;height:100%;overflow:hidden"></div>';
+  await renderPriorities();
+}
+function closePriorities(){
+  const stage=document.querySelector(".app .stage");
+  stage.innerHTML='<div class="grid" id="grid"></div>';
+  renderAll();
+}
+
+function prioBarRow(label,color,ms,total){
+  const pct=total>0?Math.round(ms/total*100):0;
+  const row=document.createElement("div"); row.style.cssText="margin-bottom:9px";
+  const top=document.createElement("div");
+  top.style.cssText="display:flex;align-items:baseline;gap:8px;font-size:13px;margin-bottom:4px";
+  const nm=document.createElement("span"); nm.style.cssText="font-weight:700;flex:1;min-width:0"; nm.textContent=label;
+  const val=document.createElement("span"); val.style.cssText="color:var(--ink2);font-variant-numeric:tabular-nums";
+  val.textContent=fmtDurShort(ms)+"  \u00b7  "+pct+"%";
+  top.appendChild(nm); top.appendChild(val);
+  const track=document.createElement("div");
+  track.style.cssText="height:9px;border-radius:6px;background:var(--panel2);overflow:hidden";
+  const fill=document.createElement("div");
+  fill.style.cssText="height:100%;border-radius:6px;width:"+pct+"%;background:"+color;
+  track.appendChild(fill);
+  row.appendChild(top); row.appendChild(track);
+  return row;
+}
+
+async function renderPriorities(){
+  const root=document.getElementById("prioRoot");
+  if(!root) return;
+  const data=await attrTotals(prioRange);
+  root.innerHTML="";
+
+  const head=document.createElement("div");
+  head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap";
+  const h=document.createElement("h2"); h.style.cssText="margin:0;font-size:14px;font-weight:700"; h.textContent="Priorities";
+  const sp=document.createElement("div"); sp.style.flex="1";
+  const home=document.createElement("button"); home.className="btn sm"; home.textContent="Home";
+  home.addEventListener("click",closePriorities);
+  head.appendChild(h); head.appendChild(sp); head.appendChild(home);
+  root.appendChild(head);
+
+  const tabs=document.createElement("div");
+  tabs.style.cssText="display:flex;gap:6px;padding:10px 12px 0;flex-wrap:wrap";
+  [["day","Today"],["week","Week"],["month","Month"],["year","Year"],["all","All"]].forEach(r=>{
+    const b=document.createElement("button");
+    b.className="btn sm"+(prioRange===r[0]?" pri":"");
+    b.textContent=r[1];
+    b.addEventListener("click",()=>{ prioRange=r[0]; renderPriorities(); });
+    tabs.appendChild(b);
+  });
+  root.appendChild(tabs);
+
+  const body=document.createElement("div");
+  body.style.cssText="flex:1;overflow-y:auto;padding:14px 12px max(14px, env(safe-area-inset-bottom))";
+
+  if(!data.total){
+    const e=document.createElement("div"); e.className="hint"; e.style.padding="18px 4px";
+    e.textContent="No tracked time in this range yet.";
+    body.appendChild(e); root.appendChild(body); return;
+  }
+
+  const totalLine=document.createElement("div");
+  totalLine.style.cssText="font-size:13px;color:var(--ink2);margin-bottom:16px";
+  totalLine.textContent="Total tracked: "+fmtDurShort(data.total);
+  body.appendChild(totalLine);
+
+  CHANNEL_ATTRS.forEach(def=>{
+    const sect=document.createElement("div"); sect.style.cssText="margin-bottom:22px";
+    const t=document.createElement("div"); t.className="sect-title"; t.style.marginTop="0"; t.textContent=def.label;
+    sect.appendChild(t);
+    const buckets=def.scale?["1","2","3","4","5"]:def.options.map(o=>o.v);
+    let shown=0;
+    buckets.concat([""]).forEach(v=>{
+      const ms=data.by[def.key][v]||0;
+      if(!ms) return;
+      shown++;
+      sect.appendChild(prioBarRow(attrLabel(def.key,v),attrColor(def.key,v),ms,data.total));
+    });
+    if(!shown){
+      const e=document.createElement("div"); e.className="hint"; e.style.margin="0";
+      e.textContent="No channels tagged yet.";
+      sect.appendChild(e);
+    }
+    body.appendChild(sect);
+  });
+
+  /* Eisenhower quadrant */
+  const qt=document.createElement("div"); qt.className="sect-title"; qt.textContent="Eisenhower quadrant";
+  body.appendChild(qt);
+  const qh=document.createElement("div"); qh.className="hint"; qh.style.margin="0 0 10px";
+  qh.textContent="Urgent and Important both mean a rating of "+HIGH_SCALE+" or 5.";
+  body.appendChild(qh);
+  const grid=document.createElement("div");
+  grid.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:8px";
+  QUADRANTS.forEach(q=>{
+    const ms=data.quad[q.k]||0;
+    const pct=data.total>0?Math.round(ms/data.total*100):0;
+    const cell=document.createElement("div");
+    cell.style.cssText="border:1px solid var(--line);border-left:4px solid "+q.color+";border-radius:12px;padding:11px;background:var(--panel2)";
+    cell.innerHTML='<div style="font-weight:800;font-size:13px">'+escapeHtml(q.label)+'</div>'+
+      '<div class="hint" style="margin:2px 0 7px">'+escapeHtml(q.hint)+'</div>'+
+      '<div style="font-size:17px;font-weight:800;font-variant-numeric:tabular-nums">'+escapeHtml(fmtDurShort(ms))+'</div>'+
+      '<div class="hint" style="margin:2px 0 0">'+pct+'% of tracked time</div>';
+    grid.appendChild(cell);
+  });
+  body.appendChild(grid);
+  if(data.quad.untagged){
+    const u=document.createElement("div"); u.className="hint"; u.style.margin="10px 0 0";
+    u.textContent=fmtDurShort(data.quad.untagged)+" is not on the grid because those channels have no urgency or importance rating yet.";
+    body.appendChild(u);
+  }
+  root.appendChild(body);
+}
 
 function openSessionEditor(dk,sn){
   editingSessId=sn?sn.id:null;
@@ -1377,6 +1630,7 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
       it.addEventListener("click",()=>{loadProfile(p.id);document.getElementById("avatarMenu").style.display="none";renderAvatarMenu();});m.appendChild(it);}}
   const sep=document.createElement("div");sep.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep);
   const pastDayItem=document.createElement("div");pastDayItem.className="menu-item";pastDayItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";pastDayItem.textContent="📅 Edit a day";pastDayItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openDayEditor(todayKey());});m.appendChild(pastDayItem);
+  const prioItem=document.createElement("div");prioItem.className="menu-item";prioItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";prioItem.textContent="🎯 Priorities";prioItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openPriorities();});m.appendChild(prioItem);
   const channelsItem=document.createElement("div");channelsItem.className="menu-item";channelsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";channelsItem.textContent="🎨 Channels";channelsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openChannels();});m.appendChild(channelsItem);
   
   const settingsItem=document.createElement("div");settingsItem.className="menu-item";settingsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";settingsItem.textContent="⚙️ Settings";settingsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openSettings();});m.appendChild(settingsItem);
@@ -1500,7 +1754,7 @@ function initializeEventListeners(){
   const chanColor=document.getElementById("chanColor");if(chanColor)chanColor.addEventListener("input",()=>{renderPalette(document.getElementById("chanColor").value);updateChanPreview();});
   const chanLabel=document.getElementById("chanLabel");if(chanLabel)chanLabel.addEventListener("input",updateChanPreview);
   const chanSave=document.getElementById("chanSave");if(chanSave)chanSave.addEventListener("click",async()=>{const label=document.getElementById("chanLabel").value.trim()||"Untitled";const color=document.getElementById("chanColor").value;const parentId=editingParentId;
-    if(editingChanId){const c=state.channels.find(x=>x.id===editingChanId);c.label=label;c.color=color;await saveLocal("channels",c);}
+    if(editingChanId){const c=state.channels.find(x=>x.id===editingChanId);c.label=label;c.color=color;applyEditingAttrs(c);await saveLocal("channels",c);}
     else{
       // Use editingParentId which was set by openChannelEditor
       let parentIdToUse=editingParentId;
@@ -1511,7 +1765,7 @@ function initializeEventListeners(){
         parentIdToUse=null;
       }
       const order=Math.max(-1,...state.channels.map(c=>!parentIdToUse||c.parentChannelId===parentIdToUse?c.order:-1))+1;
-      const newCh={id:newId,profileId:state.profileId,label:label,color:color,order:order,archived:false,parentChannelId:parentIdToUse};
+      const newCh=applyEditingAttrs({id:newId,profileId:state.profileId,label:label,color:color,order:order,archived:false,parentChannelId:parentIdToUse});
       
       await saveLocal("channels",newCh);
       await new Promise(r=>setTimeout(r,250));
@@ -1889,7 +2143,58 @@ async function restoreChannel(id){
   toast("Restored");
 }
 async function deleteChannel(id){if(!await uiConfirm("Permanently delete this channel? This cannot be undone."))return;try{await db.transaction(["channels"],"readwrite").objectStore("channels").delete(id);const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const toDelete=allSessions.filter(s=>s.channelId===id);for(const sess of toDelete){await db.transaction(["sessions"],"readwrite").objectStore("sessions").delete(sess.id);}state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();toast("Deleted permanently");}catch(e){console.error("Delete error:",e);toast("Error deleting channel");}}
-function openChannelEditor(id,parentId){editingChanId=id;editingParentId=parentId||null;const c=id?state.channels.find(x=>x.id===id):null;const parent=parentId?state.channels.find(x=>x.id===parentId):null;document.getElementById("chanTitle").textContent=c?"Edit channel":parent?"Add subcategory":"Add channel";document.getElementById("chanLabel").value=c?c.label:"";const col=c?c.color:parent?parent.color:PALETTE[state.channels.length%PALETTE.length];document.getElementById("chanColor").value=col;document.getElementById("chanArchive").style.display=c?"block":"none";renderPalette(col);updateChanPreview();openScrim("chanScrim");}
+function openChannelEditor(id,parentId){editingChanId=id;editingParentId=parentId||null;const c=id?state.channels.find(x=>x.id===id):null;const parent=parentId?state.channels.find(x=>x.id===parentId):null;document.getElementById("chanTitle").textContent=c?"Edit channel":parent?"Add subcategory":"Add channel";document.getElementById("chanLabel").value=c?c.label:"";const col=c?c.color:parent?parent.color:PALETTE[state.channels.length%PALETTE.length];document.getElementById("chanColor").value=col;document.getElementById("chanArchive").style.display=c?"block":"none";renderPalette(col);renderChannelAttrs(c);updateChanPreview();openScrim("chanScrim");}
+/* Builds a picker per entry in CHANNEL_ATTRS. Nothing here knows what a tier
+   or a DRIP bucket is - add an entry to that table and its picker appears. */
+let editingAttrs={};
+function renderChannelAttrs(ch){
+  const host=document.getElementById("chanAttrs");
+  if(!host) return;
+  host.innerHTML=""; editingAttrs={};
+  CHANNEL_ATTRS.forEach(def=>{
+    const cur=(ch&&ch[def.key]!==undefined&&ch[def.key]!==null)?String(ch[def.key]):"";
+    editingAttrs[def.key]=cur;
+
+    const wrap=document.createElement("div"); wrap.style.cssText="margin-bottom:16px";
+    const t=document.createElement("div");
+    t.style.cssText="font-size:12px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px";
+    t.textContent=def.label;
+    const h=document.createElement("div"); h.className="hint"; h.style.margin="0 0 8px";
+    let hintTxt=def.hint;
+    const parent=ch&&ch.parentChannelId?state.channels.find(c=>c.id===ch.parentChannelId):null;
+    const inherited=parent?channelAttr(parent,def.key):null;
+    if(!cur&&inherited!==null&&inherited!==undefined&&inherited!=="") hintTxt+="  \u00b7  inheriting "+attrLabel(def.key,inherited);
+    h.textContent=hintTxt;
+
+    const row=document.createElement("div"); row.style.cssText="display:flex;gap:6px;flex-wrap:wrap";
+    const opts=def.scale?[1,2,3,4,5].map(n=>({v:String(n),label:String(n)})):def.options;
+    const paint=()=>{
+      [].slice.call(row.children).forEach(x=>{
+        const on=x.dataset.v===String(editingAttrs[def.key]||"");
+        const col=x.dataset.v?attrColor(def.key,x.dataset.v):null;
+        x.style.background=on?(col||"var(--panel)"):"var(--panel2)";
+        x.style.color=(on&&col)?contrastInk(col):"var(--ink)";
+        x.style.borderColor=on?"var(--accent)":"var(--line)";
+        x.style.fontWeight=on?"800":"700";
+      });
+    };
+    [{v:"",label:"\u2014"}].concat(opts).forEach(o=>{
+      const btn=document.createElement("button");
+      btn.type="button"; btn.className="btn sm"; btn.textContent=o.label; btn.dataset.v=o.v;
+      if(def.scale) btn.style.minWidth="44px";
+      btn.title=o.hint||"";
+      btn.addEventListener("click",()=>{ editingAttrs[def.key]=o.v; paint(); });
+      row.appendChild(btn);
+    });
+    paint();
+    wrap.appendChild(t); wrap.appendChild(h); wrap.appendChild(row);
+    host.appendChild(wrap);
+  });
+}
+function applyEditingAttrs(rec){
+  CHANNEL_ATTRS.forEach(d=>{ const v=editingAttrs[d.key]; rec[d.key]=(v===""||v===undefined)?null:v; });
+  return rec;
+}
 function renderPalette(sel){const p=document.getElementById("chanPalette");p.innerHTML="";PALETTE.forEach(col=>{const ch=document.createElement("div");ch.className="pchip"+(col.toLowerCase()===sel.toLowerCase()?" sel":"");ch.style.background=col;ch.addEventListener("click",()=>{document.getElementById("chanColor").value=col;renderPalette(col);updateChanPreview();});p.appendChild(ch);});}
 function updateChanPreview(){const col=document.getElementById("chanColor").value;const lbl=document.getElementById("chanLabel").value||"Preview";const prev=document.getElementById("chanPreview");prev.style.background=`linear-gradient(160deg,${col},${shade(col,.22)})`;prev.style.color=contrastInk(col);document.getElementById("cpLabel").textContent=lbl;document.getElementById("chanPreviewSw").style.background=col;}
 
