@@ -347,7 +347,7 @@
 
 <!-- NEW PROFILE -->
 <div class="scrim" id="npScrim"><div class="sheet" style="max-width:460px"><div class="sheet-h"><h2>New profile</h2><button class="x" data-close>×</button></div>
-  <div class="sheet-b"><div class="sect-title" style="margin-top:0">Name</div><input id="npName" style="width:100%" placeholder="e.g. Tamara" maxlength="24">
+  <div class="sheet-b"><div class="sect-title" style="margin-top:0">Name</div><input id="npName" style="width:100%" placeholder="e.g. Work" maxlength="24">
     <div class="sect-title">Start with</div><select id="npSeed" style="width:100%"><option value="blank">Blank (add your own buttons)</option><option value="sample">A few sample buttons</option></select>
     <button class="btn pri" id="npCreate" style="width:100%; margin-top:20px">Create profile</button></div></div></div>
 
@@ -389,6 +389,25 @@ const SUPA_KEY = "sb_publishable_-aDVEq7DzlUz7hlvpgkUhw_i6yXO2SU";
 const SB = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth:{ persistSession:true, autoRefreshToken:true, storageKey:"dtt-auth" }});
 
 const PALETTE = ["#22c55e","#ec4899","#3b82f6","#f97316","#a855f7","#14b8a6","#eab308","#ef4444","#06b6d4","#84cc16","#f43f5e","#8b5cf6","#0ea5e9","#f59e0b","#10b981","#d946ef"];
+
+/* Standard starting channels for a brand new account or a new profile.
+   Order here is the order they appear on the dashboard. */
+const DEFAULT_CHANNELS = [
+  {label:"Admin",     color:"#ec4899"},  /* pink       */
+  {label:"Email",     color:"#3b82f6"},  /* blue       */
+  {label:"Corporate", color:"#ef4444"},  /* red        */
+  {label:"Sales",     color:"#22c55e"},  /* green      */
+  {label:"Marketing", color:"#a855f7"},  /* purple     */
+  {label:"Wasted",    color:"#94a3b8"},  /* light gray */
+  {label:"Break",     color:"#475569"},  /* dark gray  */
+  {label:"Personal",  color:"#18181b"}   /* near black */
+];
+async function createDefaultChannels(profileId){
+  let o=0;
+  for(const c of DEFAULT_CHANNELS){
+    await saveLocal("channels",{id:uid(),profileId:profileId,label:c.label,color:c.color,order:o++,archived:false,parentChannelId:null});
+  }
+}
 
 /* ===== IndexedDB ===== */
 const DB_NAME="dtt2", DB_VER=5; let db;
@@ -660,26 +679,10 @@ async function seedIfEmpty(){
   console.log("seedIfEmpty: After pull, found", after.length, "profiles");
   if(after.length) return;
   console.log("seedIfEmpty: Creating seed data...");
-  const markId=uid(), tamId=uid();
-  await saveLocal("profiles",{id:markId,name:"Mark",hourFmt:"12",confirmEnd:"1"});
-  await saveLocal("profiles",{id:tamId,name:"Tamara",hourFmt:"12",confirmEnd:"1"});
-  const mark=[["Regional",0],["Sales",0],["Marketing",1],["Admin",2],["Processing",3],["Calls",4],["Email",5],["Meetings",6],["Break",-1]];
-  let o=0;
-  let regionalId=null;
-  for(const[l,ci]of mark){
-    const chId=uid();
-    await saveLocal("channels",{id:chId,profileId:markId,label:l,color:ci<0?"#64748b":PALETTE[ci],order:o++,archived:false});
-    if(l==="Regional") regionalId=chId;
-  }
-  // Add subcategories for Regional
-  if(regionalId){
-    const subs=[["Corporate Meeting",0],["Corporate Event",1],["Operations",2],["Corporate Planning",3]];
-    let so=0;
-    for(const[l,ci]of subs) await saveLocal("channels",{id:uid(),profileId:markId,parentChannelId:regionalId,label:l,color:PALETTE[ci],order:so++,archived:false});
-  }
-  const tam=[["Design",1],["Client Work",2],["Content",4],["Email",5],["Break",-1]];
-  o=0; for(const[l,ci]of tam) await saveLocal("channels",{id:uid(),profileId:tamId,label:l,color:ci<0?"#64748b":PALETTE[ci],order:o++,archived:false});
-  await idbPut("meta",{k:"lastProfile",v:markId});
+  const pid=uid();
+  await saveLocal("profiles",{id:pid,name:"Me",hourFmt:"12",confirmEnd:"1"});
+  await createDefaultChannels(pid);
+  await idbPut("meta",{k:"lastProfile",v:pid});
 }
 
 /* ===== timer logic ===== */
@@ -1102,7 +1105,7 @@ function initializeEventListeners(){
   // New profile
   const npCreate=document.getElementById("npCreate");if(npCreate)npCreate.addEventListener("click",async()=>{const name=document.getElementById("npName").value.trim();if(!name){toast("Enter a name");return;}const seed=document.getElementById("npSeed").value;const pid=uid();
     await saveLocal("profiles",{id:pid,name,hourFmt:"12",confirmEnd:"1"});
-    if(seed==="sample"){const s=[["Focus",2],["Meetings",6],["Email",5],["Break",-1]];let o=0;for(const[l,ci]of s)await saveLocal("channels",{id:uid(),profileId:pid,label:l,color:ci<0?"#64748b":PALETTE[ci],order:o++,archived:false});}
+    if(seed==="sample"){await createDefaultChannels(pid);}
     closeScrim("npScrim");await loadProfile(pid);toast("Profile created");});
 
   // CSV export
