@@ -1345,6 +1345,10 @@ async function openEditsModal(){try{const content=document.getElementById("edits
 async function openTimeline(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';const today=new Date();const dayName=today.toLocaleDateString('en-US',{weekday:'short'});const dateStr=today.toLocaleDateString('en-US',{month:'short',day:'numeric'});html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)">';html+='<div style="display:flex;align-items:center;gap:12px">';html+='<div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">'+dayName+' '+dateStr+'</div>';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Edits</h2>';html+='</div>';html+='<button class="btn sm" onclick="closeTimelineView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:0" id="tlContent"></div>';html+='</div>';stage.innerHTML=html;window.closeTimelineView=()=>{stage.innerHTML=origStage;renderGrid();};const all=(await idbAll("sessions","profile",IDBKeyRange.only(state.profileId))).filter(s=>s.date===todayKey()).sort((a,b)=>a.startTs-b.startTs);const tlContent=document.getElementById("tlContent");if(!all.length){tlContent.innerHTML='<div class="hint" style="padding:20px">No sessions yet today.</div>';}else{tlContent.innerHTML="";all.forEach(s=>{const c=state.channels.find(x=>x.id===s.channelId)||{label:"(deleted)",color:"#64748b"};const dur=s.endTs?s.durMs:(now()-s.startTs);const open=!s.endTs;const row=document.createElement("div");row.style.display="flex";row.style.alignItems="center";row.style.gap="12px";row.style.padding="12px 14px";row.style.borderBottom="1px solid var(--line)";const leftDiv=document.createElement("div");leftDiv.style.display="flex";leftDiv.style.alignItems="center";leftDiv.style.gap="8px";leftDiv.style.flex="0 1 auto";const colorDot=document.createElement("div");colorDot.style.width="12px";colorDot.style.height="12px";colorDot.style.borderRadius="50%";colorDot.style.background=c.color;colorDot.style.flexShrink="0";leftDiv.appendChild(colorDot);const infoDiv=document.createElement("div");infoDiv.style.minWidth="0";const labelDiv=document.createElement("div");labelDiv.style.fontSize="12px";labelDiv.style.fontWeight="600";labelDiv.style.color="var(--ink)";labelDiv.innerHTML=`${escapeHtml(c.label)}${open?' <span style="color:var(--good);font-size:11px">● running</span>':''}`;infoDiv.appendChild(labelDiv);const timeDiv=document.createElement("div");timeDiv.style.fontSize="11px";timeDiv.style.color="var(--ink2)";timeDiv.textContent=`${fmtClock(s.startTs,state.profile.hourFmt)} — ${s.endTs?fmtClock(s.endTs,state.profile.hourFmt):"now"}`;infoDiv.appendChild(timeDiv);leftDiv.appendChild(infoDiv);row.appendChild(leftDiv);const durDiv=document.createElement("div");durDiv.style.fontSize="11px";durDiv.style.fontWeight="600";durDiv.style.color="var(--ink2)";durDiv.style.whiteSpace="nowrap";durDiv.textContent=fmtDur(dur);row.appendChild(durDiv);if(s.endTs){const adjBtn=document.createElement("button");adjBtn.className="btn sm";adjBtn.textContent="Adjust";adjBtn.addEventListener("click",()=>openAdjustModal(s));row.appendChild(adjBtn);}tlContent.appendChild(row);});}}
 /* Adherence cell: Timing on top, Budget beneath. Returns HTML so it drops
    into the existing <td>/<div> WITHOUT changing any table column count. */
+function fmtHM(ms){
+  const total=Math.max(0,Math.round((ms||0)/60000));
+  return Math.floor(total/60)+"h "+String(total%60).padStart(2,"0")+"m";
+}
 function adhTone(p){ return p>=80?"var(--good)":p>=50?"var(--warn)":"var(--bad)"; }
 function adhCellHtml(match,budgetPct){
   if(!match||!match.total) return '<span style="color:var(--muted)">&mdash;</span>';
@@ -2210,7 +2214,7 @@ async function openPlanAdherence(){const app=document.querySelector('.app');cons
       if(!plannedSlotsElapsed){
         footer.innerHTML='<div style="color:var(--ink2);font-weight:600">Nothing planned has elapsed yet today</div>';
       }else{
-        let h='<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">';
+        let h='<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:stretch">';
         h+='<div style="flex:1;min-width:150px;background:var(--panel);border:1px solid '+tone(timingPct)+';border-radius:10px;padding:10px">'+
              '<div style="font-size:10px;font-weight:800;letter-spacing:.6px;color:var(--muted);text-transform:uppercase">Timing</div>'+
              '<div style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><div style="font-size:20px;font-weight:800;color:'+tone(timingPct)+'">'+timingPct+'%</div>'+
@@ -2219,28 +2223,37 @@ async function openPlanAdherence(){const app=document.querySelector('.app');cons
         h+='<div style="flex:1;min-width:150px;background:var(--panel);border:1px solid '+tone(budgetPct)+';border-radius:10px;padding:10px">'+
              '<div style="font-size:10px;font-weight:800;letter-spacing:.6px;color:var(--muted);text-transform:uppercase">Budget</div>'+
              '<div style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><div style="font-size:20px;font-weight:800;color:'+tone(budgetPct)+'">'+budgetPct+'%</div>'+
-             '<div style="font-size:11px;color:var(--ink2)">'+fmtDurShort(creditedMs)+' / '+fmtDurShort(plannedTotalMs)+'</div></div>'+
+             '<div style="font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap">'+fmtHM(creditedMs)+'/'+fmtHM(plannedTotalMs)+'</div></div>'+
              '<div style="font-size:10px;color:var(--muted);margin-top:2px">planned amount, any time</div></div>';
         h+='</div>';
 
         if(rows.length){
-          h+='<div style="margin-top:10px;text-align:left">';
+          /* One shared grid so every column lines up across all rows, with a
+             fixed h/m format and tabular figures so the digits align too. */
+          const cols='grid-template-columns:12px minmax(0,1fr) 62px 62px 44px;gap:8px;align-items:center';
+          h+='<div style="margin-top:12px;text-align:left;display:grid;'+cols+'">';
+          const head='font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding-bottom:2px';
+          h+='<div></div>'+
+             '<div style="'+head+'">Channel</div>'+
+             '<div style="'+head+';text-align:right">Planned</div>'+
+             '<div style="'+head+';text-align:right">Actual</div>'+
+             '<div style="'+head+';text-align:right">Met</div>';
+          const cell='font-size:11px;padding:5px 0;border-top:1px solid var(--line)';
+          const num=cell+';text-align:right;font-variant-numeric:tabular-nums;color:var(--ink2)';
           rows.forEach(r=>{
             const pill=r.pct>=100?'var(--good)':r.pct>=60?'var(--warn)':'var(--bad)';
-            h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-top:1px solid var(--line);font-size:11px">'+
-                 '<span style="width:10px;height:10px;border-radius:3px;background:'+r.color+';flex:0 0 auto"></span>'+
-                 '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)">'+escapeHtml(r.label)+'</span>'+
-                 '<span style="color:var(--ink2)">planned '+fmtDurShort(r.planned)+'</span>'+
-                 '<span style="color:var(--ink2)">actual '+fmtDurShort(r.actual)+'</span>'+
-                 '<span style="min-width:38px;text-align:right;font-weight:800;color:'+pill+'">'+r.pct+'%</span>'+
-               '</div>';
+            h+='<div style="'+cell+';display:flex;align-items:center"><span style="width:10px;height:10px;border-radius:3px;background:'+r.color+'"></span></div>'+
+               '<div style="'+cell+';min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)">'+escapeHtml(r.label)+'</div>'+
+               '<div style="'+num+'">'+fmtHM(r.planned)+'</div>'+
+               '<div style="'+num+'">'+fmtHM(r.actual)+'</div>'+
+               '<div style="'+num+';font-weight:800;color:'+pill+'">'+r.pct+'%</div>';
           });
           if(unplannedMs>0){
-            h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-top:1px solid var(--line);font-size:11px;opacity:.8">'+
-                 '<span style="width:10px;height:10px;border-radius:3px;background:var(--muted);flex:0 0 auto"></span>'+
-                 '<span style="flex:1;color:var(--ink2)">Unplanned time</span>'+
-                 '<span style="color:var(--ink2)">actual '+fmtDurShort(unplannedMs)+'</span>'+
-                 '<span style="min-width:38px"></span></div>';
+            h+='<div style="'+cell+';display:flex;align-items:center;opacity:.75"><span style="width:10px;height:10px;border-radius:3px;background:var(--muted)"></span></div>'+
+               '<div style="'+cell+';color:var(--ink2);opacity:.85;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Unplanned</div>'+
+               '<div style="'+num+';opacity:.6">&mdash;</div>'+
+               '<div style="'+num+';opacity:.85">'+fmtHM(unplannedMs)+'</div>'+
+               '<div style="'+num+';opacity:.6">&mdash;</div>';
           }
           h+='</div>';
         }
