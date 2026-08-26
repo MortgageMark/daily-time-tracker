@@ -417,80 +417,108 @@ async function createDefaultChannels(profileId){
 const DB_NAME="dtt2", DB_VER=5; let db;
 function ensureObjectStores(){if(!db)return;try{const names=["profiles","channels","sessions","plans","dayplans","meta","selected_plan","day_notes"];for(const name of names){if(!db.objectStoreNames.contains(name)){console.warn(`Object store ${name} missing, incrementing DB version`);closeDatabase();setTimeout(()=>{const r=indexedDB.open(DB_NAME,DB_VER+1);r.onupgradeneeded=e=>{const d=e.target.result;for(const n of names)if(!d.objectStoreNames.contains(n)){const keyPath=n==="selected_plan"||n==="day_notes"?"date":(n==="meta"?"k":"id");d.createObjectStore(n,{keyPath:keyPath});}};r.onsuccess=e=>{db=e.target.result;};},100);return false;}}}catch(e){console.error("Error checking object stores:",e);}return true;}
 function closeDatabase(){if(db){db.close();db=null;}}
-function openDB(){return new Promise((res,rej)=>{
-  console.log("openDB: Starting, DB_NAME=",DB_NAME,"DB_VER=",DB_VER);
-  const r=indexedDB.open(DB_NAME,DB_VER);
+/* Schema the app needs, in one place so open and repair cannot disagree. */
+const DB_STORES=[
+  {name:"profiles",keyPath:"id"},
+  {name:"channels",keyPath:"id"},
+  {name:"sessions",keyPath:"id"},
+  {name:"plans",keyPath:"id"},
+  {name:"dayplans",keyPath:"id"},
+  {name:"meta",keyPath:"k"},
+  {name:"selected_plan",keyPath:"date"},
+  {name:"day_notes",keyPath:"date"}
+];
+const DB_INDEXED=["channels","sessions","plans","dayplans"];
 
-  r.onupgradeneeded=e=>{
-    console.log("openDB: onupgradeneeded fired");
+/* Bring a database up to the schema above, inside an upgrade transaction. */
+function applySchema(d,txn){
+  if(d.objectStoreNames.contains("dayplans")){
     try{
-      const d=e.target.result;
-      const txn=e.target.transaction;
-      const stores=[
-        {name:"profiles",keyPath:"id"},
-        {name:"channels",keyPath:"id"},
-        {name:"sessions",keyPath:"id"},
-        {name:"plans",keyPath:"id"},
-        {name:"dayplans",keyPath:"id"},
-        {name:"meta",keyPath:"k"},
-        {name:"selected_plan",keyPath:"date"},
-        {name:"day_notes",keyPath:"date"}
-      ];
-
-      if(d.objectStoreNames.contains("dayplans")){
-        try{
-          if(txn.objectStore("dayplans").keyPath!=="id"){
-            console.log("openDB: rebuilding dayplans with keyPath id");
-            d.deleteObjectStore("dayplans");
-          }
-        }catch(err){ console.warn("openDB: dayplans keyPath check failed",err); }
+      if(txn.objectStore("dayplans").keyPath!=="id"){
+        console.log("openDB: rebuilding dayplans with keyPath id");
+        d.deleteObjectStore("dayplans");
       }
-
-      for(const store of stores){
-        if(!d.objectStoreNames.contains(store.name)){
-          console.log("openDB: Creating store",store.name);
-          d.createObjectStore(store.name,{keyPath:store.keyPath});
-        }
-      }
-
-      // Create indexes on stores that exist in this transaction
-      try{
-        for(const store of ["channels","sessions","plans","dayplans"]){
-          try{
-            const st=txn.objectStore(store);
-            if(!st.indexNames.contains("profile")){
-              st.createIndex("profile","profileId");
-              console.log("openDB: Created index profile on",store);
-            }
-          }catch(e){
-            console.warn("openDB: Could not create index on",store,e.message);
-          }
-        }
-      }catch(ex){
-        console.warn("openDB: Index creation error:",ex.message);
-      }
-    }catch(err){
-      console.error("openDB: Error in onupgradeneeded:",err);
-      rej(err);
+    }catch(err){ console.warn("openDB: dayplans keyPath check failed",err); }
+  }
+  for(const store of DB_STORES){
+    if(!d.objectStoreNames.contains(store.name)){
+      console.log("openDB: creating store",store.name);
+      d.createObjectStore(store.name,{keyPath:store.keyPath});
     }
-  };
-
-  r.onsuccess=e=>{
+  }
+  for(const name of DB_INDEXED){
     try{
-      db=e.target.result;
-      console.log("openDB: Success! Database ready, stores:",Array.from(db.objectStoreNames));
-      res();
-    }catch(err){
-      console.error("openDB: Error in onsuccess:",err);
-      rej(err);
-    }
-  };
+      const st=txn.objectStore(name);
+      if(!st.indexNames.contains("profile")){ st.createIndex("profile","profileId"); console.log("openDB: created index profile on",name); }
+    }catch(err){ console.warn("openDB: index on "+name+" failed",err); }
+  }
+}
 
-  r.onerror=e=>{
-    console.error("openDB: Error event:",e.target.error);
-    rej(new Error("IndexedDB error: "+(e.target.error?.message||"unknown")));
-  };
-});}
+/* What is missing from an already-open database. */
+function schemaGaps(d){
+  const gaps=[];
+  for(const store of DB_STORES) if(!d.objectStoreNames.contains(store.name)) gaps.push("store:"+store.name);
+  for(const name of DB_INDEXED){
+    if(!d.objectStoreNames.contains(name)) continue;
+    try{
+      const st=d.transaction([name],"readonly").objectStore(name);
+      if(!st.indexNames.contains("profile")) gaps.push("index:"+name);
+      if(name==="dayplans"&&st.keyPath!=="id") gaps.push("keypath:dayplans");
+    }catch(err){ gaps.push("unreadable:"+name); }
+  }
+  return gaps;
+}
+
+function openAt(version){
+  return new Promise((res,rej)=>{
+    const r=version?indexedDB.open(DB_NAME,version):indexedDB.open(DB_NAME);
+    r.onupgradeneeded=e=>{
+      try{ applySchema(e.target.result,e.target.transaction); }
+      catch(err){ console.error("openDB: upgrade failed",err); }
+    };
+    r.onsuccess=e=>res(e.target.result);
+    r.onerror=()=>rej(r.error||new Error("indexedDB.open failed"));
+    r.onblocked=()=>rej(new Error("blocked"));
+  });
+}
+
+/* Opens the database and guarantees the schema, repairing rather than failing.
+   Two things previously left the app completely blank with nothing able to
+   save, because db stayed null and every tx() threw "Database not initialized":
+     - a database at a HIGHER version than DB_VER (VersionError on open)
+     - a database at the right version but missing the "profile" indexes, so
+       every idbAll(store,"profile",...) threw NotFoundError
+   Both are now detected and fixed in place. Nothing is deleted: the stores and
+   their contents are preserved, only missing pieces are added. */
+async function openDB(){
+  console.log("openDB: starting, DB_NAME=",DB_NAME,"DB_VER=",DB_VER);
+  let d=null;
+  try{
+    d=await openAt(DB_VER);
+  }catch(err){
+    if(err&&err.name==="VersionError"){
+      console.warn("openDB: existing database is newer than DB_VER, adopting it");
+      d=await openAt(null);                      // open at whatever version exists
+    }else{
+      throw err;
+    }
+  }
+  let gaps=schemaGaps(d);
+  if(gaps.length){
+    console.warn("openDB: repairing schema, missing:",gaps.join(", "));
+    const next=d.version+1;
+    d.close();
+    d=await openAt(next);                        // upgrade transaction adds what is missing
+    gaps=schemaGaps(d);
+    if(gaps.length) console.error("openDB: still missing after repair:",gaps.join(", "));
+    else console.log("openDB: schema repaired");
+  }
+  db=d;
+  db.onversionchange=()=>{ try{ db.close(); }catch(e){} };
+  console.log("openDB: ready, version",db.version,"stores:",Array.from(db.objectStoreNames).join(","));
+  return db;
+}
+
 function playNotification(){try{const ctx=new (window.AudioContext||window.webkitAudioContext)();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=800;osc.type='sine';gain.gain.setValueAtTime(0.3,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.2);osc.start(ctx.currentTime);osc.stop(ctx.currentTime+0.2);}catch(e){}}
 function tx(s,m="readonly"){
   if(!db)throw new Error("Database not initialized");
@@ -838,7 +866,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=1;
+const APP_RELEASE=2;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -2722,7 +2750,37 @@ async function enterAppSafe(email){
   if(appEntered) return;
   appEntered=true;
   if(email) window._acctEmail=email;
-  await enterApp();
+  try{
+    await enterApp();
+  }catch(err){
+    /* Never leave a blank screen. Show what broke and offer the one repair
+       that is always safe here: clear local data and re-pull from the cloud. */
+    console.error("enterApp failed",err);
+    showBootError(err);
+  }
+}
+function showBootError(err){
+  if(document.getElementById("bootError")) return;
+  const msg=(err&&(err.message||err.name))||String(err);
+  const box=document.createElement("div");
+  box.id="bootError";
+  box.style.cssText="position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg)";
+  box.innerHTML='<div style="max-width:420px;width:100%;background:var(--panel);border:1px solid var(--warn);border-radius:14px;padding:22px">'+
+    '<div style="font-size:17px;font-weight:800;color:var(--ink);margin-bottom:8px">This device could not load your data</div>'+
+    '<div class="hint" style="margin-bottom:14px">Your time and channels are safe in the cloud. This is a problem with the copy stored on this device.</div>'+
+    '<div style="font-size:11px;font-family:ui-monospace,monospace;color:var(--ink2);background:#0a1424;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:16px;word-break:break-word">'+escapeHtml(msg)+'</div>'+
+    '<button class="btn pri" id="bootFixBtn" style="width:100%">Reset this device and reload</button>'+
+    '<button class="btn sm" id="bootRetryBtn" style="width:100%;margin-top:8px">Just reload</button></div>';
+  document.body.appendChild(box);
+  const fix=document.getElementById("bootFixBtn");
+  if(fix) fix.addEventListener("click",async()=>{
+    fix.textContent="Resetting...";
+    try{ if(db) db.close(); }catch(e){}
+    try{ await new Promise(r=>{ const q=indexedDB.deleteDatabase(DB_NAME); q.onsuccess=q.onerror=q.onblocked=()=>r(); }); }catch(e){}
+    location.reload();
+  });
+  const retry=document.getElementById("bootRetryBtn");
+  if(retry) retry.addEventListener("click",()=>location.reload());
 }
 async function doAuth(){
   const btn=document.getElementById("loginBtn");
@@ -2836,7 +2894,7 @@ function hashParam(h,k){
   for(const p of parts){ const i=p.indexOf("="); if(i>0&&p.slice(0,i)===k) return decodeURIComponent(p.slice(i+1).split("+").join(" ")); }
   return "";
 }
-(async function(){ await openDB();
+(async function(){ try{ await openDB(); }catch(err){ console.error("openDB failed",err); showBootError(err); return; }
   const gate=document.getElementById("loginGate");
   const hash=location.hash||"";
   SB.auth.onAuthStateChange((ev,session)=>{
