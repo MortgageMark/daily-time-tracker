@@ -585,17 +585,27 @@ function fromRow(store,row){
    supabase-plans-migration.sql; until that runs they are skipped after the
    first PGRST205 ("table not found") so sync does not spam errors. */
 const SYNC_STORES=["profiles","channels","sessions","plans","dayplans"];
-const missingRemoteTables=new Set();
+/* Tables the backend does not have yet. Recorded with a timestamp and
+   retried periodically, so running the migration starts syncing without
+   the user having to reload the app. */
+const missingRemoteTables=new Map();
+const MISSING_TABLE_RETRY_MS=10*60*1000;
+function tableSkipped(store){
+  const at=missingRemoteTables.get(store);
+  if(at===undefined) return false;
+  if(now()-at>MISSING_TABLE_RETRY_MS){ missingRemoteTables.delete(store); return false; }
+  return true;
+}
 function isMissingTable(error){
   return !!error&&(error.code==="PGRST205"||/schema cache|does not exist/i.test(error.message||""));
 }
 function noteMissingTable(store,error){
   if(!missingRemoteTables.has(store)){
-    missingRemoteTables.add(store);
-    console.warn("sync: table '"+store+"' is missing in Supabase - skipping until it exists. Run supabase-plans-migration.sql.");
+    console.warn("sync: table '"+store+"' is missing in Supabase - will retry periodically. Run supabase-plans-migration.sql.");
   }
+  missingRemoteTables.set(store,now());
 }
-function syncableStores(){ return SYNC_STORES.filter(s=>!missingRemoteTables.has(s)); }
+function syncableStores(){ return SYNC_STORES.filter(s=>!tableSkipped(s)); }
 async function dirtyRecords(){
   const out=[];
   for(const store of syncableStores()){
@@ -614,7 +624,7 @@ async function runSync(){
   if(dirty.length) setSync("syncing"); else if(syncState!=="synced") setSync("syncing");
   // PUSH
   for(const {store,rec} of dirty){
-    if(missingRemoteTables.has(store)) continue;
+    if(tableSkipped(store)) continue;
     try{
       const { data, error } = await SB.from(store).upsert(toRow(store,rec)).select().single();
       if(isMissingTable(error)){ noteMissingTable(store,error); continue; }

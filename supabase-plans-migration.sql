@@ -84,7 +84,21 @@ create trigger dayplans_touch_updated_at
   before update on public.dayplans
   for each row execute function public.touch_updated_at();
 
--- Verify
-select 'plans' as table, count(*) from public.plans
+-- ---------------------------------------------------------------
+-- Grants. Supabase's default privileges usually cover this, but stating
+-- it explicitly means a project with non-default defaults still works.
+-- Without these the client gets a permission error rather than a clean
+-- "table missing", which the app cannot distinguish and would retry.
+-- ---------------------------------------------------------------
+grant select, insert, update, delete on public.plans    to authenticated;
+grant select, insert, update, delete on public.dayplans to authenticated;
+
+-- PostgREST caches the schema. It normally reloads on its own within a few
+-- seconds, but asking explicitly avoids the app continuing to see 404s
+-- after this script has already run.
+notify pgrst, 'reload schema';
+
+-- Verify ("table" is a reserved word, hence table_name)
+select 'plans' as table_name, count(*) as row_count from public.plans
 union all
 select 'dayplans', count(*) from public.dayplans;
