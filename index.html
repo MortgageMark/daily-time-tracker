@@ -665,14 +665,14 @@ function toRow(store,r){
   if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived,parent_channel_id:r.parentChannelId||null,tier:r.tier||null,drip:r.drip||null,urgency:r.urgency||null,importance:r.importance||null};
   if(store==="sessions")return {id:r.id,profile_id:r.profileId,channel_id:r.channelId,start_ts:new Date(r.startTs).toISOString(),end_ts:r.endTs?new Date(r.endTs).toISOString():null,duration_seconds:r.endTs?Math.round((r.endTs-r.startTs)/1000):null,business_date:r.date,voided:!!r.voided,revision:r.revision||0};
   if(store==="plans")return {id:r.id,profile_id:r.profileId,name:r.name,schedule:r.schedule||{},sort_order:r.order||0};
-  if(store==="dayplans")return {id:r.id,profile_id:r.profileId,date:r.date,plan_id:r.planId||null,plan_name:r.planName||null,schedule:r.schedule||{},edited:!!r.edited};
+  if(store==="dayplans")return {id:r.id,profile_id:r.profileId,date:r.date,plan_id:r.planId||null,plan_name:r.planName||null,schedule:r.schedule||{},edited:!!r.edited,day_type:r.dayType||null};
 }
 function fromRow(store,row){
   const u=row.updated_at?Date.parse(row.updated_at):now();
   if(store==="profiles")return {id:row.id,name:row.name,hourFmt:row.hour_fmt||"12",confirmEnd:row.confirm_end?"1":"0",_u:u,_dirty:false};
   if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,parentChannelId:row.parent_channel_id||null,tier:row.tier||null,drip:row.drip||null,urgency:row.urgency||null,importance:row.importance||null,_u:u,_dirty:false};
   if(store==="plans")return {id:row.id,profileId:row.profile_id,name:row.name,schedule:row.schedule||{},order:row.sort_order||0,_u:u,_dirty:false};
-  if(store==="dayplans")return {id:row.id,profileId:row.profile_id,date:row.date,planId:row.plan_id||null,planName:row.plan_name||null,schedule:row.schedule||{},edited:!!row.edited,_u:u,_dirty:false};
+  if(store==="dayplans")return {id:row.id,profileId:row.profile_id,date:row.date,planId:row.plan_id||null,planName:row.plan_name||null,schedule:row.schedule||{},edited:!!row.edited,dayType:row.day_type||null,_u:u,_dirty:false};
   if(store==="sessions")return {id:row.id,profileId:row.profile_id,channelId:row.channel_id,startTs:Date.parse(row.start_ts),endTs:row.end_ts?Date.parse(row.end_ts):null,durMs:row.end_ts?(Date.parse(row.end_ts)-Date.parse(row.start_ts)):0,date:row.business_date,voided:!!row.voided,revision:row.revision||0,_u:u,_dirty:false};
 }
 /* Stores that round-trip to Supabase. plans/dayplans need the tables from
@@ -712,7 +712,7 @@ function noteMissingTable(store,error){
    new fields. So on that error the new columns are stripped and the push is
    retried, and the full set is retried periodically in case the migration
    lands later. Same shape as the missing-table handling above. */
-const OPTIONAL_COLUMNS={channels:["tier","drip","urgency","importance"]};
+const OPTIONAL_COLUMNS={channels:["tier","drip","urgency","importance"],dayplans:["day_type"]};
 const missingRemoteColumns=new Map();
 const MISSING_COLUMN_RETRY_MS=10*60*1000;
 function columnsSkipped(store){
@@ -1085,6 +1085,62 @@ setInterval(async()=>{ if(!db||!state.profileId||!state.profile)return;
 },1000);
 
 /* =====================================================================
+   NON-WORKING DAYS
+   A day off used to score 0% Timing and 0% Budget against whatever the
+   weekday template said, so a week of leave dragged down every long-range
+   average. Marking a day non-working excludes it from scoring instead.
+
+   The flag lives on `dayplans`, NOT on `day_notes`. day_notes is keyed by
+   date alone and does not sync, so two profiles on one device would share
+   each other's holidays and nothing would reach a second device. dayplans is
+   already keyed profileId|date and already syncs.
+
+   Time tracked on a non-working day is still recorded and still shows in
+   totals - only the adherence score is skipped. Clearing the stored scores
+   IS the exclusion mechanism: every average checks for matchScore/budgetScore
+   and skips the day when they are absent.
+   ===================================================================== */
+const DAY_TYPES=[
+  {v:"vacation",label:"Vacation",color:"#22c55e"},
+  {v:"holiday", label:"Holiday", color:"#4f8cff"},
+  {v:"sick",    label:"Sick",    color:"#f59e0b"},
+  {v:"personal",label:"Personal",color:"#a855f7"}
+];
+function dayTypeDef(v){ return v?DAY_TYPES.find(d=>d.v===v)||null:null; }
+function dayTypeLabel(v){ const d=dayTypeDef(v); return d?d.label:"Working day"; }
+
+async function getDayType(dk){
+  if(!state.profileId) return null;
+  const rec=await idbGet("dayplans",state.profileId+"|"+dk);
+  return (rec&&rec.dayType)?rec.dayType:null;
+}
+/* Drops any stored adherence score for a day. Marking a day non-working after
+   it has already been scored must clear the old numbers, or the day would
+   keep reporting "Timing 0/8" forever. */
+async function clearDayScores(dk){
+  const n=await idbGet("day_notes",dk);
+  if(n&&(n.matchScore||n.budgetScore)){
+    delete n.matchScore; delete n.budgetScore;
+    await saveLocal("day_notes",n);
+  }
+}
+async function setDayType(dk,v){
+  if(!state.profileId) return null;
+  const key=state.profileId+"|"+dk;
+  let rec=await idbGet("dayplans",key);
+  if(!rec){
+    /* A bare marker. It deliberately carries no planId and no schedule, so
+       dayPlanMaterialised() still reports false and ensureDayPlan() fills in
+       the real plan when the day actually arrives. */
+    rec={id:key,profileId:state.profileId,date:dk,planId:null,planName:null,schedule:{},edited:false};
+  }
+  rec.dayType=v||null;
+  await saveLocal("dayplans",rec);
+  if(v) await clearDayScores(dk); else await refreshDayScores(dk);
+  return rec;
+}
+
+/* =====================================================================
    CHANNEL ATTRIBUTES
    Must/Will/Want, DRIP and the two Eisenhower axes are all the same shape:
    one tagged value per channel, plus a report that groups time by it. They
@@ -1170,84 +1226,166 @@ function closeDayEditor(){
 async function renderDayEditor(){
   const root=document.getElementById("dayEditorRoot");
   if(!root||!dayEditorDate) return;
-  const dk=dayEditorDate;
-  const sess=await sessionsForDay(dk);
-  const total=sess.reduce((a,s)=>a+(s.endTs?s.durMs:(now()-s.startTs)),0);
-  const isToday=dk===todayKey();
+  const dk=dayEditorDate, tk=todayKey();
+  const isToday=dk===tk;
+  const isFuture=dk>tk;                     /* YYYY-MM-DD compares correctly as text */
+  const dayType=await getDayType(dk);
+  const sess=isFuture?[]:await sessionsForDay(dk);
+  const total=sess.reduce((a,x)=>a+(x.endTs?x.durMs:(now()-x.startTs)),0);
+  const note=isFuture?{}:(await idbGet("day_notes",dk)||{});
+  const fmt=state.profile&&state.profile.hourFmt;
 
   root.innerHTML="";
 
-  /* header */
+  /* ---------------- header ---------------- */
   const head=document.createElement("div");
   head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap";
   const prev=document.createElement("button"); prev.className="btn sm"; prev.textContent="\u2039";
-  const next=document.createElement("button"); next.className="btn sm"; next.textContent="\u203a"; next.disabled=isToday; if(isToday) next.style.opacity=".4";
+  const next=document.createElement("button"); next.className="btn sm"; next.textContent="\u203a";
   const dateInput=document.createElement("input");
-  dateInput.type="date"; dateInput.value=dk; dateInput.max=todayKey();
+  dateInput.type="date"; dateInput.value=dk;
+  /* Future dates are reachable now, because a day off is marked ahead of time.
+     Bounded at +2 years so the picker stays sane. */
+  const maxD=new Date(dayStartTs(tk)); maxD.setFullYear(maxD.getFullYear()+2);
+  dateInput.max=dateKey(maxD.getTime());
   dateInput.style.cssText="font-size:16px;background:#0a1424;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:7px 9px";
   const lbl=document.createElement("div");
   lbl.style.cssText="font-weight:700;font-size:13px;color:var(--ink2);white-space:nowrap";
-  lbl.textContent=prettyDate(dk);
+  lbl.textContent=prettyDate(dk)+(isFuture?" \u00b7 upcoming":"");
   const spacer=document.createElement("div"); spacer.style.flex="1";
-  const todayBtn=document.createElement("button"); todayBtn.className="btn sm"; todayBtn.textContent="Today"; todayBtn.disabled=isToday; if(isToday) todayBtn.style.opacity=".4";
+  const todayBtn=document.createElement("button"); todayBtn.className="btn sm"; todayBtn.textContent="Today";
+  todayBtn.disabled=isToday; if(isToday) todayBtn.style.opacity=".4";
   const homeBtn=document.createElement("button"); homeBtn.className="btn sm"; homeBtn.textContent="Home";
   prev.addEventListener("click",()=>{ dayEditorDate=shiftDateKey(dk,-1); renderDayEditor(); });
-  next.addEventListener("click",()=>{ if(!isToday){ dayEditorDate=shiftDateKey(dk,1); renderDayEditor(); } });
+  next.addEventListener("click",()=>{ dayEditorDate=shiftDateKey(dk,1); renderDayEditor(); });
   dateInput.addEventListener("change",()=>{ if(dateInput.value){ dayEditorDate=dateInput.value; renderDayEditor(); } });
-  todayBtn.addEventListener("click",()=>{ dayEditorDate=todayKey(); renderDayEditor(); });
+  todayBtn.addEventListener("click",()=>{ dayEditorDate=tk; renderDayEditor(); });
   homeBtn.addEventListener("click",closeDayEditor);
   [prev,dateInput,next,lbl,spacer,todayBtn,homeBtn].forEach(n=>head.appendChild(n));
   root.appendChild(head);
 
-  /* body */
+  /* ---------------- body ---------------- */
   const body=document.createElement("div");
   body.style.cssText="flex:1;overflow-y:auto;padding:12px";
-  if(!sess.length){
-    const empty=document.createElement("div");
-    empty.className="hint"; empty.style.padding="18px 4px";
-    empty.textContent="No time recorded on this day yet. Use \u201cAdd session\u201d below to enter it.";
-    body.appendChild(empty);
-  }
-  sess.forEach(sn=>{
-    const ch=state.channels.find(c=>c.id===sn.channelId)||{label:"(deleted channel)",color:"#64748b"};
-    const row=document.createElement("div");
-    row.style.cssText="display:flex;align-items:center;gap:10px;padding:11px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--panel2)";
-    const dot=document.createElement("span");
-    dot.style.cssText="width:12px;height:12px;border-radius:50%;flex:none;background:"+ch.color;
-    const info=document.createElement("div"); info.style.cssText="flex:1;min-width:0";
-    const nm=document.createElement("div");
-    nm.style.cssText="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
-    nm.textContent=ch.label;
-    const tm=document.createElement("div");
-    tm.className="hint"; tm.style.margin="2px 0 0";
-    const fmt=state.profile&&state.profile.hourFmt;
-    tm.textContent=fmtClock(sn.startTs,fmt)+" \u2013 "+(sn.endTs?fmtClock(sn.endTs,fmt):"running")+"  \u00b7  "+fmtDurShort(sn.endTs?sn.durMs:(now()-sn.startTs));
-    info.appendChild(nm); info.appendChild(tm);
-    const edit=document.createElement("button");
-    edit.className="btn sm"; edit.textContent="Edit";
-    edit.addEventListener("click",()=>openSessionEditor(dk,sn));
-    row.appendChild(dot); row.appendChild(info); row.appendChild(edit);
-    body.appendChild(row);
+
+  /* day type */
+  const dtTitle=document.createElement("div"); dtTitle.className="sect-title"; dtTitle.style.marginTop="0";
+  dtTitle.textContent="Working day?";
+  body.appendChild(dtTitle);
+  const dtRow=document.createElement("div");
+  dtRow.style.cssText="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px";
+  const dtOpts=[{v:"",label:"Working"}].concat(DAY_TYPES.map(d=>({v:d.v,label:d.label,color:d.color})));
+  dtOpts.forEach(o=>{
+    const b=document.createElement("button");
+    b.className="btn sm"; b.textContent=o.label;
+    const on=String(dayType||"")===o.v;
+    if(on&&o.color){ b.style.background=o.color; b.style.borderColor=o.color; b.style.color=contrastInk(o.color); }
+    else if(on){ b.style.borderColor="var(--accent)"; }
+    b.style.fontWeight=on?"800":"700";
+    b.addEventListener("click",async()=>{
+      await setDayType(dk,o.v||null);
+      await updateTodayTotals();
+      await renderDayEditor();
+      toast(o.v?dayTypeLabel(o.v):"Marked as a working day");
+    });
+    dtRow.appendChild(b);
   });
+  body.appendChild(dtRow);
+  const dtHint=document.createElement("div"); dtHint.className="hint"; dtHint.style.margin="0 0 16px";
+  dtHint.textContent=dayType
+    ? "Not scored. Time you do track still counts in your totals, but this day is left out of your adherence averages."
+    : "Marking a day off keeps it out of your adherence averages instead of scoring it as a total miss.";
+  body.appendChild(dtHint);
+
+  /* sessions, or a note that the day has not happened yet */
+  if(isFuture){
+    const f=document.createElement("div"); f.className="hint"; f.style.padding="6px 4px 0";
+    f.textContent="This day has not happened yet, so there is no time to edit. You can mark it off in advance now.";
+    body.appendChild(f);
+  } else {
+    const sTitle=document.createElement("div"); sTitle.className="sect-title"; sTitle.textContent="Sessions";
+    body.appendChild(sTitle);
+    if(!sess.length){
+      const empty=document.createElement("div"); empty.className="hint"; empty.style.padding="4px 4px 8px";
+      empty.textContent="No time recorded on this day yet.";
+      body.appendChild(empty);
+    }
+    sess.forEach(sn=>{
+      const ch=state.channels.find(c=>c.id===sn.channelId)||{label:"(deleted channel)",color:"#64748b"};
+      const row=document.createElement("div");
+      row.style.cssText="display:flex;align-items:center;gap:10px;padding:11px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--panel2)";
+      const dot=document.createElement("span");
+      dot.style.cssText="width:12px;height:12px;border-radius:50%;flex:none;background:"+ch.color;
+      const info=document.createElement("div"); info.style.cssText="flex:1;min-width:0";
+      const nm=document.createElement("div");
+      nm.style.cssText="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+      nm.textContent=ch.label;
+      const tm=document.createElement("div"); tm.className="hint"; tm.style.margin="2px 0 0";
+      tm.textContent=fmtClock(sn.startTs,fmt)+" \u2013 "+(sn.endTs?fmtClock(sn.endTs,fmt):"running")+"  \u00b7  "+fmtDurShort(sn.endTs?sn.durMs:(now()-sn.startTs));
+      info.appendChild(nm); info.appendChild(tm);
+      const edit=document.createElement("button");
+      edit.className="btn sm"; edit.textContent="Edit";
+      edit.addEventListener("click",()=>openSessionEditor(dk,sn));
+      row.appendChild(dot); row.appendChild(info); row.appendChild(edit);
+      body.appendChild(row);
+    });
+
+    /* rating + notes: retrospective, so today and past only - never the future */
+    const rTitle=document.createElement("div"); rTitle.className="sect-title";
+    rTitle.textContent=isToday?"Rate today":"Rate this day";
+    body.appendChild(rTitle);
+    const stars=document.createElement("div");
+    stars.style.cssText="display:flex;gap:6px;font-size:30px;line-height:1;user-select:none;margin-bottom:10px";
+    const cur=note.rating||0;
+    for(let i=1;i<=5;i++){
+      const sEl=document.createElement("span");
+      sEl.textContent=i<=cur?"\u2605":"\u2606";
+      sEl.style.cssText="cursor:pointer;color:"+(i<=cur?"#fbbf24":"var(--muted)");
+      sEl.title="Rate "+i+"/5";
+      sEl.addEventListener("click",async()=>{
+        const ta=document.getElementById("dayEditorNotes");
+        await saveDayRatingAndNotes(dk,i===cur?0:i,ta?ta.value:(note.notes||""));
+        await renderDayEditor();
+      });
+      stars.appendChild(sEl);
+    }
+    body.appendChild(stars);
+    const ta=document.createElement("textarea");
+    ta.id="dayEditorNotes";
+    ta.placeholder="How did this day go?";
+    ta.value=note.notes||"";
+    ta.rows=3;
+    ta.style.cssText="width:100%;font-size:16px;background:#0a1424;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;resize:vertical";
+    ta.addEventListener("change",async()=>{ await saveDayRatingAndNotes(dk,note.rating||0,ta.value); toast("Notes saved"); });
+    body.appendChild(ta);
+  }
   root.appendChild(body);
 
-  /* footer */
+  /* ---------------- footer ---------------- */
   const foot=document.createElement("div");
   foot.style.cssText="padding:10px 12px max(10px, env(safe-area-inset-bottom)) 12px;border-top:1px solid var(--line);background:rgba(10,16,28,.7);display:flex;align-items:center;gap:10px;flex-wrap:wrap";
-  const add=document.createElement("button");
-  add.className="btn pri sm"; add.textContent="+ Add session";
-  add.addEventListener("click",()=>openSessionEditor(dk,null));
+  if(!isFuture){
+    const add=document.createElement("button");
+    add.className="btn pri sm"; add.textContent="+ Add session";
+    add.addEventListener("click",()=>openSessionEditor(dk,null));
+    foot.appendChild(add);
+  }
   const tot=document.createElement("div");
   tot.style.cssText="margin-left:auto;font-size:13px;color:var(--ink2);text-align:right";
-  const scores=await refreshDayScores(dk);
-  let line="Total "+fmtDurShort(total);
-  if(scores&&scores.plannedSlotsElapsed) line+="  \u00b7  Timing "+scores.matchedSlots+"/"+scores.plannedSlotsElapsed;
-  if(scores&&typeof scores.budgetPct==="number") line+="  \u00b7  Budget "+Math.round(scores.budgetPct)+"%";
-  tot.textContent=line;
-  foot.appendChild(add); foot.appendChild(tot);
+  if(isFuture){
+    tot.textContent=dayType?dayTypeLabel(dayType):"Working day";
+  } else if(dayType){
+    tot.textContent="Total "+fmtDurShort(total)+"  \u00b7  "+dayTypeLabel(dayType)+", not scored";
+  } else {
+    const scores=await refreshDayScores(dk);
+    let line="Total "+fmtDurShort(total);
+    if(scores&&scores.plannedSlotsElapsed) line+="  \u00b7  Timing "+scores.matchedSlots+"/"+scores.plannedSlotsElapsed;
+    if(scores&&typeof scores.budgetPct==="number") line+="  \u00b7  Budget "+Math.round(scores.budgetPct)+"%";
+    tot.textContent=line;
+  }
+  foot.appendChild(tot);
   root.appendChild(foot);
 }
-
 function tsToTimeInput(ts){ const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
 
 /* =====================================================================
@@ -2381,9 +2519,9 @@ async function openCombinedSummary(){
     
     // Custom date picker (hidden by default)
     content+='<div id="customDatePicker" style="display:none;gap:8px;margin-bottom:12px;padding:12px;background:var(--panel2);border-radius:8px">';
-    content+='<input type="date" id="startDate" style="padding:6px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:12px">';
+    content+='<input type="date" id="startDate" max="'+todayKey()+'" style="padding:6px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:16px">';
     content+='<span style="color:var(--ink2)">to</span>';
-    content+='<input type="date" id="endDate" style="padding:6px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:12px">';
+    content+='<input type="date" id="endDate" max="'+todayKey()+'" style="padding:6px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:16px">';
     content+='<button class="btn pri sm" id="applyDateRange" style="cursor:pointer">Apply</button>';
     content+='</div>';
     
@@ -2739,9 +2877,17 @@ function weekdayTemplate(date){
   const nm=names[new Date(parts[0],parts[1]-1,parts[2]).getDay()].toLowerCase();
   return (planState.plans||[]).find(p=>String(p.name).toLowerCase()===nm)||null;
 }
+/* A dayplan that carries neither a source template nor any blocks was never
+   really materialised - it is the bare marker that setDayType() writes when a
+   day is flagged non-working before it arrives. Returning that as if it were a
+   real day would freeze an EMPTY schedule onto the date, so a future day
+   marked as vacation and later un-marked would score against nothing. */
+function dayPlanMaterialised(rec){
+  return !!(rec && (rec.planId || (rec.schedule && Object.keys(rec.schedule).length)));
+}
 async function ensureDayPlan(date){
   const existing=await idbGet("dayplans",dayPlanKey(date));
-  if(existing) return existing;
+  if(dayPlanMaterialised(existing)) return existing;
   let src=null;
   const sel=await idbGet("selected_plan",date);
   if(sel&&sel.profileId===state.profileId&&sel.planId) src=(planState.plans||[]).find(p=>p.id===sel.planId)||null;
@@ -2749,6 +2895,8 @@ async function ensureDayPlan(date){
   const dp={ id:dayPlanKey(date), profileId:state.profileId, date:date,
              planId:src?src.id:null, planName:src?src.name:null,
              schedule:src?JSON.parse(JSON.stringify(src.schedule||{})):{}, edited:false };
+  /* Never lose a non-working flag that was set before the day materialised. */
+  if(existing&&existing.dayType) dp.dayType=existing.dayType;
   await saveLocal("dayplans",dp);
   return dp;
 }
@@ -3098,6 +3246,9 @@ async function todaysEffectivePlan(dateKey){
 async function refreshDayScores(dk){
   try{
     if(!db||!state.profileId) return null;
+    /* A non-working day is not scored at all, and any score it picked up
+       before it was marked is dropped. */
+    if(await getDayType(dk)){ await clearDayScores(dk); return null; }
     const plan=await todaysEffectivePlan(dk);
     if(!plan) return null;
     const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
