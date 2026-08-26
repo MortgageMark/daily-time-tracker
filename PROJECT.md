@@ -31,8 +31,9 @@ manifest.json                   PWA manifest
 netlify.toml                    build command, cache headers, SPA rewrite
 supabase-plans-migration.sql    already run; kept for reference / new envs
 supabase-channel-attributes-migration.sql
-                                NOT YET RUN - adds the four channel
-                                attribute columns. See Architecture.
+                                RUN 2026-08-26. Channel attribute columns.
+supabase-dayplans-daytype-migration.sql
+                                NOT YET RUN - adds dayplans.day_type.
 apple-touch-icon.png            180px, iOS home screen
 icon-192.png / icon-512.png     manifest icons (512 doubles as maskable)
 favicon-32.png                  browser tab
@@ -198,12 +199,56 @@ somehow became its own ancestor.
 4 and 5 read as high. The Priorities view reports untagged time explicitly
 rather than dropping it, so coverage cannot be silently overstated.
 
-**`supabase-channel-attributes-migration.sql` has not been run yet.** Until it
-is, these four fields work fully on-device but do not sync. Supabase rejects
-an upsert naming a column it does not have and fails the whole row, so
-`OPTIONAL_COLUMNS` / `rowForPush()` detect that once, retry the push without
-those columns, and retry the full set every 10 minutes - meaning running the
-migration starts syncing them without a reload.
+`supabase-channel-attributes-migration.sql` **was run on 2026-08-26**, so
+these four columns exist and sync normally.
+
+The mechanism behind it is worth knowing, because the next migration relies on
+it too. Supabase rejects an upsert naming a column it does not have and fails
+the whole row, so `OPTIONAL_COLUMNS` / `rowForPush()` detect that once, retry
+the push without those columns, and retry the full set every 10 minutes -
+meaning running a migration starts the sync without a reload.
+
+### Non-working days
+
+Marking a day Vacation / Holiday / Sick / Personal excludes it from adherence
+scoring. Before this, a day off scored 0% Timing and 0% Budget against the
+weekday template, so a week of leave dragged down every long-range average.
+
+**The flag lives on `dayplans`, not `day_notes`.** day_notes is keyed by date
+alone and does not sync, so two profiles on one device would share each other's
+holidays and nothing would reach a second device. dayplans is already keyed
+`profileId|date` and already syncs. Any future day-level flag belongs there for
+the same reason.
+
+- Time tracked on a non-working day **still records and still counts in
+  totals** - only the score is skipped.
+- **Clearing the stored scores IS the exclusion mechanism.** Every average
+  checks for `matchScore`/`budgetScore` and skips a day without them, so no
+  averaging code needed to change. `refreshDayScores()` returns null and calls
+  `clearDayScores()` for a flagged day.
+- Marking a day off after it was scored clears the stale numbers. The rating
+  and notes are deliberately kept - they are a separate judgement.
+
+**Marking a FUTURE day must not go through `ensureDayPlan()`.** Materialising a
+day that early freezes whatever the template says today onto it, and if
+`planState` has not loaded it would freeze an *empty* plan onto a real working
+day. `setDayType()` writes a bare marker instead, and `dayPlanMaterialised()`
+treats a record with no `planId` and no blocks as not yet materialised - so
+`ensureDayPlan()` still fills in the real plan when the day arrives and carries
+the flag across.
+
+`supabase-dayplans-daytype-migration.sql` **has not been run yet.** Until it
+does, the flag works on-device but does not sync.
+
+### Which fields may be edited for a future date
+
+The rule is not "no editing future dates" - that would block marking leave in
+advance, which is the whole point. It splits by what the field means:
+
+| Field | When |
+|---|---|
+| Star rating, notes | today and past only - retrospective |
+| Day type, plan assignment | any date, including future |
 
 ### Plans: templates vs days
 
@@ -477,6 +522,10 @@ removing it, because deletes do not propagate to Supabase and the row would
 return on the next pull. Overlaps are confirmed rather than silently accepted.
 **Channel attributes:** Must/Will/Want, DRIP and Urgency/Importance built as
 one generic mechanism, with a Priorities report and an Eisenhower quadrant.
+**Non-working days:** Vacation/Holiday/Sick/Personal on any date including
+future ones, excluded from adherence scoring; star rating and notes extended to
+any past day; the Summary's lookback range no longer accepts future dates and
+its inputs raised to 16px.
 
 ---
 
