@@ -52,7 +52,8 @@
   .tile .label{font-size:22px; font-weight:800; letter-spacing:.2px; text-shadow:0 1px 2px rgba(0,0,0,.18)}
   .tile .time{font-size:30px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.5px}
   .tile .foot{display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:700; opacity:.92}
-  .tile .state{display:inline-flex; align-items:center; gap:6px; text-transform:uppercase; letter-spacing:.7px}
+  .tile .foot .sess{font-size:13px; font-variant-numeric:tabular-nums; letter-spacing:.3px}
+  .tile .state{display:inline-flex; align-items:center; gap:6px; text-transform:uppercase; letter-spacing:.7px; white-space:nowrap; min-width:0}
   .tile .state .d{width:9px;height:9px;border-radius:50%; background:currentColor}
   .tile.on{border-color:rgba(255,255,255,.9); box-shadow:0 0 0 4px rgba(255,255,255,.12), var(--shadow)}
   .tile.on::after{content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.10),transparent 40%); pointer-events:none}
@@ -78,6 +79,28 @@
   .sheet-b{padding:20px 22px}
   .x{margin-left:auto; width:38px;height:38px; border-radius:11px; border:1px solid var(--line); background:var(--panel2); font-size:20px; color:var(--ink2)}
   .row{display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--line); border-radius:14px; background:var(--panel2); margin-bottom:10px}
+  .row.chan{gap:8px}
+  .row.chan.sub{padding:9px 12px 9px 30px; border-left:2px solid var(--accent); border-radius:0 14px 14px 0; margin-left:14px}
+  .grip{cursor:grab; color:var(--muted); font-size:16px; line-height:1; flex:0 0 auto; user-select:none; touch-action:none}
+  .grip:active{cursor:grabbing}
+  .row.chan .btn.sm[disabled]{opacity:.28; cursor:not-allowed}
+  .row.chan .act-up,.row.chan .act-down{padding:7px 9px; line-height:1; min-width:32px}
+  .row.chan .act-caret{padding:3px 6px; min-width:24px; line-height:1.2; font-size:11px}
+  .row.chan .grow{overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
+  .row.chan .btn{flex:0 0 auto; white-space:nowrap}
+  .row.chan .swatch{flex:0 0 auto}
+  .rowbreak{display:none}
+  .add-spacer{visibility:hidden; pointer-events:none}
+  .row.chan.drop-before{border-top:2px solid var(--accent)}
+  @media (max-width:640px){
+    .row.chan{gap:8px; padding:10px; flex-wrap:wrap; row-gap:8px}
+    .row.chan.sub{padding-left:16px; margin-left:8px}
+    .rowbreak{display:block; flex:0 0 100%; height:0; margin:0}
+    .row.chan .act-up{margin-left:auto}
+    .row.chan .act-up,.row.chan .act-down{padding:9px 16px; font-size:15px; min-width:44px}
+    .row.chan .act-edit,.row.chan .act-add{padding:9px 14px; font-size:13px}
+    .row.chan .swatch{width:26px;height:26px}
+  }
   .swatch{width:34px;height:34px;border-radius:9px; flex:none; border:2px solid rgba(255,255,255,.25)}
   input,select{font-family:inherit; font-size:15px; color:var(--ink); background:#0a1424; border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none}
   input[type=color]{padding:3px; width:52px; height:40px}
@@ -140,7 +163,23 @@
   .login label{display:block; font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:14px 0 6px}
   .login input{width:100%}
   .login .err{color:#fca5a5; font-size:13px; margin-top:12px; min-height:18px}
+  .login .ok{color:#86efac; font-size:13px; margin-top:10px; line-height:1.45}
+  .login .authlinks{display:flex; justify-content:space-between; gap:12px; margin-top:18px; font-size:13px; flex-wrap:wrap}
+  .login .authlinks a{color:var(--accent); text-decoration:none; cursor:pointer}
+  .login .authlinks a:hover{text-decoration:underline}
+  @media (max-width:640px){
+    .tile .foot{font-size:10px; gap:6px}
+    .tile .foot .sess{font-size:11px; letter-spacing:0}
+    .tile .state{letter-spacing:.3px}
+    .tile.on .runbadge{display:none}
+  }
   @media (max-width:640px){:root{--tile-min:150px} .topmeta{gap:12px} .kv .v.big{font-size:18px} .ctl{min-width:56px; padding:4px 6px; font-size:10px; height:44px} .barrow .nm{width:88px}}
+  /* Bottom nav: four buttons sharing the full width, with a comfortable tap target. */
+  @media (max-width:640px){
+    .bottombar{gap:8px; padding:10px 12px max(10px, env(safe-area-inset-bottom)) 12px}
+    .bottombar .ctl{flex:1 1 0; min-width:0; height:58px; padding:8px 4px; gap:5px; font-size:11px; border-radius:16px}
+    .bottombar .ctl svg{width:24px; height:24px}
+  }
 
   textarea{font-family:inherit;font-size:14px;color:var(--ink);background:#0a1424;border:1px solid var(--line);border-radius:10px;padding:12px;outline:none}
   textarea:focus{border-color:var(--accent)}
@@ -179,13 +218,26 @@
 <div class="login" id="loginGate">
   <div class="box">
     <h1><span class="dot"></span></h1>
-    <p>Sign in to sync your time across every device.</p>
-    <label>Email</label>
-    <input id="loginEmail" type="email" autocomplete="username" placeholder="you@example.com">
-    <label>Password</label>
-    <input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••">
+    <p id="authSub">Sign in to sync your time across every device.</p>
+    <div id="emailWrap">
+      <label>Email</label>
+      <input id="loginEmail" type="email" autocomplete="username" placeholder="you@example.com">
+    </div>
+    <div id="passWrap">
+      <label id="passLabel">Password</label>
+      <input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <div id="pass2Wrap" style="display:none">
+      <label id="pass2Label">Confirm password</label>
+      <input id="loginPass2" type="password" autocomplete="new-password" placeholder="••••••••">
+    </div>
     <button class="btn pri" id="loginBtn" style="width:100%; margin-top:20px">Sign in</button>
     <div class="err" id="loginErr"></div>
+    <div class="ok" id="loginOk"></div>
+    <div class="authlinks">
+      <a href="#" id="forgotLink">Forgot password?</a>
+      <a href="#" id="modeLink">Create account</a>
+    </div>
   </div>
 </div>
 
@@ -218,6 +270,7 @@
     <div class="hint" style="margin:8px 0 14px">Rename, recolor, reorder or archive any button. Names and colors can change anytime — history stays tied to a permanent internal ID, so nothing is ever lost.</div>
     <div id="channelList"></div>
     <div class="sect-title">Archived channels</div><div id="archivedList"><div class="hint">None archived.</div></div>
+    <div id="dangerZone"></div>
     <div class="sect-title">Preferences</div>
     <div class="row"><div class="grow">Time format</div><select id="hourFmt"><option value="12">12-hour</option><option value="24">24-hour</option></select></div>
     <div class="row"><div class="grow">Button size</div><select id="btnSize"><option value="normal" selected>Normal</option><option value="compact">Compact</option><option value="spacious">Spacious</option></select></div>
@@ -228,7 +281,7 @@
     <div class="sect-title">Data</div>
     <div class="row"><div class="grow"><b>Export CSV</b><div class="hint">Download every session for this profile as a spreadsheet.</div></div><button class="btn sm" id="exportCsvBtn">Export</button></div>
     <div class="sect-title">Account</div>
-    <div class="row"><div class="grow"><b>Signed in as</b><div class="hint" id="acctEmail"></div></div><button class="btn sm warn" id="signOutBtn">Sign out</button></div>
+    <div class="row"><div class="grow"><b>Signed in as</b><div class="hint" id="acctEmail"></div></div></div>
   </div></div></div>
 
 <!-- CHANNEL EDITOR -->
@@ -685,6 +738,7 @@ async function renderGrid(){ const grid=document.getElementById("grid");
     const ink=contrastInk(c.color);
     const bg=on?`linear-gradient(160deg,${tint(c.color,.10)},${shade(c.color,.12)})`:`linear-gradient(160deg,${c.color},${shade(c.color,.22)})`;
     const pct=dayTotal>0?Math.round(ms/dayTotal*100):0;
+    const sessMs=(on&&running)?Math.max(0,now()-running.startTs):0;
     const el=document.createElement("button");
     el.className="tile"+(on?" on":"");
     el.style.background=bg;
@@ -693,7 +747,7 @@ async function renderGrid(){ const grid=document.getElementById("grid");
     el.draggable=true;
     el.style.cursor="grab";
     const subLabel=on&&runningCh?.parentChannelId===c.id?` · ${runningCh.label}`:"";
-    el.innerHTML=`<div class="runbadge" style="color:${ink}"><span class="d"></span>Running</div><div class="label">${escapeHtml(c.label)}${subLabel}</div><div class="time" data-ch="${c.id}">${fmtDur(ms)}</div><div class="foot"><span class="state">${on?'<span class="d"></span>Running':'Paused'}</span><span class="pct">${pct}%</span></div>`;
+    el.innerHTML=`<div class="runbadge" style="color:${ink}"><span class="d"></span>Running</div><div class="label">${escapeHtml(c.label)}${subLabel}</div><div class="time" data-ch="${c.id}">${fmtDur(ms)}</div><div class="foot"><span class="state">${on?`<span class="d"></span><span class="sess">${fmtDur(sessMs)}</span>`:'Paused'}</span><span class="pct">${pct}%</span></div>`;
     el.addEventListener("click",e=>{if(e.target.closest(".dragging"))return;switchTo(c.id);});
     el.addEventListener("dragstart",e=>{el.classList.add("dragging");e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",c.id);e.dataTransfer.setData("draggedElement",active.indexOf(c));el.style.opacity="0.5"});
     el.addEventListener("dragend",e=>{el.classList.remove("dragging");el.style.opacity="1"});
@@ -717,7 +771,9 @@ setInterval(async()=>{ if(!db||!state.profileId||!state.profile)return; await up
   document.getElementById("topTotal").textContent=fmtDur(total);
   document.querySelectorAll(".time[data-ch]").forEach(n=>{n.textContent=fmtDur(map[n.getAttribute("data-ch")]||0);});
   const active=state.channels.filter(c=>!c.archived&&!c.parentChannelId).sort((a,b)=>a.order-b.order);
-  document.querySelectorAll(".tile").forEach((t,i)=>{const c=active[i];if(!c)return;const ms=map[c.id]||0;const pct=total>0?Math.round(ms/total*100):0;const p=t.querySelector(".pct");if(p)p.textContent=pct+"%";});
+  document.querySelectorAll(".tile").forEach((t,i)=>{const c=active[i];if(!c)return;const ms=map[c.id]||0;const pct=total>0?Math.round(ms/total*100):0;const p=t.querySelector(".pct");if(p)p.textContent=pct+"%";
+    const s=t.querySelector(".sess");
+    if(s){ if(running&&running.startTs){ s.textContent=fmtDur(Math.max(0,now()-running.startTs)); } else { renderGrid(); } }});
 },1000);
 
 /* ===== toast ===== */
@@ -736,6 +792,17 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
   const channelsItem=document.createElement("div");channelsItem.className="menu-item";channelsItem.style="padding:10px 12px;cursor:pointer;font-size:12px;color:var(--ink)";channelsItem.textContent="🎨 Channels";channelsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openChannels();});m.appendChild(channelsItem);
   
   const settingsItem=document.createElement("div");settingsItem.className="menu-item";settingsItem.style="padding:10px 12px;cursor:pointer;font-size:12px;color:var(--ink)";settingsItem.textContent="⚙️ Settings";settingsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openSettings();});m.appendChild(settingsItem);
+
+  const sep2=document.createElement("div");sep2.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep2);
+  if(window._acctEmail){
+    const who=document.createElement("div");
+    who.style="padding:6px 12px 2px;font-size:10px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+    who.textContent=window._acctEmail;
+    m.appendChild(who);
+  }
+  const signOutItem=document.createElement("div");signOutItem.className="menu-item";signOutItem.style="padding:10px 12px;cursor:pointer;font-size:12px;color:var(--warn)";signOutItem.textContent="🚪 Sign out";
+  signOutItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";doSignOut();});
+  m.appendChild(signOutItem);
 }
 
 /* ===== scrims ===== */
@@ -890,6 +957,7 @@ function openChannels(){const app=document.querySelector('.app');const stage=app
         <div class="hint" style="margin:8px 0 14px">Rename, recolor, reorder or archive any button. Names and colors can change anytime — history stays tied to a permanent internal ID, so nothing is ever lost.</div>
         <div id="channelList"></div>
         <div class="sect-title">Archived channels</div><div id="archivedList"><div class="hint">None archived.</div></div>
+        <div id="dangerZone2"></div>
       </div>
     </div>
   </div>
@@ -918,7 +986,7 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
         <div class="row"><div class="grow"><b>Delete Date Range</b><div class="hint">Remove all data from a specific date range.</div></div><button class="btn sm warn" id="deleteDateRangeBtn">Delete Range</button></div>
         <div class="row"><div class="grow"><b>Complete Reset</b><div class="hint">⚠️ Permanently delete ALL data. This cannot be undone.</div></div><button class="btn sm warn" id="completeResetBtn" style="background:#dc2626">Complete Reset</button></div>
         <div class="sect-title">Account</div>
-        <div class="row"><div class="grow"><b>Signed in as</b><div class="hint" id="acctEmail"></div></div><button class="btn sm warn" id="signOutBtn">Sign out</button></div>
+        <div class="row"><div class="grow"><b>Signed in as</b><div class="hint" id="acctEmail"></div></div></div>
       </div>
     </div>
   </div>
@@ -975,67 +1043,186 @@ function dedupChannels(chs){
 function applyButtonSize(size){const grid=document.getElementById("grid");if(!grid)return;const base=172;const heights={compact:140,normal:172,spacious:220};const h=heights[size]||heights.normal;document.querySelectorAll(".tile").forEach(t=>{t.style.height=h+"px";});}
 
 
-function renderChannelSettings(){const list=document.getElementById("channelList");list.innerHTML="";
-  
-  
-  // Visual debug display
-  const debugDiv=document.createElement("div");
-  debugDiv.style.cssText="background:#2a2a3e;border:2px solid #ffd700;padding:10px;margin-bottom:12px;font-size:11px;color:#ffd700;font-family:monospace;border-radius:6px";
-  let debugHtml="📊 Channels: ";
-  state.channels.forEach(ch=>{
-    if(ch.archived) return;
-    const mark=ch.parentChannelId?"└":"•";
-    debugHtml+=mark+ch.label;
-    if(ch.parentChannelId) debugHtml+="(→"+ch.parentChannelId.slice(0,4)+")";
-    debugHtml+=" | ";
+/* ===== channel ordering =====
+   order is scoped to a sibling group: top-level channels order among themselves,
+   subcategories order among siblings under the same parent. Moving a parent
+   therefore carries its subcategories with it. */
+const COLLAPSE_KEY="dtt_collapsed_chans";
+function loadCollapsed(){
+  try{ const raw=localStorage.getItem(COLLAPSE_KEY); return new Set(raw?JSON.parse(raw):[]); }
+  catch(e){ return new Set(); }
+}
+const collapsedChans=loadCollapsed();
+function saveCollapsed(){
+  try{ localStorage.setItem(COLLAPSE_KEY,JSON.stringify(Array.from(collapsedChans))); }catch(e){}
+}
+let dragChanId=null;
+
+function siblingsOf(parentId){
+  const pid=parentId||null;
+  return state.channels.filter(c=>!c.archived&&(c.parentChannelId||null)===pid).sort((a,b)=>a.order-b.order);
+}
+async function persistOrder(sibs){
+  for(let k=0;k<sibs.length;k++){
+    if(sibs[k].order!==k){ sibs[k].order=k; await saveLocal("channels",sibs[k]); }
+  }
+}
+async function refreshChannels(){
+  state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
+  state.channels=dedupChannels(state.channels);
+  state.channels.forEach(c=>{if(!c.hasOwnProperty("parentChannelId"))c.parentChannelId=null;});
+  renderChannelSettings(); renderGrid();
+}
+async function moveChannel(id,dir){
+  const ch=state.channels.find(c=>c.id===id); if(!ch) return;
+  const sibs=siblingsOf(ch.parentChannelId);
+  const i=sibs.findIndex(c=>c.id===id), j=i+dir;
+  if(i<0||j<0||j>=sibs.length) return;
+  sibs.splice(j,0,sibs.splice(i,1)[0]);
+  await persistOrder(sibs);
+  await refreshChannels();
+}
+async function dropChannel(draggedId,targetId){
+  if(!draggedId||draggedId===targetId) return;
+  const a=state.channels.find(c=>c.id===draggedId), b=state.channels.find(c=>c.id===targetId);
+  if(!a||!b) return;
+  if((a.parentChannelId||null)!==(b.parentChannelId||null)){ toast("Reorder within the same group"); return; }
+  const sibs=siblingsOf(a.parentChannelId);
+  const from=sibs.findIndex(c=>c.id===draggedId), to=sibs.findIndex(c=>c.id===targetId);
+  if(from<0||to<0||from===to) return;
+  sibs.splice(to,0,sibs.splice(from,1)[0]);
+  await persistOrder(sibs);
+  await refreshChannels();
+}
+function toggleCollapse(id){
+  if(collapsedChans.has(id)) collapsedChans.delete(id); else collapsedChans.add(id);
+  saveCollapsed();
+  renderChannelSettings();
+}
+function buildChannelRow(c,idx,total,subCount){
+  const isSub=!!c.parentChannelId;
+  const row=document.createElement("div");
+  row.className="row chan"+(isSub?" sub":"");
+  row.draggable=true; row.dataset.channelId=c.id;
+  const collapsed=collapsedChans.has(c.id);
+  const caret=(!isSub&&subCount>0)
+    ? `<button class="btn sm act-caret" title="${collapsed?"Expand":"Collapse"}">${collapsed?"▸":"▾"}</button>`
+    : `<span style="display:inline-block;flex:0 0 24px;width:24px"></span>`;
+  const meta=(!isSub&&subCount)?`<span class="hint" style="margin-left:8px">${subCount} sub${subCount>1?"s":""}${collapsed?" · hidden":""}</span>`:"";
+  const name=isSub?`<span style="font-size:13px">${escapeHtml(c.label)}</span>`:`<b>${escapeHtml(c.label)}</b>${meta}`;
+  row.innerHTML=
+    `<span class="grip" title="Drag to reorder">⠿</span>`+
+    caret+
+    `<div class="swatch" style="background:${c.color}"></div>`+
+    `<div class="grow">${name}</div>`+
+    `<span class="rowbreak"></span>`+
+    `<button class="btn sm act-up" title="Move up"${idx===0?" disabled":""}>▲</button>`+
+    `<button class="btn sm act-down" title="Move down"${idx===total-1?" disabled":""}>▼</button>`+
+    `<button class="btn sm act-edit">Edit</button>`+
+    (isSub?`<button class="btn sm add-spacer" tabindex="-1" aria-hidden="true">+<span class="add-txt"> Add</span></button>`:`<button class="btn sm act-add" title="Add subcategory">+<span class="add-txt"> Add</span></button>`);
+
+  const q=s=>row.querySelector(s);
+  const up=q(".act-up"), dn=q(".act-down"), ed=q(".act-edit"), ad=q(".act-add"), ca=q(".act-caret");
+  if(up) up.addEventListener("click",e=>{e.stopPropagation();moveChannel(c.id,-1);});
+  if(dn) dn.addEventListener("click",e=>{e.stopPropagation();moveChannel(c.id,1);});
+  if(ed) ed.addEventListener("click",e=>{e.stopPropagation();openChannelEditor(c.id);});
+  if(ad) ad.addEventListener("click",e=>{e.stopPropagation();openChannelEditor(null,c.id);});
+  if(ca) ca.addEventListener("click",e=>{e.stopPropagation();toggleCollapse(c.id);});
+
+  row.addEventListener("dragstart",e=>{
+    dragChanId=c.id; e.dataTransfer.effectAllowed="move";
+    try{ e.dataTransfer.setData("text/plain",c.id); }catch(err){}
+    row.style.opacity="0.45";
   });
-  debugDiv.textContent=debugHtml||"(loading...)";
-  list.appendChild(debugDiv);
-  
-  // Nuclear delete button - visible at top
-  const nuclearBtn=document.createElement("button");
-  nuclearBtn.style.cssText="width:100%;padding:12px;margin:12px 0;background:#ff4444;color:white;border:none;border-radius:6px;font-weight:bold;font-size:14px;cursor:pointer";
-  nuclearBtn.textContent="🔥 DELETE ALL CHANNELS - Start Fresh";
-  nuclearBtn.addEventListener("click",async()=>{
-    if(!confirm("DELETE ALL CHANNELS? This will remove everything from everywhere. Last chance!")) return;
-    try{
-      const allChs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
-      for(const ch of allChs){
-        await db.transaction(["channels"],"readwrite").objectStore("channels").delete(ch.id);
-        try{await SB.from("channels").delete().eq("id",ch.id);}catch(e){}
-      }
-      state.channels=[];
-      renderChannelSettings();
-      renderGrid();
-      toast("All channels permanently deleted!");
-    }catch(e){
-      console.error("Error:",e);
-      toast("Error deleting channels");
+  row.addEventListener("dragend",()=>{ dragChanId=null; row.style.opacity="1"; row.classList.remove("drop-before"); });
+  row.addEventListener("dragover",e=>{
+    const d=dragChanId?state.channels.find(x=>x.id===dragChanId):null;
+    if(!d||d.id===c.id||(d.parentChannelId||null)!==(c.parentChannelId||null)) return;
+    e.preventDefault(); e.dataTransfer.dropEffect="move"; row.classList.add("drop-before");
+  });
+  row.addEventListener("dragleave",()=>row.classList.remove("drop-before"));
+  row.addEventListener("drop",async e=>{
+    e.preventDefault(); row.classList.remove("drop-before");
+    const id=dragChanId||e.dataTransfer.getData("text/plain");
+    dragChanId=null;
+    await dropChannel(id,c.id);
+  });
+  return row;
+}
+function renderChannelSettings(){
+  const list=document.getElementById("channelList"); if(!list) return;
+  list.innerHTML="";
+  const tops=siblingsOf(null);
+  if(!tops.length){
+    list.innerHTML='<div class="hint">No channels yet. Use "+ Add channel" above to create one.</div>';
+  }else{
+    tops.forEach((c,i)=>{
+      const subs=siblingsOf(c.id);
+      list.appendChild(buildChannelRow(c,i,tops.length,subs.length));
+      if(!collapsedChans.has(c.id)) subs.forEach((s,j)=>list.appendChild(buildChannelRow(s,j,subs.length,0)));
+    });
+  }
+  const arch=state.channels.filter(c=>c.archived); const al=document.getElementById("archivedList");
+  if(al){
+    if(!arch.length) al.innerHTML='<div class="hint">None archived.</div>';
+    else{
+      al.innerHTML="";
+      arch.forEach(c=>{
+        const row=document.createElement("div"); row.className="row";
+        row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b> <span class="archived-tag">Archived</span></div><button class="btn sm">Restore</button><button class="btn sm" style="background:rgba(240,68,68,.2);border-color:#f87171;color:#f87171">Delete</button>`;
+        row.querySelector(".btn").addEventListener("click",()=>restoreChannel(c.id));
+        row.querySelectorAll(".btn")[1].addEventListener("click",()=>deleteChannel(c.id));
+        al.appendChild(row);
+      });
     }
-  });
-  list.appendChild(nuclearBtn);
-  
-  const active=state.channels.filter(c=>!c.archived&&!c.parentChannelId).sort((a,b)=>a.order-b.order);
-  active.forEach((c,i)=>{const row=document.createElement("div");row.className="row";
-    row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b><div style="font-size:11px;color:var(--muted);margin-top:4px">↕ Drag to reorder</div></div><button class="btn sm">Edit</button>`;
-    row.style.cursor="grab";row.draggable=true;row.dataset.channelId=c.id;
-    row.addEventListener("dragstart",e=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",c.id);row.style.opacity="0.5"});
-    row.addEventListener("dragend",e=>{row.style.opacity="1"});
-    row.addEventListener("dragover",e=>{e.preventDefault();e.dataTransfer.dropEffect="move";row.style.borderTop="2px solid var(--accent)"});
-    row.addEventListener("dragleave",e=>{row.style.borderTop=""});
-    row.addEventListener("drop",async e=>{e.preventDefault();row.style.borderTop="";const draggedId=e.dataTransfer.getData("text/plain");if(draggedId!==c.id){const draggedCh=state.channels.find(x=>x.id===draggedId);const targetCh=c;const tempOrder=draggedCh.order;draggedCh.order=targetCh.order;targetCh.order=tempOrder;await saveLocal("channels",draggedCh);await saveLocal("channels",targetCh);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid()}});
-    const chId=c.id;row.querySelector(".btn").addEventListener("click",()=>openChannelEditor(chId));list.appendChild(row);
-    const subs=state.channels.filter(sc=>sc.parentChannelId===c.id&&!sc.archived).sort((a,b)=>a.order-b.order);
-    
-    subs.forEach(sub=>{const subRow=document.createElement("div");subRow.className="row";subRow.style.paddingLeft="48px";subRow.style.borderLeft="2px solid var(--line)";subRow.innerHTML=`<div class="swatch" style="background:${sub.color}"></div><div class="grow"><span style="font-size:12px">${escapeHtml(sub.label)}</span></div><button class="btn sm">Edit</button>`;const subId=sub.id;subRow.querySelector(".btn").addEventListener("click",()=>openChannelEditor(subId));list.appendChild(subRow);});
-    // Add subcategory button - inline with edit button
-    const addSubBtn=document.createElement("button");addSubBtn.className="btn sm";addSubBtn.textContent="+ Add";addSubBtn.style.marginLeft="8px";const parentId=c.id;addSubBtn.addEventListener("click",()=>{openChannelEditor(null,parentId);});row.appendChild(addSubBtn);});
-  const arch=state.channels.filter(c=>c.archived);const al=document.getElementById("archivedList");
-  if(!arch.length)al.innerHTML='<div class="hint">None archived.</div>';
-  else{al.innerHTML="";arch.forEach(c=>{const row=document.createElement("div");row.className="row";row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b> <span class="archived-tag">Archived</span></div><button class="btn sm">Restore</button><button class="btn sm" style="background:rgba(240,68,68,.2);border-color:#f87171;color:#f87171">Delete</button>`;const restoreBtn=row.querySelector(".btn");restoreBtn.addEventListener("click",()=>restoreChannel(c.id));const deleteBtn=row.querySelectorAll(".btn")[1];deleteBtn.addEventListener("click",()=>deleteChannel(c.id));al.appendChild(row);});}
-  document.getElementById("acctEmail").textContent=(window._acctEmail||"");}
-async function moveChannel(id,dir){const active=state.channels.filter(c=>!c.archived).sort((a,b)=>a.order-b.order);const idx=active.findIndex(c=>c.id===id);const sw=idx+dir;if(sw<0||sw>=active.length)return;const a=active[idx],b=active[sw];const ao=a.order;a.order=b.order;b.order=ao;await saveLocal("channels",a);await saveLocal("channels",b);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();}
-async function restoreChannel(id){const c=state.channels.find(x=>x.id===id);c.archived=false;c.order=Math.max(0,...state.channels.map(x=>x.order))+1;await saveLocal("channels",c);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();toast("Restored");}
+  }
+  renderDangerZone();
+  const acct=document.getElementById("acctEmail"); if(acct) acct.textContent=(window._acctEmail||"");}
+
+/* Delete-all lives at the very bottom of Channels, under Archived. */
+async function deleteAllChannels(){
+  if(!confirm("Delete ALL channels and start fresh?\n\nThis removes every channel and subcategory from this device and from the cloud. It cannot be undone.")) return;
+  if(!confirm("Last chance — permanently delete all channels?")) return;
+  try{
+    const allChs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
+    for(const ch of allChs){
+      await db.transaction(["channels"],"readwrite").objectStore("channels").delete(ch.id);
+      try{ await SB.from("channels").delete().eq("id",ch.id); }catch(e){ console.warn("remote delete failed",ch.id,e); }
+    }
+    state.channels=[];
+    renderChannelSettings();
+    renderGrid();
+    toast("All channels deleted");
+  }catch(e){
+    console.error("deleteAllChannels:",e);
+    toast("Error deleting channels");
+  }
+}
+function renderDangerZone(){
+  const host=document.getElementById("dangerZone2")||document.getElementById("dangerZone");
+  if(!host) return;
+  host.innerHTML="";
+  const title=document.createElement("div");title.className="sect-title";title.textContent="Danger zone";host.appendChild(title);
+  const hint=document.createElement("div");hint.className="hint";hint.style.margin="0 0 10px";
+  hint.textContent="Removes every channel and subcategory everywhere. Archiving keeps your history — this does not.";
+  host.appendChild(hint);
+  const btn=document.createElement("button");
+  btn.className="btn sm warn";
+  btn.style.cssText="width:100%;padding:12px;background:#dc2626;border-color:#dc2626;color:#fff;font-weight:700";
+  btn.textContent="Delete all channels — start fresh";
+  btn.addEventListener("click",deleteAllChannels);
+  host.appendChild(btn);
+}
+async function restoreChannel(id){
+  const c=state.channels.find(x=>x.id===id); if(!c) return;
+  c.archived=false;
+  /* Land it at the end of its OWN sibling group, not the global max. */
+  const sibs=siblingsOf(c.parentChannelId).filter(x=>x.id!==c.id);
+  c.order=sibs.length?Math.max(...sibs.map(x=>x.order))+1:0;
+  await saveLocal("channels",c);
+  await refreshChannels();
+  toast("Restored");
+}
 async function deleteChannel(id){if(!confirm("Permanently delete this channel? This cannot be undone."))return;try{await db.transaction(["channels"],"readwrite").objectStore("channels").delete(id);const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const toDelete=allSessions.filter(s=>s.channelId===id);for(const sess of toDelete){await db.transaction(["sessions"],"readwrite").objectStore("sessions").delete(sess.id);}state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();toast("Deleted permanently");}catch(e){console.error("Delete error:",e);toast("Error deleting channel");}}
 function openChannelEditor(id,parentId){editingChanId=id;editingParentId=parentId||null;const c=id?state.channels.find(x=>x.id===id):null;const parent=parentId?state.channels.find(x=>x.id===parentId):null;document.getElementById("chanTitle").textContent=c?"Edit channel":parent?"Add subcategory":"Add channel";document.getElementById("chanLabel").value=c?c.label:"";const col=c?c.color:parent?parent.color:PALETTE[state.channels.length%PALETTE.length];document.getElementById("chanColor").value=col;document.getElementById("chanArchive").style.display=c?"block":"none";renderPalette(col);updateChanPreview();openScrim("chanScrim");}
 function renderPalette(sel){const p=document.getElementById("chanPalette");p.innerHTML="";PALETTE.forEach(col=>{const ch=document.createElement("div");ch.className="pchip"+(col.toLowerCase()===sel.toLowerCase()?" sel":"");ch.style.background=col;ch.addEventListener("click",()=>{document.getElementById("chanColor").value=col;renderPalette(col);updateChanPreview();});p.appendChild(ch);});}
@@ -1592,7 +1779,7 @@ let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selected
       const chId=plan?.schedule?.[slot];
       const ch=chId?state.channels.find(x=>x.id===chId):null;
       
-      html+=`<button onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" 
+      html+=`<button onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" ondragover="event.preventDefault();event.dataTransfer.dropEffect='copy';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='1px'" ondragleave="this.style.outline=''" ondrop="this.style.outline='';planDrop(event,'${slot}')" 
         style="padding:12px;background:${ch?ch.color+'33':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:6px;font-weight:600;font-size:12px;cursor:pointer;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;transition:all .15s">
         <div style="font-size:10px;opacity:0.7">${display}</div>
         <div style="font-weight:700;margin-top:2px">${ch?ch.label.substring(0,12):'—'}</div>
@@ -1616,7 +1803,7 @@ let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selected
       const ch=chId?state.channels.find(x=>x.id===chId):null;
       
       html+=`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--ink2);padding:8px">${display}</div>`;
-      html+=`<div onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" 
+      html+=`<div onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" ondragover="event.preventDefault();event.dataTransfer.dropEffect='copy';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='1px'" ondragleave="this.style.outline=''" ondrop="this.style.outline='';planDrop(event,'${slot}')" 
         style="padding:8px;background:${ch?ch.color+'22':'var(--panel2)'};border:1px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center">${ch?ch.label:'—'}</div>`;
       html+=`<button onclick="clearPlanSlot(${planState.selectedPlanIdx},'${slot}')" style="background:none;border:1px solid var(--line);color:var(--muted);padding:4px 6px;border-radius:3px;cursor:pointer;font-size:9px;height:fit-content">✕</button>`;
     });
@@ -1650,6 +1837,19 @@ let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selected
   }
 }
 
+async function planDrop(e,slot){
+  e.preventDefault();
+  const chId=e.dataTransfer.getData("text/plain");
+  if(!chId) return;
+  const plan=planState.plans[planState.selectedPlanIdx];
+  if(!plan) return;
+  if(!plan.schedule) plan.schedule={};
+  plan.schedule[slot]=chId;
+  await saveLocal("plans",plan);
+  await renderPlanPageUI();
+  const ch=state.channels.find(c=>c.id===chId);
+  toast(ch?("Planned "+ch.label):"Planned");
+}
 function openPlanSlotModal(planIdx,slot){
   const plan=planState.plans[planIdx];
   if(!plan)return;
@@ -2069,20 +2269,137 @@ function dailyTrendChart(dayKeys,byDay,byAdherence,byRating,byNotes){
 function hourChart(byHour){const w=720,h=170,pad=26;const max=Math.max(...byHour,1);const bw=(w-pad*2)/24-3;let bars="",labels="";byHour.forEach((v,hh)=>{const x=pad+hh*((w-pad*2)/24);const bh=(h-pad*2)*(v/max);const y=h-pad-bh;const peak=v===max&&v>0;bars+=`<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="3" fill="${peak?'#22c55e':'var(--accent)'}"><title>${hourLabel(hh)}: ${fmtDurShort(v)}</title></rect>`;if(hh%3===0)labels+=`<text x="${x+bw/2}" y="${h-8}" text-anchor="middle">${hourLabel(hh)}</text>`;});return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">${bars}${labels}<line x1="${pad-6}" y1="${h-pad}" x2="${w-pad+6}" y2="${h-pad}" stroke="var(--line)"/></svg>`;}
 
 /* ===== auth ===== */
-document.getElementById("loginBtn").addEventListener("click",doLogin);
-document.getElementById("loginPass").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
-async function doLogin(){const email=document.getElementById("loginEmail").value.trim();const pass=document.getElementById("loginPass").value;const err=document.getElementById("loginErr");err.textContent="";
-  if(!email||!pass){err.textContent="Enter your email and password.";return;}
-  document.getElementById("loginBtn").textContent="Signing in…";
-  const {data,error}=await SB.auth.signInWithPassword({email,password:pass});
-  document.getElementById("loginBtn").textContent="Sign in";
-  if(error){err.textContent=error.message;return;}
-  window._acctEmail=data.user.email; await enterApp();}
-document.getElementById("signOutBtn").addEventListener("click",async()=>{await SB.auth.signOut();location.reload();});
+/* Modes: signin | signup | reset | newpass */
+let authMode="signin";
+const AUTH_UI={
+  signin :{sub:"Sign in to sync your time across every device.",btn:"Sign in",        passLabel:"Password",    email:true, pass:true, pass2:false,forgot:"Forgot password?",mode:"Create account"},
+  signup :{sub:"Create an account to start tracking your time.",btn:"Create account", passLabel:"Password",    email:true, pass:true, pass2:true, forgot:"",                mode:"Back to sign in"},
+  reset  :{sub:"Enter your email and we will send you a reset link.",btn:"Send reset link",passLabel:"Password",email:true, pass:false,pass2:false,forgot:"",                mode:"Back to sign in"},
+  newpass:{sub:"Choose a new password for your account.",       btn:"Update password",passLabel:"New password",email:false,pass:true, pass2:true, forgot:"",                mode:""}
+};
+function setAuthMode(m){
+  authMode=m; const u=AUTH_UI[m]; if(!u) return;
+  const show=(id,on)=>{const el=document.getElementById(id); if(el) el.style.display=on?"":"none";};
+  document.getElementById("authSub").textContent=u.sub;
+  document.getElementById("loginBtn").textContent=u.btn;
+  document.getElementById("loginBtn").disabled=false;
+  document.getElementById("passLabel").textContent=u.passLabel;
+  show("emailWrap",u.email); show("passWrap",u.pass); show("pass2Wrap",u.pass2);
+  const fl=document.getElementById("forgotLink"); fl.textContent=u.forgot; show("forgotLink",!!u.forgot);
+  const ml=document.getElementById("modeLink");   ml.textContent=u.mode;   show("modeLink",!!u.mode);
+  document.getElementById("loginErr").textContent="";
+  document.getElementById("loginOk").textContent="";
+  document.getElementById("loginPass").setAttribute("autocomplete",m==="signin"?"current-password":"new-password");
+  if(!u.pass)  document.getElementById("loginPass").value="";
+  if(!u.pass2) document.getElementById("loginPass2").value="";
+}
+document.getElementById("loginBtn").addEventListener("click",doAuth);
+["loginEmail","loginPass","loginPass2"].forEach(id=>{
+  document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();doAuth();}});
+});
+document.getElementById("forgotLink").addEventListener("click",e=>{e.preventDefault();setAuthMode("reset");});
+document.getElementById("modeLink").addEventListener("click",e=>{e.preventDefault();setAuthMode(authMode==="signin"?"signup":"signin");});
+
+let appEntered=false;
+async function enterAppSafe(email){
+  if(appEntered) return;
+  appEntered=true;
+  if(email) window._acctEmail=email;
+  await enterApp();
+}
+async function doAuth(){
+  const btn=document.getElementById("loginBtn");
+  const err=document.getElementById("loginErr"), ok=document.getElementById("loginOk");
+  const email=document.getElementById("loginEmail").value.trim();
+  const pass=document.getElementById("loginPass").value;
+  const pass2=document.getElementById("loginPass2").value;
+  const restore=AUTH_UI[authMode].btn;
+  err.textContent=""; ok.textContent="";
+  const fail=m=>{err.textContent=m; btn.textContent=restore; btn.disabled=false;};
+  if(btn.disabled) return;
+  btn.disabled=true;
+  try{
+    if(authMode==="signin"){
+      if(!email||!pass) return fail("Enter your email and password.");
+      btn.textContent="Signing in…";
+      const {data,error}=await SB.auth.signInWithPassword({email,password:pass});
+      if(error) return fail(error.message);
+      await enterAppSafe(data.user.email); return;
+    }
+    if(authMode==="signup"){
+      if(!email) return fail("Enter your email.");
+      if(pass.length<6) return fail("Password must be at least 6 characters.");
+      if(pass!==pass2) return fail("Those passwords do not match.");
+      btn.textContent="Creating account…";
+      const {data,error}=await SB.auth.signUp({email,password:pass,options:{emailRedirectTo:location.origin}});
+      if(error) return fail(error.message);
+      if(data&&data.session){ await enterAppSafe(data.user.email); return; }
+      ok.textContent="Account created. Check "+email+" for a confirmation link, then sign in.";
+      btn.textContent=restore; btn.disabled=false; return;
+    }
+    if(authMode==="reset"){
+      if(!email) return fail("Enter your email.");
+      btn.textContent="Sending…";
+      const {error}=await SB.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
+      if(error) return fail(error.message);
+      ok.textContent="If an account exists for "+email+", a reset link is on its way.";
+      btn.textContent=restore; btn.disabled=false; return;
+    }
+    if(authMode==="newpass"){
+      if(pass.length<6) return fail("Password must be at least 6 characters.");
+      if(pass!==pass2) return fail("Those passwords do not match.");
+      btn.textContent="Updating…";
+      const {error}=await SB.auth.updateUser({password:pass});
+      if(error) return fail(error.message);
+      history.replaceState(null,"",location.pathname+location.search);
+      const {data}=await SB.auth.getSession();
+      if(data&&data.session){ await enterAppSafe(data.session.user.email); return; }
+      ok.textContent="Password updated. Sign in with your new password.";
+      btn.disabled=false; setTimeout(()=>setAuthMode("signin"),1400); return;
+    }
+  }catch(ex){ return fail((ex&&ex.message)||"Something went wrong. Please try again."); }
+}
+function doLogin(){ return doAuth(); } /* back-compat alias (function decl so window.doLogin resolves) */
+
+/* Local IndexedDB is shared per-browser, so clear it when the account changes. */
+function idbClear(s){return new Promise((res,rej)=>{
+  try{ const r=tx(s).clear(); r.onsuccess=()=>res(true); r.onerror=()=>rej(new Error("idbClear error on "+s)); }
+  catch(e){ rej(e); }
+});}
+async function wipeLocalData(){
+  const names=["profiles","channels","sessions","plans","dayplans","meta","selected_plan","day_notes"];
+  for(const n of names){ try{ await idbClear(n); }catch(e){ console.warn("wipeLocalData:",n,e); } }
+}
+async function doSignOut(){
+  if(!confirm("Sign out of this account?")) return;
+  /* Sign-out clears local data, so push anything unsynced first. */
+  try{
+    if(navigator.onLine){ await runSync(); }
+    const dirty=await dirtyRecords();
+    if(dirty.length){
+      const msg="Warning: "+dirty.length+" change(s) have not synced to the cloud yet.\n\nSigning out clears local data and those changes will be lost. Sign out anyway?";
+      if(!confirm(msg)) return;
+    }
+  }catch(e){ console.warn("pre-sign-out sync check failed",e); }
+  try{ await wipeLocalData(); }catch(e){ console.warn("sign-out wipe failed",e); }
+  await SB.auth.signOut(); location.reload();
+}
+/* Legacy Settings button is gone (sign out now lives in the avatar menu); stay null-safe. */
+const _signOutBtn=document.getElementById("signOutBtn");
+if(_signOutBtn) _signOutBtn.addEventListener("click",doSignOut);
 
 async function enterApp(){
   document.getElementById("loginGate").style.display="none";
   document.getElementById("appRoot").style.display="flex";
+  try{
+    const who=(window._acctEmail||"").toLowerCase();
+    const prev=await idbGet("meta","acctUser");
+    if(who&&prev&&prev.v&&prev.v!==who){
+      console.log("enterApp: account changed",prev.v,"->",who,"- clearing local data");
+      await wipeLocalData();
+    }
+    if(who) await idbPut("meta",{k:"acctUser",v:who});
+  }catch(e){ console.warn("enterApp: account scope check failed",e); }
   await seedIfEmpty();
   const last=await idbGet("meta","lastProfile"); const profs=await idbAll("profiles");
   const pid=(last&&profs.find(p=>p.id===last.v))?last.v:(profs[0]&&profs[0].id);
@@ -2097,10 +2414,31 @@ setInterval(()=>{ if(navigator.onLine) runSync(); },15000); // periodic push+pul
 document.addEventListener("visibilitychange",()=>{if(!document.hidden){renderGrid();updateStatus();if(navigator.onLine)runSync();}});
 
 /* ===== boot ===== */
+function hashParam(h,k){
+  const parts=String(h||"").replace("#","").split("&");
+  for(const p of parts){ const i=p.indexOf("="); if(i>0&&p.slice(0,i)===k) return decodeURIComponent(p.slice(i+1).split("+").join(" ")); }
+  return "";
+}
 (async function(){ await openDB();
+  const gate=document.getElementById("loginGate");
+  const hash=location.hash||"";
+  SB.auth.onAuthStateChange((ev,session)=>{
+    if(ev==="PASSWORD_RECOVERY"){ gate.style.display="flex"; setAuthMode("newpass"); return; }
+    /* getSession() can transiently return null while a token refresh is in flight.
+       If a valid session shows up afterwards, enter the app instead of stranding
+       the user on the login screen. */
+    if(session&&!appEntered&&authMode!=="newpass"){ enterAppSafe(session.user.email); }
+  });
+  if(hashParam(hash,"error")||hashParam(hash,"error_code")){
+    gate.style.display="flex"; setAuthMode("signin");
+    document.getElementById("loginErr").textContent=hashParam(hash,"error_description")||"That link is invalid or has expired. Please request a new one.";
+    history.replaceState(null,"",location.pathname+location.search);
+    return;
+  }
+  if(hashParam(hash,"type")==="recovery"){ gate.style.display="flex"; setAuthMode("newpass"); return; }
   const {data}=await SB.auth.getSession();
-  if(data&&data.session){ window._acctEmail=data.session.user.email; await enterApp(); }
-  else { document.getElementById("loginGate").style.display="flex"; }
+  if(data&&data.session){ await enterAppSafe(data.session.user.email); }
+  else { gate.style.display="flex"; setAuthMode("signin"); }
 })();
 </script>
 </body>
