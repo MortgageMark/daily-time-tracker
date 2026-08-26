@@ -1612,56 +1612,6 @@ function updateSessDurHint(){
   h.textContent="Duration "+fmtDurShort(t.endTs-t.startTs)+".";
 }
 
-/* =====================================================================
-   DISPLAY DIAGNOSTICS
-   The empty strip below the bottom bar in the installed iOS PWA has now
-   survived two fixes aimed at causes that could not be reproduced off-device:
-   env(safe-area-inset-*) resolves to 0 in a desktop emulator, so the numbers
-   were being reasoned about rather than observed. This reads the real values
-   off the real device. Reachable from the avatar menu.
-   ===================================================================== */
-function displayDiagnostics(){
-  const app=document.querySelector(".app"), bar=document.querySelector(".bottombar");
-  const ar=app?app.getBoundingClientRect():null;
-  const br=bar?bar.getBoundingClientRect():null;
-  /* env() can only be read through a real property on a real element. */
-  const probe=document.createElement("div");
-  probe.style.cssText="position:fixed;left:0;bottom:0;width:1px;pointer-events:none;visibility:hidden";
-  document.body.appendChild(probe);
-  probe.style.height="env(safe-area-inset-bottom)";
-  const sab=getComputedStyle(probe).height;
-  probe.style.height="env(safe-area-inset-top)";
-  const sat=getComputedStyle(probe).height;
-  probe.remove();
-  const vv=window.visualViewport;
-  const gap=br?Math.round(window.innerHeight-br.bottom):null;
-  const L=[];
-  L.push("v"+APP_RELEASE+"  build "+String(BUILD_ID));
-  L.push("");
-  L.push("GAP BELOW BAR: "+(gap===null?"?":gap+"px"));
-  L.push("");
-  L.push("standalone(css): "+(window.matchMedia("(display-mode: standalone)").matches?"yes":"no"));
-  L.push("standalone(nav): "+(navigator.standalone===true?"yes":(navigator.standalone===false?"no":"n/a")));
-  L.push("");
-  L.push("innerHeight   "+window.innerHeight);
-  L.push("clientHeight  "+document.documentElement.clientHeight);
-  L.push("screen.height "+screen.height);
-  L.push("visualVP h    "+(vv?Math.round(vv.height):"-")+"  top "+(vv?Math.round(vv.offsetTop):"-"));
-  L.push("");
-  L.push("safe-area top    "+sat);
-  L.push("safe-area bottom "+sab);
-  L.push("");
-  L.push("app  pos "+(app?getComputedStyle(app).position:"-"));
-  L.push("app  top "+(ar?Math.round(ar.top):"-")+"  bot "+(ar?Math.round(ar.bottom):"-")+"  h "+(ar?Math.round(ar.height):"-"));
-  L.push("bar  top "+(br?Math.round(br.top):"-")+"  bot "+(br?Math.round(br.bottom):"-")+"  h "+(br?Math.round(br.height):"-"));
-  L.push("bar  padBottom "+(bar?getComputedStyle(bar).paddingBottom:"-"));
-  return L.join("\n");
-}
-window.showDisplayDiagnostics=async()=>{
-  const txt=displayDiagnostics();
-  await uiChoice({title:"Display diagnostics",message:txt,choices:[{label:"Close",value:"x"}]});
-};
-
 /* ===== toast ===== */
 let toastT; /* ===== build version + update detection =====
    BUILD_ID is rewritten at deploy time by the Netlify build command in
@@ -1675,7 +1625,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=9;
+const APP_RELEASE=10;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -1850,7 +1800,6 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
   const sep=document.createElement("div");sep.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep);
   const pastDayItem=document.createElement("div");pastDayItem.className="menu-item";pastDayItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";pastDayItem.textContent="📅 Edit a day";pastDayItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openDayEditor(todayKey());});m.appendChild(pastDayItem);
   const prioItem=document.createElement("div");prioItem.className="menu-item";prioItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";prioItem.textContent="🎯 Priorities";prioItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openPriorities();});m.appendChild(prioItem);
-  const diagItem=document.createElement("div");diagItem.className="menu-item";diagItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";diagItem.textContent="🔧 Display info";diagItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";showDisplayDiagnostics();});m.appendChild(diagItem);
   const channelsItem=document.createElement("div");channelsItem.className="menu-item";channelsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";channelsItem.textContent="🎨 Channels";channelsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openChannels();});m.appendChild(channelsItem);
   
   const settingsItem=document.createElement("div");settingsItem.className="menu-item";settingsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";settingsItem.textContent="⚙️ Settings";settingsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openSettings();});m.appendChild(settingsItem);
@@ -3866,7 +3815,14 @@ async function wipeLocalData(){
 }
 async function doSignOut(){
   if(!await uiConfirm("Sign out of this account?")) return;
-  /* Sign-out clears local data, so push anything unsynced first. */
+  /* Sign-out clears local data, so push anything unsynced first.
+
+     CAREFUL: this push is exactly the hazard described in Landmines. A browser
+     that has not been opened in a long time holds an old snapshot, and any of
+     its rows still marked _dirty will be pushed over the good server copy.
+     Signing out - the obvious way to "clean up" such a browser - is therefore
+     the one action that can destroy data. The count is surfaced below so the
+     decision is at least informed; the real fix is in the backlog. */
   try{
     if(navigator.onLine){ await runSync(); }
     const dirty=await dirtyRecords();

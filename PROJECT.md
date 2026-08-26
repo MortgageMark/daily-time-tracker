@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v4, staged locally and not yet pushed
-- **Last deployed:** v3 (`17919e2`), 2026-08-26
+- **Current release:** v10
+- **Last deployed:** v9, 2026-08-26 (v10 adds no user-facing change)
 - **Status:** stable, in daily use
 
 ---
@@ -366,8 +366,30 @@ now defers to `isMissingColumn` first. Keep that ordering.
 **Never let `<body>` lose its background-color.** The login screen is
 `position:fixed` and `.app` is `display:none` until sign-in, so body can
 collapse to zero height. A gradient with a zero-height positioning area paints
-nothing, and with no color behind it the canvas falls back to white - which
-showed on iOS as a white band in the bottom safe area.
+nothing, and with no color behind it the canvas falls back to white.
+
+**Never use `apple-mobile-web-app-status-bar-style: black-translucent`.** It
+lifts the web view up under the status bar without extending its height, so
+the view ends up short at the BOTTOM by exactly the status-bar height, leaving
+a dead band the page cannot paint into. Use `black`. This cost five releases
+to find, because it presents as a styling bug and is immune to every styling
+fix. The diagnosis that finally worked:
+
+- `screen.height` minus `innerHeight` equalled `safe-area-inset-top` exactly
+- the bottom bar could be dragged and would vanish at a boundary above the
+  screen edge - content leaving the viewport, which no CSS can cause
+- `GAP BELOW BAR` measured 0px throughout and was actively misleading: the bar
+  really was at the bottom of the web view; the web view was not at the bottom
+  of the screen
+
+**When a fix does not move a visible symptom, re-measure the symptom rather
+than refining the fix.** Four fixes in a row landed, were individually
+correct, and changed nothing the user could see. Each one should have been
+treated as evidence the diagnosis was wrong. Ask for on-device numbers early:
+`env(safe-area-inset-*)` resolves to 0 in a desktop emulator, so anything
+reasoned about rather than observed is guesswork. A temporary diagnostic panel
+(removed in v10, see git history for `displayDiagnostics`) settled in one
+round trip what four releases of inference could not.
 
 **Watch for duplicate function declarations.** A second `moveChannel` silently
 shadowed the new one. `renderPlanSelect` is still defined twice — both are dead,
@@ -386,6 +408,15 @@ attach to `window`; function declarations do.
 - `day_notes` and `selected_plan` are keyed by date only — two profiles on one
   device share them. Needs a composite-key migration.
 - Deletes do not propagate to Supabase; deleted rows can return on next pull.
+- **A dormant browser can overwrite good server data.** `pullRemote()` refuses
+  to overwrite a local row marked `_dirty`, but `runSync()` pushes that same
+  dirty row up. So a browser left unopened for weeks holds a stale snapshot
+  that wins on the next sync. Seen for real: Safari on Mark's phone showed
+  channels many revisions out of date while Chrome was correct - separate
+  browsers keep entirely separate IndexedDB stores. **Signing out makes it
+  worse, not better:** `doSignOut()` runs a sync before wiping, so the obvious
+  cleanup is what triggers the overwrite. To reset a stale browser safely,
+  clear its website data from the OS instead. See backlog 7.7.
 - iOS caches the home screen icon and name at install. Changing them requires
   removing and re-adding the shortcut, once.
 - Supabase's built-in mailer is rate-limited to a few messages an hour and often
@@ -477,10 +508,30 @@ account boundary, so it needs real design:
 
 Do not bolt this on. It deserves its own session.
 
+### 7.7 Stale-device sync protection — *real bug, not a feature*
+
+A browser holding an old snapshot can push it over good server data, because
+`runSync()` pushes any `_dirty` row while `pullRemote()` refuses to overwrite
+one. Signing out triggers exactly this, since it syncs before wiping.
+
+Worth considering, roughly in order of effort:
+
+- Record a `_u` timestamp on every dirty row and refuse to push one that is
+  older than the server's `updated_at` unless the user confirms.
+- Show what would be overwritten - "this device has 14 changes from 3 weeks
+  ago" - instead of silently pushing.
+- A "this device is out of date, pull fresh" path that wipes locally WITHOUT
+  syncing first, which is the missing safe reset.
+- Reconsider whether `_dirty` should really outrank a newer server row at all.
+
+The current merge rule is not wrong so much as asymmetric: local always wins
+on push, server never wins over dirty on pull. Pick one and make it coherent.
+
 ### What is left
 
-1. **Perfect Week** — needs a scoping conversation first
-2. **Coach access** — needs a security design session
+1. **Stale-device sync protection** — the only actual bug on this list
+2. **Perfect Week** — needs a scoping conversation first
+3. **Coach access** — needs a security design session
 
 Items 1, 3, 4 and 5 shipped in v4. The generic channel-attribute mechanism
 they share is `CHANNEL_ATTRS` - see Architecture > Channel attributes.
@@ -526,6 +577,19 @@ one generic mechanism, with a Priorities report and an Eisenhower quadrant.
 future ones, excluded from adherence scoring; star rating and notes extended to
 any past day; the Summary's lookback range no longer accepts future dates and
 its inputs raised to 16px.
+
+**v5-v9** — chasing one symptom: a dead band below the bottom bar in the
+installed iOS PWA. v5 pinned `.app` with position:fixed/inset:0 (real fix, the
+measured gap went to 0). v7 and v8 rebalanced the bar's safe-area padding
+(real, still not it). v6 added a temporary on-device diagnostic, which is what
+finally produced the numbers that identified the actual cause in v9:
+`apple-mobile-web-app-status-bar-style: black-translucent` was making the web
+view itself shorter than the screen. Also in this run: future days can no
+longer be star-rated (guarded at `saveDayRatingAndNotes`, the single choke
+point the four separate star renderers had drifted away from), ratings can be
+cleared, and the day-type picker appears on every Summary row.
+
+**v10** — removes the diagnostic panel; no user-facing change.
 
 ---
 
