@@ -92,7 +92,15 @@
   .empty{max-width:520px; margin:8vh auto; text-align:center; color:var(--ink2)}
   .empty h2{color:var(--ink)}
 
-  .bottombar{display:flex; align-items:center; gap:10px; padding:12px 18px max(12px, env(safe-area-inset-bottom)) 18px; border-top:1px solid var(--line); background:#0a101c; backdrop-filter:blur(8px)}
+  /* The bar dumped the ENTIRE safe-area inset below the buttons: 12px above,
+     34px below on an iPhone. That is a third of the bar sitting empty under
+     the controls, which reads as a gap even though the app reaches the screen
+     edge (measured on-device: gap 0px, inset 34px).
+     The inset cannot go to zero - the home indicator would sit on the buttons
+     and taps would trigger its swipe gesture - so it is scaled back to ~62%
+     and the top padding raised to meet it. The buttons end up optically
+     centred in the bar instead of pinned to its top edge. */
+  .bottombar{display:flex; align-items:center; gap:10px; padding:16px 18px max(16px, calc(env(safe-area-inset-bottom) * 0.62)) 18px; border-top:1px solid var(--line); background:#0a101c; backdrop-filter:blur(8px)}
   .ctl{display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 14px; border-radius:14px; border:1px solid var(--line); background:var(--panel); font-size:12px; font-weight:700; min-width:76px; color:var(--ink2)}
   .ctl svg{width:22px;height:22px}
   .ctl:active{transform:scale(.96)}
@@ -237,7 +245,7 @@
   @media (max-width:640px){:root{--tile-min:150px} .topmeta{gap:12px} .kv .v.big{font-size:18px} .ctl{min-width:56px; padding:4px 6px; font-size:10px; height:44px} .barrow .nm{width:88px}}
   /* Bottom nav: four buttons sharing the full width, with a comfortable tap target. */
   @media (max-width:640px){
-    .bottombar{gap:8px; padding:10px 12px max(10px, env(safe-area-inset-bottom)) 12px}
+    .bottombar{gap:8px; padding:14px 12px max(14px, calc(env(safe-area-inset-bottom) * 0.62)) 12px}
     .bottombar .ctl{flex:1 1 0; min-width:0; height:58px; padding:8px 4px; gap:5px; font-size:11px; border-radius:16px}
     .bottombar .ctl svg{width:24px; height:24px}
   }
@@ -1652,7 +1660,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=6;
+const APP_RELEASE=7;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
