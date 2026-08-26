@@ -1,5 +1,8 @@
 [build]
-  command = "echo 'No build needed - single file app'"
+  # On every deploy: stamp the build id into index.html and write version.json
+  # (build id + release number) so the running app can detect a newer deploy.
+  # COMMIT_REF is provided by Netlify. Times are UTC: YYYYMMDDHHMM-<short commit>.
+  command = "BUILD_ID=\"$(date -u +%Y%m%d%H%M)-$(echo ${COMMIT_REF:-nocommit} | cut -c1-7)\"; RELEASE=$(grep -o 'const APP_RELEASE=[0-9]*' index.html | grep -o '[0-9]*' | head -1); RELEASE=${RELEASE:-0}; echo \"Build: $BUILD_ID  release v$RELEASE\"; sed -i \"s/__BUILD_ID__/$BUILD_ID/g\" index.html; printf '{\"build\":\"%s\",\"release\":%s}' \"$BUILD_ID\" \"$RELEASE\" > version.json; cat version.json; echo; grep -c \"$BUILD_ID\" index.html"
   publish = "."
   functions = "functions"
 
@@ -7,7 +10,27 @@
   framework = "static"
   publish = "."
 
-# Redirect all routes to index.html for PWA
+# version.json must never be cached, or the update check reads a stale answer.
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-store, max-age=0"
+
+# Belt and braces: this matches Netlify's default for HTML, stated explicitly
+# so a future config change cannot silently start caching the app shell.
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Redirect all routes to index.html for PWA.
+# Netlify serves a real file before applying a non-forced rewrite, so
+# /version.json, /manifest.json and the icons are unaffected by this rule.
 [[redirects]]
   from = "/*"
   to = "/index.html"

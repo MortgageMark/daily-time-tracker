@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="DailyTimeTracker">
+<meta name="apple-mobile-web-app-title" content="Time Tracker">
 <meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <title>Daily Time Tracker</title>
 <style>
   :root{
@@ -52,7 +56,8 @@
   .tile .label{font-size:22px; font-weight:800; letter-spacing:.2px; text-shadow:0 1px 2px rgba(0,0,0,.18)}
   .tile .time{font-size:30px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.5px}
   .tile .foot{display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:700; opacity:.92}
-  .tile .state{display:inline-flex; align-items:center; gap:6px; text-transform:uppercase; letter-spacing:.7px}
+  .tile .foot .sess{font-size:13px; font-variant-numeric:tabular-nums; letter-spacing:.3px}
+  .tile .state{display:inline-flex; align-items:center; gap:6px; text-transform:uppercase; letter-spacing:.7px; white-space:nowrap; min-width:0}
   .tile .state .d{width:9px;height:9px;border-radius:50%; background:currentColor}
   .tile.on{border-color:rgba(255,255,255,.9); box-shadow:0 0 0 4px rgba(255,255,255,.12), var(--shadow)}
   .tile.on::after{content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.10),transparent 40%); pointer-events:none}
@@ -78,6 +83,28 @@
   .sheet-b{padding:20px 22px}
   .x{margin-left:auto; width:38px;height:38px; border-radius:11px; border:1px solid var(--line); background:var(--panel2); font-size:20px; color:var(--ink2)}
   .row{display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--line); border-radius:14px; background:var(--panel2); margin-bottom:10px}
+  .row.chan{gap:8px}
+  .row.chan.sub{padding:9px 12px 9px 30px; border-left:2px solid var(--accent); border-radius:0 14px 14px 0; margin-left:14px}
+  .grip{cursor:grab; color:var(--muted); font-size:16px; line-height:1; flex:0 0 auto; user-select:none; touch-action:none}
+  .grip:active{cursor:grabbing}
+  .row.chan .btn.sm[disabled]{opacity:.28; cursor:not-allowed}
+  .row.chan .act-up,.row.chan .act-down{padding:7px 9px; line-height:1; min-width:32px}
+  .row.chan .act-caret{padding:3px 6px; min-width:24px; line-height:1.2; font-size:11px}
+  .row.chan .grow{overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
+  .row.chan .btn{flex:0 0 auto; white-space:nowrap}
+  .row.chan .swatch{flex:0 0 auto}
+  .rowbreak{display:none}
+  .add-spacer{visibility:hidden; pointer-events:none}
+  .row.chan.drop-before{border-top:2px solid var(--accent)}
+  @media (max-width:640px){
+    .row.chan{gap:8px; padding:10px; flex-wrap:wrap; row-gap:8px}
+    .row.chan.sub{padding-left:16px; margin-left:8px}
+    .rowbreak{display:block; flex:0 0 100%; height:0; margin:0}
+    .row.chan .act-up{margin-left:auto}
+    .row.chan .act-up,.row.chan .act-down{padding:9px 16px; font-size:15px; min-width:44px}
+    .row.chan .act-edit,.row.chan .act-add{padding:9px 14px; font-size:13px}
+    .row.chan .swatch{width:26px;height:26px}
+  }
   .swatch{width:34px;height:34px;border-radius:9px; flex:none; border:2px solid rgba(255,255,255,.25)}
   input,select{font-family:inherit; font-size:15px; color:var(--ink); background:#0a1424; border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none}
   input[type=color]{padding:3px; width:52px; height:40px}
@@ -140,7 +167,23 @@
   .login label{display:block; font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:14px 0 6px}
   .login input{width:100%}
   .login .err{color:#fca5a5; font-size:13px; margin-top:12px; min-height:18px}
+  .login .ok{color:#86efac; font-size:13px; margin-top:10px; line-height:1.45}
+  .login .authlinks{display:flex; justify-content:space-between; gap:12px; margin-top:18px; font-size:13px; flex-wrap:wrap}
+  .login .authlinks a{color:var(--accent); text-decoration:none; cursor:pointer}
+  .login .authlinks a:hover{text-decoration:underline}
+  @media (max-width:640px){
+    .tile .foot{font-size:10px; gap:6px}
+    .tile .foot .sess{font-size:11px; letter-spacing:0}
+    .tile .state{letter-spacing:.3px}
+    .tile.on .runbadge{display:none}
+  }
   @media (max-width:640px){:root{--tile-min:150px} .topmeta{gap:12px} .kv .v.big{font-size:18px} .ctl{min-width:56px; padding:4px 6px; font-size:10px; height:44px} .barrow .nm{width:88px}}
+  /* Bottom nav: four buttons sharing the full width, with a comfortable tap target. */
+  @media (max-width:640px){
+    .bottombar{gap:8px; padding:10px 12px max(10px, env(safe-area-inset-bottom)) 12px}
+    .bottombar .ctl{flex:1 1 0; min-width:0; height:58px; padding:8px 4px; gap:5px; font-size:11px; border-radius:16px}
+    .bottombar .ctl svg{width:24px; height:24px}
+  }
 
   textarea{font-family:inherit;font-size:14px;color:var(--ink);background:#0a1424;border:1px solid var(--line);border-radius:10px;padding:12px;outline:none}
   textarea:focus{border-color:var(--accent)}
@@ -179,13 +222,26 @@
 <div class="login" id="loginGate">
   <div class="box">
     <h1><span class="dot"></span></h1>
-    <p>Sign in to sync your time across every device.</p>
-    <label>Email</label>
-    <input id="loginEmail" type="email" autocomplete="username" placeholder="you@example.com">
-    <label>Password</label>
-    <input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••">
+    <p id="authSub">Sign in to sync your time across every device.</p>
+    <div id="emailWrap">
+      <label>Email</label>
+      <input id="loginEmail" type="email" autocomplete="username" placeholder="you@example.com">
+    </div>
+    <div id="passWrap">
+      <label id="passLabel">Password</label>
+      <input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <div id="pass2Wrap" style="display:none">
+      <label id="pass2Label">Confirm password</label>
+      <input id="loginPass2" type="password" autocomplete="new-password" placeholder="••••••••">
+    </div>
     <button class="btn pri" id="loginBtn" style="width:100%; margin-top:20px">Sign in</button>
     <div class="err" id="loginErr"></div>
+    <div class="ok" id="loginOk"></div>
+    <div class="authlinks">
+      <a href="#" id="forgotLink">Forgot password?</a>
+      <a href="#" id="modeLink">Create account</a>
+    </div>
   </div>
 </div>
 
@@ -218,6 +274,7 @@
     <div class="hint" style="margin:8px 0 14px">Rename, recolor, reorder or archive any button. Names and colors can change anytime — history stays tied to a permanent internal ID, so nothing is ever lost.</div>
     <div id="channelList"></div>
     <div class="sect-title">Archived channels</div><div id="archivedList"><div class="hint">None archived.</div></div>
+    <div id="dangerZone"></div>
     <div class="sect-title">Preferences</div>
     <div class="row"><div class="grow">Time format</div><select id="hourFmt"><option value="12">12-hour</option><option value="24">24-hour</option></select></div>
     <div class="row"><div class="grow">Button size</div><select id="btnSize"><option value="normal" selected>Normal</option><option value="compact">Compact</option><option value="spacious">Spacious</option></select></div>
@@ -228,7 +285,7 @@
     <div class="sect-title">Data</div>
     <div class="row"><div class="grow"><b>Export CSV</b><div class="hint">Download every session for this profile as a spreadsheet.</div></div><button class="btn sm" id="exportCsvBtn">Export</button></div>
     <div class="sect-title">Account</div>
-    <div class="row"><div class="grow"><b>Signed in as</b><div class="hint" id="acctEmail"></div></div><button class="btn sm warn" id="signOutBtn">Sign out</button></div>
+    <div class="row"><div class="grow"><b>Signed in as</b><div class="hint" id="acctEmail"></div></div></div>
   </div></div></div>
 
 <!-- CHANNEL EDITOR -->
@@ -294,7 +351,7 @@
 
 <!-- NEW PROFILE -->
 <div class="scrim" id="npScrim"><div class="sheet" style="max-width:460px"><div class="sheet-h"><h2>New profile</h2><button class="x" data-close>×</button></div>
-  <div class="sheet-b"><div class="sect-title" style="margin-top:0">Name</div><input id="npName" style="width:100%" placeholder="e.g. Tamara" maxlength="24">
+  <div class="sheet-b"><div class="sect-title" style="margin-top:0">Name</div><input id="npName" style="width:100%" placeholder="e.g. Work" maxlength="24">
     <div class="sect-title">Start with</div><select id="npSeed" style="width:100%"><option value="blank">Blank (add your own buttons)</option><option value="sample">A few sample buttons</option></select>
     <button class="btn pri" id="npCreate" style="width:100%; margin-top:20px">Create profile</button></div></div></div>
 
@@ -337,9 +394,28 @@ const SB = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth:{ persistSess
 
 const PALETTE = ["#22c55e","#ec4899","#3b82f6","#f97316","#a855f7","#14b8a6","#eab308","#ef4444","#06b6d4","#84cc16","#f43f5e","#8b5cf6","#0ea5e9","#f59e0b","#10b981","#d946ef"];
 
+/* Standard starting channels for a brand new account or a new profile.
+   Order here is the order they appear on the dashboard. */
+const DEFAULT_CHANNELS = [
+  {label:"Admin",     color:"#ec4899"},  /* pink       */
+  {label:"Email",     color:"#3b82f6"},  /* blue       */
+  {label:"Corporate", color:"#ef4444"},  /* red        */
+  {label:"Sales",     color:"#22c55e"},  /* green      */
+  {label:"Marketing", color:"#a855f7"},  /* purple     */
+  {label:"Wasted",    color:"#94a3b8"},  /* light gray */
+  {label:"Break",     color:"#475569"},  /* dark gray  */
+  {label:"Personal",  color:"#18181b"}   /* near black */
+];
+async function createDefaultChannels(profileId){
+  let o=0;
+  for(const c of DEFAULT_CHANNELS){
+    await saveLocal("channels",{id:uid(),profileId:profileId,label:c.label,color:c.color,order:o++,archived:false,parentChannelId:null});
+  }
+}
+
 /* ===== IndexedDB ===== */
-const DB_NAME="dtt2", DB_VER=4; let db;
-function ensureObjectStores(){if(!db)return;try{const names=["profiles","channels","sessions","plans","dayplans","meta","selected_plan","day_notes"];for(const name of names){if(!db.objectStoreNames.contains(name)){console.warn(`Object store ${name} missing, incrementing DB version`);closeDatabase();setTimeout(()=>{const r=indexedDB.open(DB_NAME,DB_VER+1);r.onupgradeneeded=e=>{const d=e.target.result;for(const n of names)if(!d.objectStoreNames.contains(n)){const keyPath=n==="dayplans"||n==="selected_plan"||n==="day_notes"?"date":"id";d.createObjectStore(n,{keyPath:keyPath});}};r.onsuccess=e=>{db=e.target.result;};},100);return false;}}}catch(e){console.error("Error checking object stores:",e);}return true;}
+const DB_NAME="dtt2", DB_VER=5; let db;
+function ensureObjectStores(){if(!db)return;try{const names=["profiles","channels","sessions","plans","dayplans","meta","selected_plan","day_notes"];for(const name of names){if(!db.objectStoreNames.contains(name)){console.warn(`Object store ${name} missing, incrementing DB version`);closeDatabase();setTimeout(()=>{const r=indexedDB.open(DB_NAME,DB_VER+1);r.onupgradeneeded=e=>{const d=e.target.result;for(const n of names)if(!d.objectStoreNames.contains(n)){const keyPath=n==="selected_plan"||n==="day_notes"?"date":(n==="meta"?"k":"id");d.createObjectStore(n,{keyPath:keyPath});}};r.onsuccess=e=>{db=e.target.result;};},100);return false;}}}catch(e){console.error("Error checking object stores:",e);}return true;}
 function closeDatabase(){if(db){db.close();db=null;}}
 function openDB(){return new Promise((res,rej)=>{
   console.log("openDB: Starting, DB_NAME=",DB_NAME,"DB_VER=",DB_VER);
@@ -355,11 +431,20 @@ function openDB(){return new Promise((res,rej)=>{
         {name:"channels",keyPath:"id"},
         {name:"sessions",keyPath:"id"},
         {name:"plans",keyPath:"id"},
-        {name:"dayplans",keyPath:"date"},
+        {name:"dayplans",keyPath:"id"},
         {name:"meta",keyPath:"k"},
         {name:"selected_plan",keyPath:"date"},
         {name:"day_notes",keyPath:"date"}
       ];
+
+      if(d.objectStoreNames.contains("dayplans")){
+        try{
+          if(txn.objectStore("dayplans").keyPath!=="id"){
+            console.log("openDB: rebuilding dayplans with keyPath id");
+            d.deleteObjectStore("dayplans");
+          }
+        }catch(err){ console.warn("openDB: dayplans keyPath check failed",err); }
+      }
 
       for(const store of stores){
         if(!d.objectStoreNames.contains(store.name)){
@@ -485,16 +570,45 @@ function toRow(store,r){
   if(store==="profiles")return {id:r.id,name:r.name,hour_fmt:r.hourFmt||"12",confirm_end:(r.confirmEnd!=="0")};
   if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived,parent_channel_id:r.parentChannelId||null};
   if(store==="sessions")return {id:r.id,profile_id:r.profileId,channel_id:r.channelId,start_ts:new Date(r.startTs).toISOString(),end_ts:r.endTs?new Date(r.endTs).toISOString():null,duration_seconds:r.endTs?Math.round((r.endTs-r.startTs)/1000):null,business_date:r.date,voided:!!r.voided,revision:r.revision||0};
+  if(store==="plans")return {id:r.id,profile_id:r.profileId,name:r.name,schedule:r.schedule||{},sort_order:r.order||0};
+  if(store==="dayplans")return {id:r.id,profile_id:r.profileId,date:r.date,plan_id:r.planId||null,plan_name:r.planName||null,schedule:r.schedule||{},edited:!!r.edited};
 }
 function fromRow(store,row){
   const u=row.updated_at?Date.parse(row.updated_at):now();
   if(store==="profiles")return {id:row.id,name:row.name,hourFmt:row.hour_fmt||"12",confirmEnd:row.confirm_end?"1":"0",_u:u,_dirty:false};
   if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,parentChannelId:row.parent_channel_id||null,_u:u,_dirty:false};
+  if(store==="plans")return {id:row.id,profileId:row.profile_id,name:row.name,schedule:row.schedule||{},order:row.sort_order||0,_u:u,_dirty:false};
+  if(store==="dayplans")return {id:row.id,profileId:row.profile_id,date:row.date,planId:row.plan_id||null,planName:row.plan_name||null,schedule:row.schedule||{},edited:!!row.edited,_u:u,_dirty:false};
   if(store==="sessions")return {id:row.id,profileId:row.profile_id,channelId:row.channel_id,startTs:Date.parse(row.start_ts),endTs:row.end_ts?Date.parse(row.end_ts):null,durMs:row.end_ts?(Date.parse(row.end_ts)-Date.parse(row.start_ts)):0,date:row.business_date,voided:!!row.voided,revision:row.revision||0,_u:u,_dirty:false};
 }
+/* Stores that round-trip to Supabase. plans/dayplans need the tables from
+   supabase-plans-migration.sql; until that runs they are skipped after the
+   first PGRST205 ("table not found") so sync does not spam errors. */
+const SYNC_STORES=["profiles","channels","sessions","plans","dayplans"];
+/* Tables the backend does not have yet. Recorded with a timestamp and
+   retried periodically, so running the migration starts syncing without
+   the user having to reload the app. */
+const missingRemoteTables=new Map();
+const MISSING_TABLE_RETRY_MS=10*60*1000;
+function tableSkipped(store){
+  const at=missingRemoteTables.get(store);
+  if(at===undefined) return false;
+  if(now()-at>MISSING_TABLE_RETRY_MS){ missingRemoteTables.delete(store); return false; }
+  return true;
+}
+function isMissingTable(error){
+  return !!error&&(error.code==="PGRST205"||/schema cache|does not exist/i.test(error.message||""));
+}
+function noteMissingTable(store,error){
+  if(!missingRemoteTables.has(store)){
+    console.warn("sync: table '"+store+"' is missing in Supabase - will retry periodically. Run supabase-plans-migration.sql.");
+  }
+  missingRemoteTables.set(store,now());
+}
+function syncableStores(){ return SYNC_STORES.filter(s=>!tableSkipped(s)); }
 async function dirtyRecords(){
   const out=[];
-  for(const store of ["profiles","channels","sessions"]){
+  for(const store of syncableStores()){
     const all=await idbAll(store); for(const r of all) if(r._dirty) out.push({store,rec:r});
   }
   return out;
@@ -502,6 +616,7 @@ async function dirtyRecords(){
 function scheduleSync(){ if(syncTimer)return; syncTimer=setTimeout(()=>{syncTimer=null;runSync();},400); }
 
 async function runSync(){
+  if(!db){ return; }   /* 15s timer can fire before openDB() resolves */
   if(!navigator.onLine){ setSync("offline"); return; }
   const { data:sess } = await SB.auth.getSession();
   if(!sess || !sess.session){ setSync("offline"); return; }
@@ -509,8 +624,10 @@ async function runSync(){
   if(dirty.length) setSync("syncing"); else if(syncState!=="synced") setSync("syncing");
   // PUSH
   for(const {store,rec} of dirty){
+    if(tableSkipped(store)) continue;
     try{
       const { data, error } = await SB.from(store).upsert(toRow(store,rec)).select().single();
+      if(isMissingTable(error)){ noteMissingTable(store,error); continue; }
       if(error) throw error;
       rec._dirty=false; if(data&&data.updated_at) rec._u=Date.parse(data.updated_at);
       await idbPut(store,rec);
@@ -525,8 +642,9 @@ async function runSync(){
 async function pullRemote(){
   if(pulling) return; pulling=true;
   try{
-    for(const store of ["profiles","channels","sessions"]){
+    for(const store of syncableStores()){
       const { data, error } = await SB.from(store).select("*");
+      if(isMissingTable(error)){ noteMissingTable(store,error); continue; }
       if(error) throw error;
       for(const row of (data||[])){
         const local=await idbGet(store,row.id);
@@ -575,26 +693,10 @@ async function seedIfEmpty(){
   console.log("seedIfEmpty: After pull, found", after.length, "profiles");
   if(after.length) return;
   console.log("seedIfEmpty: Creating seed data...");
-  const markId=uid(), tamId=uid();
-  await saveLocal("profiles",{id:markId,name:"Mark",hourFmt:"12",confirmEnd:"1"});
-  await saveLocal("profiles",{id:tamId,name:"Tamara",hourFmt:"12",confirmEnd:"1"});
-  const mark=[["Regional",0],["Sales",0],["Marketing",1],["Admin",2],["Processing",3],["Calls",4],["Email",5],["Meetings",6],["Break",-1]];
-  let o=0;
-  let regionalId=null;
-  for(const[l,ci]of mark){
-    const chId=uid();
-    await saveLocal("channels",{id:chId,profileId:markId,label:l,color:ci<0?"#64748b":PALETTE[ci],order:o++,archived:false});
-    if(l==="Regional") regionalId=chId;
-  }
-  // Add subcategories for Regional
-  if(regionalId){
-    const subs=[["Corporate Meeting",0],["Corporate Event",1],["Operations",2],["Corporate Planning",3]];
-    let so=0;
-    for(const[l,ci]of subs) await saveLocal("channels",{id:uid(),profileId:markId,parentChannelId:regionalId,label:l,color:PALETTE[ci],order:so++,archived:false});
-  }
-  const tam=[["Design",1],["Client Work",2],["Content",4],["Email",5],["Break",-1]];
-  o=0; for(const[l,ci]of tam) await saveLocal("channels",{id:uid(),profileId:tamId,label:l,color:ci<0?"#64748b":PALETTE[ci],order:o++,archived:false});
-  await idbPut("meta",{k:"lastProfile",v:markId});
+  const pid=uid();
+  await saveLocal("profiles",{id:pid,name:"Me",hourFmt:"12",confirmEnd:"1"});
+  await createDefaultChannels(pid);
+  await idbPut("meta",{k:"lastProfile",v:pid});
 }
 
 /* ===== timer logic ===== */
@@ -685,6 +787,7 @@ async function renderGrid(){ const grid=document.getElementById("grid");
     const ink=contrastInk(c.color);
     const bg=on?`linear-gradient(160deg,${tint(c.color,.10)},${shade(c.color,.12)})`:`linear-gradient(160deg,${c.color},${shade(c.color,.22)})`;
     const pct=dayTotal>0?Math.round(ms/dayTotal*100):0;
+    const sessMs=(on&&running)?Math.max(0,now()-running.startTs):0;
     const el=document.createElement("button");
     el.className="tile"+(on?" on":"");
     el.style.background=bg;
@@ -693,7 +796,7 @@ async function renderGrid(){ const grid=document.getElementById("grid");
     el.draggable=true;
     el.style.cursor="grab";
     const subLabel=on&&runningCh?.parentChannelId===c.id?` · ${runningCh.label}`:"";
-    el.innerHTML=`<div class="runbadge" style="color:${ink}"><span class="d"></span>Running</div><div class="label">${escapeHtml(c.label)}${subLabel}</div><div class="time" data-ch="${c.id}">${fmtDur(ms)}</div><div class="foot"><span class="state">${on?'<span class="d"></span>Running':'Paused'}</span><span class="pct">${pct}%</span></div>`;
+    el.innerHTML=`<div class="runbadge" style="color:${ink}"><span class="d"></span>Running</div><div class="label">${escapeHtml(c.label)}${subLabel}</div><div class="time" data-ch="${c.id}">${fmtDur(ms)}</div><div class="foot"><span class="state">${on?`<span class="d"></span><span class="sess">${fmtDur(sessMs)}</span>`:'Paused'}</span><span class="pct">${pct}%</span></div>`;
     el.addEventListener("click",e=>{if(e.target.closest(".dragging"))return;switchTo(c.id);});
     el.addEventListener("dragstart",e=>{el.classList.add("dragging");e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",c.id);e.dataTransfer.setData("draggedElement",active.indexOf(c));el.style.opacity="0.5"});
     el.addEventListener("dragend",e=>{el.classList.remove("dragging");el.style.opacity="1"});
@@ -717,11 +820,145 @@ setInterval(async()=>{ if(!db||!state.profileId||!state.profile)return; await up
   document.getElementById("topTotal").textContent=fmtDur(total);
   document.querySelectorAll(".time[data-ch]").forEach(n=>{n.textContent=fmtDur(map[n.getAttribute("data-ch")]||0);});
   const active=state.channels.filter(c=>!c.archived&&!c.parentChannelId).sort((a,b)=>a.order-b.order);
-  document.querySelectorAll(".tile").forEach((t,i)=>{const c=active[i];if(!c)return;const ms=map[c.id]||0;const pct=total>0?Math.round(ms/total*100):0;const p=t.querySelector(".pct");if(p)p.textContent=pct+"%";});
+  document.querySelectorAll(".tile").forEach((t,i)=>{const c=active[i];if(!c)return;const ms=map[c.id]||0;const pct=total>0?Math.round(ms/total*100):0;const p=t.querySelector(".pct");if(p)p.textContent=pct+"%";
+    const s=t.querySelector(".sess");
+    if(s){ if(running&&running.startTs){ s.textContent=fmtDur(Math.max(0,now()-running.startTs)); } else { renderGrid(); } }});
 },1000);
 
 /* ===== toast ===== */
-let toastT; function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1500);}
+let toastT; /* ===== build version + update detection =====
+   BUILD_ID is rewritten at deploy time by the Netlify build command in
+   netlify.toml (see there). Format: YYYYMMDDHHMM-<short commit>, UTC.
+
+   Netlify already serves index.html with must-revalidate + ETag and there is
+   no service worker, so a reload always fetches the newest build. The real
+   cause of someone running an old version is simply that they never reload:
+   an installed PWA or a long-lived tab keeps executing whatever it loaded.
+   So the running app polls a tiny version.json and offers a reload. */
+/* Human-facing release number. Bump this when cutting a release; the
+   build stamp below is filled in automatically at deploy time. Together
+   they read as "v3 - 2026.08.26 03:45". */
+const APP_RELEASE=1;
+const BUILD_ID="__BUILD_ID__";
+function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
+function fmtBuild(id){
+  const s=String(id||"");
+  if(!s||s.indexOf("__BUILD")===0) return "dev build";
+  if(s.length<12) return s;
+  return s.slice(0,4)+"."+s.slice(4,6)+"."+s.slice(6,8)+" "+s.slice(8,10)+":"+s.slice(10,12);
+}
+let updateReady=false;
+async function checkForUpdate(){
+  if(updateReady||!buildIsStamped()||!navigator.onLine) return;
+  try{
+    const r=await fetch("/version.json?t="+Date.now(),{cache:"no-store"});
+    if(!r.ok) return;
+    const j=await r.json();
+    if(j&&j.build&&j.build!==BUILD_ID){ updateReady=true; showUpdateBanner(j.build,j.release); }
+  }catch(e){ /* offline, blocked, or file missing - stay quiet */ }
+}
+function showUpdateBanner(newBuild,newRelease){
+  if(document.getElementById("updateBanner")) return;
+  const bar=document.createElement("div");
+  bar.id="updateBanner";
+  bar.style.cssText="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));z-index:300;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--accent);box-shadow:var(--shadow);max-width:calc(100vw - 24px);flex-wrap:wrap;justify-content:center";
+  bar.innerHTML='<span style="font-size:13px;font-weight:700;color:var(--ink)">New version available</span>'+
+                '<span style="font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums">'+(newRelease?('v'+newRelease+' '):'')+fmtBuild(newBuild)+'</span>'+
+                '<button class="btn sm pri" id="updateReloadBtn">Reload</button>'+
+                '<button class="btn sm" id="updateLaterBtn">Later</button>';
+  document.body.appendChild(bar);
+  const rb=document.getElementById("updateReloadBtn");
+  const lb=document.getElementById("updateLaterBtn");
+  /* A reload is safe mid-session: a running timer lives as an open session in
+     IndexedDB and is restored by reloadFromLocal() on boot. */
+  if(rb) rb.addEventListener("click",()=>{ location.reload(); });
+  if(lb) lb.addEventListener("click",()=>{ bar.remove(); });
+}
+setInterval(checkForUpdate,15*60*1000);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkForUpdate(); });
+setTimeout(checkForUpdate,8000);
+
+/* ===== in-app dialogs =====
+   Native confirm()/prompt() are unreliable outside a plain top-level page:
+   sandboxed frames return false without showing anything, and prompt() can
+   throw outright. Every destructive or naming action routes through these
+   instead, so the answer never depends on the host environment. */
+function uiDialog(opts){
+  return new Promise(resolve=>{
+    const o=opts||{};
+    const wantsInput=o.kind==="prompt";
+    let settled=false;
+    const done=v=>{ if(settled) return; settled=true; cleanup(); resolve(v); };
+
+    const scrim=document.createElement("div");
+    scrim.className="scrim";
+    scrim.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.7);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px";
+
+    const card=document.createElement("div");
+    card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:400px;width:100%;box-shadow:var(--shadow)";
+
+    if(o.title){
+      const h=document.createElement("div");
+      h.style.cssText="font-size:16px;font-weight:800;margin-bottom:8px;color:var(--ink)";
+      h.textContent=o.title;
+      card.appendChild(h);
+    }
+    const msg=document.createElement("div");
+    msg.style.cssText="font-size:14px;line-height:1.55;color:var(--ink2);white-space:pre-wrap";
+    msg.textContent=o.message||"";
+    card.appendChild(msg);
+
+    let input=null;
+    if(wantsInput){
+      input=document.createElement("input");
+      input.type="text";
+      input.value=o.value||"";
+      input.style.cssText="width:100%;margin-top:14px;padding:11px;background:#0a1424;border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:14px;outline:none";
+      card.appendChild(input);
+    }
+
+    const row=document.createElement("div");
+    row.style.cssText="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap";
+    const cancel=document.createElement("button");
+    cancel.className="btn sm";
+    cancel.textContent=o.cancelLabel||"Cancel";
+    const ok=document.createElement("button");
+    ok.className="btn sm "+(o.danger?"warn":"pri");
+    ok.textContent=o.okLabel||"OK";
+    if(o.danger) ok.style.cssText="background:#dc2626;border-color:#dc2626;color:#fff";
+    row.appendChild(cancel); row.appendChild(ok);
+    card.appendChild(row);
+    scrim.appendChild(card);
+
+    const onKey=e=>{
+      if(e.key==="Escape"){ e.preventDefault(); done(wantsInput?null:false); }
+      else if(e.key==="Enter"&&(!wantsInput||document.activeElement===input)){
+        e.preventDefault(); done(wantsInput?(input.value||""):true);
+      }
+    };
+    function cleanup(){
+      document.removeEventListener("keydown",onKey,true);
+      if(scrim.parentNode) scrim.parentNode.removeChild(scrim);
+    }
+    cancel.addEventListener("click",()=>done(wantsInput?null:false));
+    ok.addEventListener("click",()=>done(wantsInput?(input.value||""):true));
+    scrim.addEventListener("click",e=>{ if(e.target===scrim) done(wantsInput?null:false); });
+    document.addEventListener("keydown",onKey,true);
+
+    document.body.appendChild(scrim);
+    setTimeout(()=>{ if(wantsInput){ input.focus(); input.select(); } else { ok.focus(); } },30);
+  });
+}
+function uiConfirm(message,opts){
+  const o=opts||{};
+  return uiDialog({kind:"confirm",message:message,title:o.title||"Are you sure?",okLabel:o.okLabel||"Confirm",cancelLabel:o.cancelLabel||"Cancel",danger:!!o.danger});
+}
+function uiPrompt(message,value,opts){
+  const o=opts||{};
+  return uiDialog({kind:"prompt",message:message,value:value||"",title:o.title||"",okLabel:o.okLabel||"Save",cancelLabel:o.cancelLabel||"Cancel"});
+}
+
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1500);}
 
 /* ===== avatar menu ===== */
 function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.innerHTML="";
@@ -736,6 +973,23 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
   const channelsItem=document.createElement("div");channelsItem.className="menu-item";channelsItem.style="padding:10px 12px;cursor:pointer;font-size:12px;color:var(--ink)";channelsItem.textContent="🎨 Channels";channelsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openChannels();});m.appendChild(channelsItem);
   
   const settingsItem=document.createElement("div");settingsItem.className="menu-item";settingsItem.style="padding:10px 12px;cursor:pointer;font-size:12px;color:var(--ink)";settingsItem.textContent="⚙️ Settings";settingsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openSettings();});m.appendChild(settingsItem);
+
+  const sep2=document.createElement("div");sep2.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep2);
+  if(window._acctEmail){
+    const who=document.createElement("div");
+    who.style="padding:6px 12px 2px;font-size:10px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+    who.textContent=window._acctEmail;
+    m.appendChild(who);
+  }
+  const signOutItem=document.createElement("div");signOutItem.className="menu-item";signOutItem.style="padding:10px 12px;cursor:pointer;font-size:12px;color:var(--warn)";signOutItem.textContent="🚪 Sign out";
+  signOutItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";doSignOut();});
+  m.appendChild(signOutItem);
+
+  const ver=document.createElement("div");
+  ver.style="padding:8px 12px 10px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:6px";
+  ver.innerHTML='<span>Version</span><span style="font-variant-numeric:tabular-nums;color:var(--ink2)">v'+APP_RELEASE+'</span><span style="font-variant-numeric:tabular-nums;opacity:.75">'+fmtBuild(BUILD_ID)+'</span>';
+  ver.title="Release v"+APP_RELEASE+"  build "+String(BUILD_ID);
+  m.appendChild(ver);
 }
 
 /* ===== scrims ===== */
@@ -869,7 +1123,7 @@ function initializeEventListeners(){
   // New profile
   const npCreate=document.getElementById("npCreate");if(npCreate)npCreate.addEventListener("click",async()=>{const name=document.getElementById("npName").value.trim();if(!name){toast("Enter a name");return;}const seed=document.getElementById("npSeed").value;const pid=uid();
     await saveLocal("profiles",{id:pid,name,hourFmt:"12",confirmEnd:"1"});
-    if(seed==="sample"){const s=[["Focus",2],["Meetings",6],["Email",5],["Break",-1]];let o=0;for(const[l,ci]of s)await saveLocal("channels",{id:uid(),profileId:pid,label:l,color:ci<0?"#64748b":PALETTE[ci],order:o++,archived:false});}
+    if(seed==="sample"){await createDefaultChannels(pid);}
     closeScrim("npScrim");await loadProfile(pid);toast("Profile created");});
 
   // CSV export
@@ -890,6 +1144,7 @@ function openChannels(){const app=document.querySelector('.app');const stage=app
         <div class="hint" style="margin:8px 0 14px">Rename, recolor, reorder or archive any button. Names and colors can change anytime — history stays tied to a permanent internal ID, so nothing is ever lost.</div>
         <div id="channelList"></div>
         <div class="sect-title">Archived channels</div><div id="archivedList"><div class="hint">None archived.</div></div>
+        <div id="dangerZone2"></div>
       </div>
     </div>
   </div>
@@ -918,7 +1173,7 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
         <div class="row"><div class="grow"><b>Delete Date Range</b><div class="hint">Remove all data from a specific date range.</div></div><button class="btn sm warn" id="deleteDateRangeBtn">Delete Range</button></div>
         <div class="row"><div class="grow"><b>Complete Reset</b><div class="hint">⚠️ Permanently delete ALL data. This cannot be undone.</div></div><button class="btn sm warn" id="completeResetBtn" style="background:#dc2626">Complete Reset</button></div>
         <div class="sect-title">Account</div>
-        <div class="row"><div class="grow"><b>Signed in as</b><div class="hint" id="acctEmail"></div></div><button class="btn sm warn" id="signOutBtn">Sign out</button></div>
+        <div class="row"><div class="grow"><b>Signed in as</b><div class="hint" id="acctEmail"></div></div></div>
       </div>
     </div>
   </div>
@@ -975,68 +1230,187 @@ function dedupChannels(chs){
 function applyButtonSize(size){const grid=document.getElementById("grid");if(!grid)return;const base=172;const heights={compact:140,normal:172,spacious:220};const h=heights[size]||heights.normal;document.querySelectorAll(".tile").forEach(t=>{t.style.height=h+"px";});}
 
 
-function renderChannelSettings(){const list=document.getElementById("channelList");list.innerHTML="";
-  
-  
-  // Visual debug display
-  const debugDiv=document.createElement("div");
-  debugDiv.style.cssText="background:#2a2a3e;border:2px solid #ffd700;padding:10px;margin-bottom:12px;font-size:11px;color:#ffd700;font-family:monospace;border-radius:6px";
-  let debugHtml="📊 Channels: ";
-  state.channels.forEach(ch=>{
-    if(ch.archived) return;
-    const mark=ch.parentChannelId?"└":"•";
-    debugHtml+=mark+ch.label;
-    if(ch.parentChannelId) debugHtml+="(→"+ch.parentChannelId.slice(0,4)+")";
-    debugHtml+=" | ";
+/* ===== channel ordering =====
+   order is scoped to a sibling group: top-level channels order among themselves,
+   subcategories order among siblings under the same parent. Moving a parent
+   therefore carries its subcategories with it. */
+const COLLAPSE_KEY="dtt_collapsed_chans";
+function loadCollapsed(){
+  try{ const raw=localStorage.getItem(COLLAPSE_KEY); return new Set(raw?JSON.parse(raw):[]); }
+  catch(e){ return new Set(); }
+}
+const collapsedChans=loadCollapsed();
+function saveCollapsed(){
+  try{ localStorage.setItem(COLLAPSE_KEY,JSON.stringify(Array.from(collapsedChans))); }catch(e){}
+}
+let dragChanId=null;
+
+function siblingsOf(parentId){
+  const pid=parentId||null;
+  return state.channels.filter(c=>!c.archived&&(c.parentChannelId||null)===pid).sort((a,b)=>a.order-b.order);
+}
+async function persistOrder(sibs){
+  for(let k=0;k<sibs.length;k++){
+    if(sibs[k].order!==k){ sibs[k].order=k; await saveLocal("channels",sibs[k]); }
+  }
+}
+async function refreshChannels(){
+  state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
+  state.channels=dedupChannels(state.channels);
+  state.channels.forEach(c=>{if(!c.hasOwnProperty("parentChannelId"))c.parentChannelId=null;});
+  renderChannelSettings(); renderGrid();
+}
+async function moveChannel(id,dir){
+  const ch=state.channels.find(c=>c.id===id); if(!ch) return;
+  const sibs=siblingsOf(ch.parentChannelId);
+  const i=sibs.findIndex(c=>c.id===id), j=i+dir;
+  if(i<0||j<0||j>=sibs.length) return;
+  sibs.splice(j,0,sibs.splice(i,1)[0]);
+  await persistOrder(sibs);
+  await refreshChannels();
+}
+async function dropChannel(draggedId,targetId){
+  if(!draggedId||draggedId===targetId) return;
+  const a=state.channels.find(c=>c.id===draggedId), b=state.channels.find(c=>c.id===targetId);
+  if(!a||!b) return;
+  if((a.parentChannelId||null)!==(b.parentChannelId||null)){ toast("Reorder within the same group"); return; }
+  const sibs=siblingsOf(a.parentChannelId);
+  const from=sibs.findIndex(c=>c.id===draggedId), to=sibs.findIndex(c=>c.id===targetId);
+  if(from<0||to<0||from===to) return;
+  sibs.splice(to,0,sibs.splice(from,1)[0]);
+  await persistOrder(sibs);
+  await refreshChannels();
+}
+function toggleCollapse(id){
+  if(collapsedChans.has(id)) collapsedChans.delete(id); else collapsedChans.add(id);
+  saveCollapsed();
+  renderChannelSettings();
+}
+function buildChannelRow(c,idx,total,subCount){
+  const isSub=!!c.parentChannelId;
+  const row=document.createElement("div");
+  row.className="row chan"+(isSub?" sub":"");
+  row.draggable=true; row.dataset.channelId=c.id;
+  const collapsed=collapsedChans.has(c.id);
+  const caret=(!isSub&&subCount>0)
+    ? `<button class="btn sm act-caret" title="${collapsed?"Expand":"Collapse"}">${collapsed?"▸":"▾"}</button>`
+    : `<span style="display:inline-block;flex:0 0 24px;width:24px"></span>`;
+  const meta=(!isSub&&subCount)?`<span class="hint" style="margin-left:8px">${subCount} sub${subCount>1?"s":""}${collapsed?" · hidden":""}</span>`:"";
+  const name=isSub?`<span style="font-size:13px">${escapeHtml(c.label)}</span>`:`<b>${escapeHtml(c.label)}</b>${meta}`;
+  row.innerHTML=
+    `<span class="grip" title="Drag to reorder">⠿</span>`+
+    caret+
+    `<div class="swatch" style="background:${c.color}"></div>`+
+    `<div class="grow">${name}</div>`+
+    `<span class="rowbreak"></span>`+
+    `<button class="btn sm act-up" title="Move up"${idx===0?" disabled":""}>▲</button>`+
+    `<button class="btn sm act-down" title="Move down"${idx===total-1?" disabled":""}>▼</button>`+
+    `<button class="btn sm act-edit">Edit</button>`+
+    (isSub?`<button class="btn sm add-spacer" tabindex="-1" aria-hidden="true">+<span class="add-txt"> Add</span></button>`:`<button class="btn sm act-add" title="Add subcategory">+<span class="add-txt"> Add</span></button>`);
+
+  const q=s=>row.querySelector(s);
+  const up=q(".act-up"), dn=q(".act-down"), ed=q(".act-edit"), ad=q(".act-add"), ca=q(".act-caret");
+  if(up) up.addEventListener("click",e=>{e.stopPropagation();moveChannel(c.id,-1);});
+  if(dn) dn.addEventListener("click",e=>{e.stopPropagation();moveChannel(c.id,1);});
+  if(ed) ed.addEventListener("click",e=>{e.stopPropagation();openChannelEditor(c.id);});
+  if(ad) ad.addEventListener("click",e=>{e.stopPropagation();openChannelEditor(null,c.id);});
+  if(ca) ca.addEventListener("click",e=>{e.stopPropagation();toggleCollapse(c.id);});
+
+  row.addEventListener("dragstart",e=>{
+    dragChanId=c.id; e.dataTransfer.effectAllowed="move";
+    try{ e.dataTransfer.setData("text/plain",c.id); }catch(err){}
+    row.style.opacity="0.45";
   });
-  debugDiv.textContent=debugHtml||"(loading...)";
-  list.appendChild(debugDiv);
-  
-  // Nuclear delete button - visible at top
-  const nuclearBtn=document.createElement("button");
-  nuclearBtn.style.cssText="width:100%;padding:12px;margin:12px 0;background:#ff4444;color:white;border:none;border-radius:6px;font-weight:bold;font-size:14px;cursor:pointer";
-  nuclearBtn.textContent="🔥 DELETE ALL CHANNELS - Start Fresh";
-  nuclearBtn.addEventListener("click",async()=>{
-    if(!confirm("DELETE ALL CHANNELS? This will remove everything from everywhere. Last chance!")) return;
-    try{
-      const allChs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
-      for(const ch of allChs){
-        await db.transaction(["channels"],"readwrite").objectStore("channels").delete(ch.id);
-        try{await SB.from("channels").delete().eq("id",ch.id);}catch(e){}
-      }
-      state.channels=[];
-      renderChannelSettings();
-      renderGrid();
-      toast("All channels permanently deleted!");
-    }catch(e){
-      console.error("Error:",e);
-      toast("Error deleting channels");
+  row.addEventListener("dragend",()=>{ dragChanId=null; row.style.opacity="1"; row.classList.remove("drop-before"); });
+  row.addEventListener("dragover",e=>{
+    const d=dragChanId?state.channels.find(x=>x.id===dragChanId):null;
+    if(!d||d.id===c.id||(d.parentChannelId||null)!==(c.parentChannelId||null)) return;
+    e.preventDefault(); e.dataTransfer.dropEffect="move"; row.classList.add("drop-before");
+  });
+  row.addEventListener("dragleave",()=>row.classList.remove("drop-before"));
+  row.addEventListener("drop",async e=>{
+    e.preventDefault(); row.classList.remove("drop-before");
+    const id=dragChanId||e.dataTransfer.getData("text/plain");
+    dragChanId=null;
+    await dropChannel(id,c.id);
+  });
+  return row;
+}
+function renderChannelSettings(){
+  const list=document.getElementById("channelList"); if(!list) return;
+  list.innerHTML="";
+  const tops=siblingsOf(null);
+  if(!tops.length){
+    list.innerHTML='<div class="hint">No channels yet. Use "+ Add channel" above to create one.</div>';
+  }else{
+    tops.forEach((c,i)=>{
+      const subs=siblingsOf(c.id);
+      list.appendChild(buildChannelRow(c,i,tops.length,subs.length));
+      if(!collapsedChans.has(c.id)) subs.forEach((s,j)=>list.appendChild(buildChannelRow(s,j,subs.length,0)));
+    });
+  }
+  const arch=state.channels.filter(c=>c.archived); const al=document.getElementById("archivedList");
+  if(al){
+    if(!arch.length) al.innerHTML='<div class="hint">None archived.</div>';
+    else{
+      al.innerHTML="";
+      arch.forEach(c=>{
+        const row=document.createElement("div"); row.className="row";
+        row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b> <span class="archived-tag">Archived</span></div><button class="btn sm">Restore</button><button class="btn sm" style="background:rgba(240,68,68,.2);border-color:#f87171;color:#f87171">Delete</button>`;
+        row.querySelector(".btn").addEventListener("click",()=>restoreChannel(c.id));
+        row.querySelectorAll(".btn")[1].addEventListener("click",()=>deleteChannel(c.id));
+        al.appendChild(row);
+      });
     }
-  });
-  list.appendChild(nuclearBtn);
-  
-  const active=state.channels.filter(c=>!c.archived&&!c.parentChannelId).sort((a,b)=>a.order-b.order);
-  active.forEach((c,i)=>{const row=document.createElement("div");row.className="row";
-    row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b><div style="font-size:11px;color:var(--muted);margin-top:4px">↕ Drag to reorder</div></div><button class="btn sm">Edit</button>`;
-    row.style.cursor="grab";row.draggable=true;row.dataset.channelId=c.id;
-    row.addEventListener("dragstart",e=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",c.id);row.style.opacity="0.5"});
-    row.addEventListener("dragend",e=>{row.style.opacity="1"});
-    row.addEventListener("dragover",e=>{e.preventDefault();e.dataTransfer.dropEffect="move";row.style.borderTop="2px solid var(--accent)"});
-    row.addEventListener("dragleave",e=>{row.style.borderTop=""});
-    row.addEventListener("drop",async e=>{e.preventDefault();row.style.borderTop="";const draggedId=e.dataTransfer.getData("text/plain");if(draggedId!==c.id){const draggedCh=state.channels.find(x=>x.id===draggedId);const targetCh=c;const tempOrder=draggedCh.order;draggedCh.order=targetCh.order;targetCh.order=tempOrder;await saveLocal("channels",draggedCh);await saveLocal("channels",targetCh);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid()}});
-    const chId=c.id;row.querySelector(".btn").addEventListener("click",()=>openChannelEditor(chId));list.appendChild(row);
-    const subs=state.channels.filter(sc=>sc.parentChannelId===c.id&&!sc.archived).sort((a,b)=>a.order-b.order);
-    
-    subs.forEach(sub=>{const subRow=document.createElement("div");subRow.className="row";subRow.style.paddingLeft="48px";subRow.style.borderLeft="2px solid var(--line)";subRow.innerHTML=`<div class="swatch" style="background:${sub.color}"></div><div class="grow"><span style="font-size:12px">${escapeHtml(sub.label)}</span></div><button class="btn sm">Edit</button>`;const subId=sub.id;subRow.querySelector(".btn").addEventListener("click",()=>openChannelEditor(subId));list.appendChild(subRow);});
-    // Add subcategory button - inline with edit button
-    const addSubBtn=document.createElement("button");addSubBtn.className="btn sm";addSubBtn.textContent="+ Add";addSubBtn.style.marginLeft="8px";const parentId=c.id;addSubBtn.addEventListener("click",()=>{openChannelEditor(null,parentId);});row.appendChild(addSubBtn);});
-  const arch=state.channels.filter(c=>c.archived);const al=document.getElementById("archivedList");
-  if(!arch.length)al.innerHTML='<div class="hint">None archived.</div>';
-  else{al.innerHTML="";arch.forEach(c=>{const row=document.createElement("div");row.className="row";row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b> <span class="archived-tag">Archived</span></div><button class="btn sm">Restore</button><button class="btn sm" style="background:rgba(240,68,68,.2);border-color:#f87171;color:#f87171">Delete</button>`;const restoreBtn=row.querySelector(".btn");restoreBtn.addEventListener("click",()=>restoreChannel(c.id));const deleteBtn=row.querySelectorAll(".btn")[1];deleteBtn.addEventListener("click",()=>deleteChannel(c.id));al.appendChild(row);});}
-  document.getElementById("acctEmail").textContent=(window._acctEmail||"");}
-async function moveChannel(id,dir){const active=state.channels.filter(c=>!c.archived).sort((a,b)=>a.order-b.order);const idx=active.findIndex(c=>c.id===id);const sw=idx+dir;if(sw<0||sw>=active.length)return;const a=active[idx],b=active[sw];const ao=a.order;a.order=b.order;b.order=ao;await saveLocal("channels",a);await saveLocal("channels",b);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();}
-async function restoreChannel(id){const c=state.channels.find(x=>x.id===id);c.archived=false;c.order=Math.max(0,...state.channels.map(x=>x.order))+1;await saveLocal("channels",c);state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();toast("Restored");}
-async function deleteChannel(id){if(!confirm("Permanently delete this channel? This cannot be undone."))return;try{await db.transaction(["channels"],"readwrite").objectStore("channels").delete(id);const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const toDelete=allSessions.filter(s=>s.channelId===id);for(const sess of toDelete){await db.transaction(["sessions"],"readwrite").objectStore("sessions").delete(sess.id);}state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();toast("Deleted permanently");}catch(e){console.error("Delete error:",e);toast("Error deleting channel");}}
+  }
+  renderDangerZone();
+  const acct=document.getElementById("acctEmail"); if(acct) acct.textContent=(window._acctEmail||"");}
+
+/* Delete-all lives at the very bottom of Channels, under Archived. */
+async function deleteAllChannels(){
+  if(!await uiConfirm("Delete ALL channels and start fresh?\n\nThis removes every channel and subcategory from this device and from the cloud. It cannot be undone.")) return;
+  if(!await uiConfirm("Last chance — permanently delete all channels?")) return;
+  try{
+    const allChs=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
+    for(const ch of allChs){
+      await db.transaction(["channels"],"readwrite").objectStore("channels").delete(ch.id);
+      try{ await SB.from("channels").delete().eq("id",ch.id); }catch(e){ console.warn("remote delete failed",ch.id,e); }
+    }
+    state.channels=[];
+    renderChannelSettings();
+    renderGrid();
+    toast("All channels deleted");
+  }catch(e){
+    console.error("deleteAllChannels:",e);
+    toast("Error deleting channels");
+  }
+}
+function renderDangerZone(){
+  const host=document.getElementById("dangerZone2")||document.getElementById("dangerZone");
+  if(!host) return;
+  host.innerHTML="";
+  const title=document.createElement("div");title.className="sect-title";title.textContent="Danger zone";host.appendChild(title);
+  const hint=document.createElement("div");hint.className="hint";hint.style.margin="0 0 10px";
+  hint.textContent="Removes every channel and subcategory everywhere. Archiving keeps your history — this does not.";
+  host.appendChild(hint);
+  const btn=document.createElement("button");
+  btn.className="btn sm warn";
+  btn.style.cssText="width:100%;padding:12px;background:#dc2626;border-color:#dc2626;color:#fff;font-weight:700";
+  btn.textContent="Delete all channels — start fresh";
+  btn.addEventListener("click",deleteAllChannels);
+  host.appendChild(btn);
+}
+async function restoreChannel(id){
+  const c=state.channels.find(x=>x.id===id); if(!c) return;
+  c.archived=false;
+  /* Land it at the end of its OWN sibling group, not the global max. */
+  const sibs=siblingsOf(c.parentChannelId).filter(x=>x.id!==c.id);
+  c.order=sibs.length?Math.max(...sibs.map(x=>x.order))+1:0;
+  await saveLocal("channels",c);
+  await refreshChannels();
+  toast("Restored");
+}
+async function deleteChannel(id){if(!await uiConfirm("Permanently delete this channel? This cannot be undone."))return;try{await db.transaction(["channels"],"readwrite").objectStore("channels").delete(id);const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const toDelete=allSessions.filter(s=>s.channelId===id);for(const sess of toDelete){await db.transaction(["sessions"],"readwrite").objectStore("sessions").delete(sess.id);}state.channels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));state.channels=dedupChannels(state.channels);state.channels.forEach(c=>{if(!c.hasOwnProperty('parentChannelId'))c.parentChannelId=null;});renderChannelSettings();renderGrid();toast("Deleted permanently");}catch(e){console.error("Delete error:",e);toast("Error deleting channel");}}
 function openChannelEditor(id,parentId){editingChanId=id;editingParentId=parentId||null;const c=id?state.channels.find(x=>x.id===id):null;const parent=parentId?state.channels.find(x=>x.id===parentId):null;document.getElementById("chanTitle").textContent=c?"Edit channel":parent?"Add subcategory":"Add channel";document.getElementById("chanLabel").value=c?c.label:"";const col=c?c.color:parent?parent.color:PALETTE[state.channels.length%PALETTE.length];document.getElementById("chanColor").value=col;document.getElementById("chanArchive").style.display=c?"block":"none";renderPalette(col);updateChanPreview();openScrim("chanScrim");}
 function renderPalette(sel){const p=document.getElementById("chanPalette");p.innerHTML="";PALETTE.forEach(col=>{const ch=document.createElement("div");ch.className="pchip"+(col.toLowerCase()===sel.toLowerCase()?" sel":"");ch.style.background=col;ch.addEventListener("click",()=>{document.getElementById("chanColor").value=col;renderPalette(col);updateChanPreview();});p.appendChild(ch);});}
 function updateChanPreview(){const col=document.getElementById("chanColor").value;const lbl=document.getElementById("chanLabel").value||"Preview";const prev=document.getElementById("chanPreview");prev.style.background=`linear-gradient(160deg,${col},${shade(col,.22)})`;prev.style.color=contrastInk(col);document.getElementById("cpLabel").textContent=lbl;document.getElementById("chanPreviewSw").style.background=col;}
@@ -1044,7 +1418,22 @@ function updateChanPreview(){const col=document.getElementById("chanColor").valu
 /* ===== timeline ===== */
 async function openEditsModal(){try{const content=document.getElementById("editsContent");if(!content){console.error("editsContent not found");return;}content.innerHTML="";if(!state.profileId){console.error("No profile ID set");content.innerHTML='<div class="hint" style="padding:20px">Error: No profile selected.</div>';openScrim("editsScrim");return;}const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const today=todayKey();const filtered=all.filter(s=>s.date===today).sort((a,b)=>a.startTs-b.startTs);if(!filtered.length){content.innerHTML='<div class="hint" style="padding:20px">No sessions yet today.</div>';}else{filtered.forEach(s=>{const c=state.channels.find(x=>x.id===s.channelId)||{label:"(deleted)",color:"#64748b"};const dur=s.endTs?s.durMs:(now()-s.startTs);const open=!s.endTs;const row=document.createElement("div");row.style.display="flex";row.style.alignItems="center";row.style.gap="12px";row.style.padding="12px 14px";row.style.borderBottom="1px solid var(--line)";const leftDiv=document.createElement("div");leftDiv.style.display="flex";leftDiv.style.alignItems="center";leftDiv.style.gap="8px";leftDiv.style.flex="0 1 auto";const colorDot=document.createElement("div");colorDot.style.width="12px";colorDot.style.height="12px";colorDot.style.borderRadius="50%";colorDot.style.background=c.color;colorDot.style.flexShrink="0";leftDiv.appendChild(colorDot);const infoDiv=document.createElement("div");infoDiv.style.minWidth="0";const labelDiv=document.createElement("div");labelDiv.style.fontSize="12px";labelDiv.style.fontWeight="600";labelDiv.style.color="var(--ink)";labelDiv.innerHTML=`${escapeHtml(c.label)}${open?' <span style="color:var(--good);font-size:11px">● running</span>':''}`;infoDiv.appendChild(labelDiv);const timeDiv=document.createElement("div");timeDiv.style.fontSize="11px";timeDiv.style.color="var(--ink2)";timeDiv.textContent=`${fmtClock(s.startTs,state.profile.hourFmt)} — ${s.endTs?fmtClock(s.endTs,state.profile.hourFmt):"now"}`;infoDiv.appendChild(timeDiv);leftDiv.appendChild(infoDiv);row.appendChild(leftDiv);const durDiv=document.createElement("div");durDiv.style.fontSize="11px";durDiv.style.fontWeight="600";durDiv.style.color="var(--ink2)";durDiv.style.whiteSpace="nowrap";durDiv.textContent=fmtDur(dur);row.appendChild(durDiv);if(s.endTs){const adjBtn=document.createElement("button");adjBtn.className="btn sm";adjBtn.textContent="Adjust";adjBtn.addEventListener("click",()=>{closeScrim("editsScrim");openAdjustModal(s);});row.appendChild(adjBtn);}content.appendChild(row);});}openScrim("editsScrim");}catch(e){console.error("Error in openEditsModal:",e);const content=document.getElementById("editsContent");if(content)content.innerHTML='<div class="hint" style="padding:20px">Error loading sessions: '+escapeHtml(e.message)+'</div>';openScrim("editsScrim");}}
 async function openTimeline(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';const today=new Date();const dayName=today.toLocaleDateString('en-US',{weekday:'short'});const dateStr=today.toLocaleDateString('en-US',{month:'short',day:'numeric'});html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)">';html+='<div style="display:flex;align-items:center;gap:12px">';html+='<div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">'+dayName+' '+dateStr+'</div>';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Edits</h2>';html+='</div>';html+='<button class="btn sm" onclick="closeTimelineView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:0" id="tlContent"></div>';html+='</div>';stage.innerHTML=html;window.closeTimelineView=()=>{stage.innerHTML=origStage;renderGrid();};const all=(await idbAll("sessions","profile",IDBKeyRange.only(state.profileId))).filter(s=>s.date===todayKey()).sort((a,b)=>a.startTs-b.startTs);const tlContent=document.getElementById("tlContent");if(!all.length){tlContent.innerHTML='<div class="hint" style="padding:20px">No sessions yet today.</div>';}else{tlContent.innerHTML="";all.forEach(s=>{const c=state.channels.find(x=>x.id===s.channelId)||{label:"(deleted)",color:"#64748b"};const dur=s.endTs?s.durMs:(now()-s.startTs);const open=!s.endTs;const row=document.createElement("div");row.style.display="flex";row.style.alignItems="center";row.style.gap="12px";row.style.padding="12px 14px";row.style.borderBottom="1px solid var(--line)";const leftDiv=document.createElement("div");leftDiv.style.display="flex";leftDiv.style.alignItems="center";leftDiv.style.gap="8px";leftDiv.style.flex="0 1 auto";const colorDot=document.createElement("div");colorDot.style.width="12px";colorDot.style.height="12px";colorDot.style.borderRadius="50%";colorDot.style.background=c.color;colorDot.style.flexShrink="0";leftDiv.appendChild(colorDot);const infoDiv=document.createElement("div");infoDiv.style.minWidth="0";const labelDiv=document.createElement("div");labelDiv.style.fontSize="12px";labelDiv.style.fontWeight="600";labelDiv.style.color="var(--ink)";labelDiv.innerHTML=`${escapeHtml(c.label)}${open?' <span style="color:var(--good);font-size:11px">● running</span>':''}`;infoDiv.appendChild(labelDiv);const timeDiv=document.createElement("div");timeDiv.style.fontSize="11px";timeDiv.style.color="var(--ink2)";timeDiv.textContent=`${fmtClock(s.startTs,state.profile.hourFmt)} — ${s.endTs?fmtClock(s.endTs,state.profile.hourFmt):"now"}`;infoDiv.appendChild(timeDiv);leftDiv.appendChild(infoDiv);row.appendChild(leftDiv);const durDiv=document.createElement("div");durDiv.style.fontSize="11px";durDiv.style.fontWeight="600";durDiv.style.color="var(--ink2)";durDiv.style.whiteSpace="nowrap";durDiv.textContent=fmtDur(dur);row.appendChild(durDiv);if(s.endTs){const adjBtn=document.createElement("button");adjBtn.className="btn sm";adjBtn.textContent="Adjust";adjBtn.addEventListener("click",()=>openAdjustModal(s));row.appendChild(adjBtn);}tlContent.appendChild(row);});}}
+/* Adherence cell: Timing on top, Budget beneath. Returns HTML so it drops
+   into the existing <td>/<div> WITHOUT changing any table column count. */
+function fmtHM(ms){
+  const total=Math.max(0,Math.round((ms||0)/60000));
+  return Math.floor(total/60)+"h "+String(total%60).padStart(2,"0")+"m";
+}
+function adhTone(p){ return p>=80?"var(--good)":p>=50?"var(--warn)":"var(--bad)"; }
+function adhCellHtml(match,budgetPct){
+  if(!match||!match.total) return '<span style="color:var(--muted)">&mdash;</span>';
+  const tp=Math.round(match.matches/match.total*100);
+  let h='<div style="font-weight:700;color:'+adhTone(tp)+'">'+match.matches+'/'+match.total+'<span style="font-size:10px;font-weight:600;color:var(--ink2);margin-left:4px">timing</span></div>';
+  if(typeof budgetPct==="number") h+='<div style="font-size:11px;font-weight:700;color:'+adhTone(budgetPct)+'">'+budgetPct+'%<span style="font-size:10px;font-weight:600;color:var(--ink2);margin-left:4px">budget</span></div>';
+  return h;
+}
 async function openCombinedSummary(){
+  await refreshTodayScores();
   try{
     console.log("openCombinedSummary: Starting, db=",db,"profileId=",state.profileId);
     const app=document.querySelector('.app');
@@ -1151,10 +1540,10 @@ async function openCombinedSummary(){
       
       const notesDisplay=dNotes?`<div style="font-size:10px;color:var(--ink2);margin:6px 0;font-style:italic;cursor:pointer" onclick="window.editWeekNotes('${dKey}')" data-edit-notes data-week-date="${dKey}" data-rating="${dRating}" title="Click to edit notes">"${escapeHtml(dNotes)}"</div>`:`<div style='font-size:10px;color:var(--muted);cursor:pointer' onclick="window.editWeekNotes('${dKey}')" data-edit-notes data-week-date="${dKey}" data-rating="${dRating}" title="Click to add notes">No notes</div>`;
       
-      const adhStr=dayNote.matchScore?dayNote.matchScore.matches+"/"+dayNote.matchScore.total:"—";
+      const adhStr=adhCellHtml(dayNote.matchScore,dayNote.budgetScore?dayNote.budgetScore.pct:undefined);
       
       weekTotal+=day.total;
-      content+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)">${dName}</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">${fmtDur(day.total)}</div><div style="font-size:11px;color:var(--ink2);margin-bottom:6px">Adherence: ${adhStr}</div><div style="margin:8px 0">${starHtml}</div>${notesDisplay}<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:9px">${chRows||'<div style="color:var(--muted)">No sessions</div>'}</div></div>`;
+      content+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)">${dName}</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">${fmtDur(day.total)}</div><div style="font-size:11px;color:var(--ink2);margin-bottom:6px">${adhStr}</div><div style="margin:8px 0">${starHtml}</div>${notesDisplay}<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:9px">${chRows||'<div style="color:var(--muted)">No sessions</div>'}</div></div>`;
     }
     content+='</div>';
     content+=`<div style="margin-top:14px;padding:12px;background:linear-gradient(180deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.3);border-radius:12px"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Total</div><div style="font-size:22px;font-weight:800;color:var(--good)">${fmtDur(weekTotal)}</div></div>`;
@@ -1181,7 +1570,7 @@ async function openCombinedSummary(){
       }).join('');
       
       const adhData=await idbGet("day_notes",dKey);
-      const adhStr=adhData&&adhData.matchScore?adhData.matchScore.matches+"/"+adhData.matchScore.total:"—";
+      const adhStr=adhCellHtml(adhData&&adhData.matchScore,adhData&&adhData.budgetScore?adhData.budgetScore.pct:undefined);
       
       weekTotal+=day.total;
       content+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink)">${dName}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editWeekNotes('${dKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
@@ -1245,7 +1634,7 @@ async function openCombinedSummary(){
         if(dayNote.deleted)continue;
         const dRating=dayNote.rating||0;
         const dNotes=dayNote.notes||"";
-        const adhStr=dayNote.matchScore?dayNote.matchScore.matches+"/"+dayNote.matchScore.total:"—";
+        const adhStr=adhCellHtml(dayNote.matchScore,dayNote.budgetScore?dayNote.budgetScore.pct:undefined);
         const dayDate=allDates[dateKey].date;
         const dayOfWeek=dayDate.getDay();
         const isWeekend=dayOfWeek===0||dayOfWeek===6;
@@ -1277,7 +1666,7 @@ async function openCombinedSummary(){
     
     window.editHistoryNotes=async(dateKey)=>{
       const currentNotes=document.querySelector(`[data-history-notes="${dateKey}"]`)?.textContent||"";
-      const newNotes=prompt("Edit notes:",currentNotes);
+      const newNotes=await uiPrompt("Edit notes:",currentNotes);
       if(newNotes!==null){
         const ratingSpan=document.querySelector(`[data-history-star="${dateKey}"]`);
         const rating=parseInt(ratingSpan?.dataset.rating||0);
@@ -1335,7 +1724,7 @@ async function openCombinedSummary(){
       const notesArea=document.querySelector('[data-edit-notes][data-week-date="'+date+'"]');
       if(notesArea){
         const currentNotes=notesArea.textContent;
-        const newNotes=prompt("Edit notes:",currentNotes);
+        const newNotes=await uiPrompt("Edit notes:",currentNotes);
         if(newNotes!==null){
           const ratingSpan=document.querySelector('[data-edit-star][data-week-date="'+date+'"]');
           const rating=parseInt(ratingSpan?.dataset.rating||0);
@@ -1403,7 +1792,7 @@ async function openCombinedSummary(){
       
       let allDayNotes=[];
       try{allDayNotes=await idbAll("day_notes");}catch(e){}
-      let totalMatches=0,totalTrackedSlots=0,daysWithTrackerData=0;
+      let totalMatches=0,totalTrackedSlots=0,daysWithTrackerData=0,totalBudgetCredited=0,totalBudgetPlanned=0;
       
       // Count days in range for adherence
       const dayInRange=new Date(startDate);
@@ -1413,6 +1802,7 @@ async function openCombinedSummary(){
         if(dayNote&&dayNote.matchScore){
           totalMatches+=dayNote.matchScore.matches||0;
           totalTrackedSlots+=dayNote.matchScore.total||0;
+          if(dayNote.budgetScore){ totalBudgetCredited+=dayNote.budgetScore.credited||0; totalBudgetPlanned+=dayNote.budgetScore.planned||0; }
           daysWithTrackerData++;
         }
         dayInRange.setDate(dayInRange.getDate()+1);
@@ -1429,6 +1819,17 @@ async function openCombinedSummary(){
         adhHtml+=`<div style="font-size:12px;color:var(--ink2)">/&nbsp;${totalTrackedSlots}</div>`;
         adhHtml+=`<div style="font-size:11px;color:var(--muted);margin-left:auto">${adhPct}%</div>`;
         adhHtml+=`</div>`;
+        adhHtml+=`<div style="font-size:10px;color:var(--muted);margin-bottom:6px">blocks hit at the planned time</div>`;
+        if(totalBudgetPlanned>0){
+          const bPct=Math.round(totalBudgetCredited/totalBudgetPlanned*100);
+          const bColor=bPct>=80?'var(--good)':bPct>=50?'var(--warn)':'var(--bad)';
+          adhHtml+=`<div style="display:flex;align-items:baseline;gap:8px;padding-top:8px;border-top:1px solid var(--line)">`;
+          adhHtml+=`<div style="font-size:20px;font-weight:800;color:${bColor}">${bPct}%</div>`;
+          adhHtml+=`<div style="font-size:12px;color:var(--ink2)">${fmtDurShort(totalBudgetCredited)}&nbsp;/&nbsp;${fmtDurShort(totalBudgetPlanned)}</div>`;
+          adhHtml+=`<div style="font-size:11px;color:var(--muted);margin-left:auto">budget</div>`;
+          adhHtml+=`</div>`;
+          adhHtml+=`<div style="font-size:10px;color:var(--muted)">planned amount met, any time</div>`;
+        }
         adhHtml+=`<div style="font-size:11px;color:var(--ink2)">Matched ${daysWithTrackerData} day${daysWithTrackerData>1?'s':''}</div>`;
         adhHtml+=`</div>`;
       }
@@ -1538,108 +1939,213 @@ let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selected
   stage.innerHTML='<div style="display:flex;flex-direction:column;height:100%;background:var(--bg)"></div>';
   window.closeDayPlanner=()=>{stage.innerHTML=origStage;renderGrid();};
   await initializePlanPage();
-}async function initializePlanPage(){await loadPlans();await renderPlanPageUI();}async function loadPlans(){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));if(!plans||plans.length===0){const defaultPlans=["Monday","Tuesday","Wednesday","Thursday","Friday","Custom"].map((name,idx)=>({id:uid(),profileId:state.profileId,name,schedule:{},order:idx}));for(const p of defaultPlans)await saveLocal("plans",p);planState.plans=defaultPlans;}else{planState.plans=plans.sort((a,b)=>a.order-b.order);}}async function renderPlanPageUI(){
-  const app=document.querySelector(".app");const stage=app?app.querySelector(".stage"):document.getElementById("stage");
+}async function initializePlanPage(){await loadPlans();try{ planState.today=await ensureDayPlan(todayKey()); }catch(e){ console.warn("ensureDayPlan failed",e); }await renderPlanPageUI();}async function loadPlans(){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));if(!plans||plans.length===0){const defaultPlans=["Monday","Tuesday","Wednesday","Thursday","Friday","Custom"].map((name,idx)=>({id:uid(),profileId:state.profileId,name,schedule:{},order:idx}));for(const p of defaultPlans)await saveLocal("plans",p);planState.plans=defaultPlans;}else{planState.plans=plans.sort((a,b)=>a.order-b.order);}}/* ===== plans: templates vs. days =====
+   plans    = reusable templates (Monday, Heavy Pipeline Day, ...)
+   dayplans = one materialised schedule per profile per date, copied from a
+              template when applied. Editing a day never touches the template;
+              "Save to template" is the explicit way to push changes back. */
+
+function dayPlanKey(date){ return state.profileId+"|"+date; }
+function fmtDayLabel(date){
+  const parts=String(date).split("-").map(Number);
+  return new Date(parts[0],parts[1]-1,parts[2]).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+}
+function weekdayTemplate(date){
+  const names=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const parts=String(date).split("-").map(Number);
+  const nm=names[new Date(parts[0],parts[1]-1,parts[2]).getDay()].toLowerCase();
+  return (planState.plans||[]).find(p=>String(p.name).toLowerCase()===nm)||null;
+}
+async function ensureDayPlan(date){
+  const existing=await idbGet("dayplans",dayPlanKey(date));
+  if(existing) return existing;
+  let src=null;
+  const sel=await idbGet("selected_plan",date);
+  if(sel&&sel.profileId===state.profileId&&sel.planId) src=(planState.plans||[]).find(p=>p.id===sel.planId)||null;
+  if(!src) src=weekdayTemplate(date);
+  const dp={ id:dayPlanKey(date), profileId:state.profileId, date:date,
+             planId:src?src.id:null, planName:src?src.name:null,
+             schedule:src?JSON.parse(JSON.stringify(src.schedule||{})):{}, edited:false };
+  await saveLocal("dayplans",dp);
+  return dp;
+}
+async function applyTemplateToToday(planId){
+  const src=(planState.plans||[]).find(p=>p.id===planId);
+  if(!src) return;
+  const date=todayKey();
+  const cur=await idbGet("dayplans",dayPlanKey(date));
+  if(cur&&cur.edited&&!await uiConfirm("Today has edits that are not saved to any template. Replacing it with "+src.name+" will discard them. Continue?")) return;
+  const fresh={ id:dayPlanKey(date), profileId:state.profileId, date:date,
+                planId:src.id, planName:src.name,
+                schedule:JSON.parse(JSON.stringify(src.schedule||{})), edited:false };
+  await saveLocal("dayplans",fresh);
+  await saveLocal("selected_plan",{date:date,profileId:state.profileId,planId:src.id});
+  planState.today=fresh;
+  await renderPlanPageUI();
+  toast("Applied "+src.name+" to today");
+}
+async function saveTodayToTemplate(){
+  const dp=planState.today; if(!dp) return;
+  const tpl=(planState.plans||[]).find(p=>p.id===dp.planId);
+  if(!tpl){ toast("Today is not linked to a template"); return; }
+  if(!await uiConfirm("Save today into the template "+tpl.name+"? Every future day that uses it will change.")) return;
+  tpl.schedule=JSON.parse(JSON.stringify(dp.schedule||{}));
+  await saveLocal("plans",tpl);
+  dp.edited=false; await saveLocal("dayplans",dp);
+  await renderPlanPageUI();
+  toast("Template "+tpl.name+" updated");
+}
+async function resetTodayToTemplate(){
+  const dp=planState.today; if(!dp||!dp.planId) return;
+  if(!await uiConfirm("Discard today's edits and reload it from its template?")) return;
+  const src=(planState.plans||[]).find(p=>p.id===dp.planId); if(!src) return;
+  const fresh={ id:dayPlanKey(dp.date), profileId:state.profileId, date:dp.date,
+                planId:src.id, planName:src.name,
+                schedule:JSON.parse(JSON.stringify(src.schedule||{})), edited:false };
+  await saveLocal("dayplans",fresh);
+  planState.today=fresh;
+  await renderPlanPageUI();
+  toast("Reloaded from "+src.name);
+}
+/* Single write path for both modes. */
+async function setPlanSlot(slot,chId){
+  if(planState.mode==="today"){
+    const dp=planState.today; if(!dp) return;
+    if(!dp.schedule) dp.schedule={};
+    if(chId) dp.schedule[slot]=chId; else delete dp.schedule[slot];
+    dp.edited=true;
+    await saveLocal("dayplans",dp);
+  }else{
+    const plan=(planState.plans||[])[planState.selectedPlanIdx]; if(!plan) return;
+    if(!plan.schedule) plan.schedule={};
+    if(chId) plan.schedule[slot]=chId; else delete plan.schedule[slot];
+    await saveLocal("plans",plan);
+  }
+  await renderPlanPageUI();
+}
+function activeSchedule(){
+  if(planState.mode==="today") return (planState.today&&planState.today.schedule)||{};
+  const plan=(planState.plans||[])[planState.selectedPlanIdx];
+  return (plan&&plan.schedule)||{};
+}
+async function setPlanMode(mode){
+  planState.mode=mode;
+  if(mode==="today") planState.today=await ensureDayPlan(todayKey());
+  await renderPlanPageUI();
+}
+async function renamePlan(idx){
+  const plan=(planState.plans||[])[idx]; if(!plan) return;
+  const name=await uiPrompt("Template name:",plan.name);
+  if(name===null) return;
+  const clean=String(name).trim(); if(!clean) return;
+  plan.name=clean;
+  await saveLocal("plans",plan);
+  await renderPlanPageUI();
+  toast("Renamed");
+}
+
+async function renderPlanPageUI(){
+  const app=document.querySelector(".app");
+  const stage=app?app.querySelector(".stage"):document.getElementById("stage");
   if(!stage)return;
-  
-  const isMobile=window.innerWidth<768;
-  const startHour=planState.startHour||8;
-  const endHour=planState.endHour||18;
-  const increment=planState.increment||30;
-  
   if(!planState.plans||planState.plans.length===0){
-    stage.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted)">Loading plans...</div>';
+    stage.innerHTML=`<div style="padding:20px;text-align:center;color:var(--muted)">Loading plans...</div>`;
     return;
   }
-  
+  if(!planState.mode) planState.mode="today";
+  if(planState.mode==="today"&&!planState.today) planState.today=await ensureDayPlan(todayKey());
+  if(planState.selectedPlanIdx>=planState.plans.length) planState.selectedPlanIdx=0;
+
+  const isMobile=window.innerWidth<768;
+  const startHour=planState.startHour||8, endHour=planState.endHour||18, increment=planState.increment||30;
   const hours=[];
   for(let h=startHour;h<endHour;h++){
     for(let m=0;m<60;m+=increment){
-      const startHr=h%12||12;
-      const ampm=h<12?"AM":"PM";
-      const timeStr=startHr+":"+(m===0?"00":m)+" "+ampm;
-      hours.push({h,m,display:timeStr});
+      const startHr=h%12||12, ampm=h<12?"AM":"PM";
+      hours.push({h:h,m:m,display:startHr+":"+(m===0?"00":m)+" "+ampm});
     }
   }
-  
+  const sched=activeSchedule();
+  const today=planState.today;
+  const isToday=planState.mode==="today";
+
   let html=`<div style="display:flex;flex-direction:column;gap:16px;padding:16px;max-width:800px;margin:0 auto">`;
-  
-  // Plan selector
-  html+=`<div>
-    <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Active Plan</label>
-    <div style="display:flex;gap:8px">
-      <select id="planSelect" style="flex:1;padding:10px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:14px">`;
-  
-  planState.plans.forEach((p,i)=>{
-    html+=`<option value="${i}">${p.name}</option>`;
-  });
-  
-  html+=`</select>
-      <button onclick="setForTodayPlan()" style="padding:10px 16px;background:var(--accent);border:none;color:white;border-radius:6px;font-weight:600;cursor:pointer;white-space:nowrap">Set for Today</button>
-    </div>
+
+  const tabStyle=on=>`flex:1;padding:10px 12px;border-radius:8px;border:1px solid ${on?"var(--accent)":"var(--line)"};background:${on?"var(--accent)":"var(--panel)"};color:${on?"#fff":"var(--ink2)"};font-weight:700;font-size:13px;cursor:pointer;transition:all .15s`;
+  html+=`<div style="display:flex;gap:8px">
+    <button onclick="setPlanMode('today')" style="${tabStyle(isToday)}">Today &middot; ${fmtDayLabel(todayKey())}</button>
+    <button onclick="setPlanMode('templates')" style="${tabStyle(!isToday)}">Templates</button>
   </div>`;
-  
-  const plan=planState.plans[planState.selectedPlanIdx];
-  
+
+  if(isToday){
+    const linked=(today&&today.planId)?(planState.plans.find(p=>p.id===today.planId)||null):null;
+    const badge=(today&&today.edited)
+      ? `<span style="margin-left:8px;padding:2px 7px;border-radius:999px;background:rgba(245,158,11,.18);border:1px solid var(--warn);color:var(--warn);font-size:10px;font-weight:800;text-transform:uppercase">Edited</span>`
+      : ``;
+    const canPush=(today&&today.edited&&linked);
+    html+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--ink)">${linked?"From template: "+escapeHtml(linked.name):"No template applied"}${badge}</div>
+      <div class="hint" style="margin-top:4px">Changes here affect today only. The template stays as it is.</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <select id="applyTplSelect" style="flex:1;min-width:130px;padding:9px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:13px">
+          ${planState.plans.map(p=>`<option value="${p.id}"${linked&&linked.id===p.id?" selected":""}>${escapeHtml(p.name)}</option>`).join("")}
+        </select>
+        <button class="btn sm pri" onclick="applyTemplateToToday(document.getElementById('applyTplSelect').value)">Apply to today</button>
+        ${canPush?`<button class="btn sm" onclick="saveTodayToTemplate()">Save to template</button>`:``}
+        ${canPush?`<button class="btn sm warn" onclick="resetTodayToTemplate()">Discard edits</button>`:``}
+      </div>
+    </div>`;
+  }else{
+    html+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px">
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Editing template</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select id="planSelect" style="flex:1;min-width:130px;padding:9px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:13px">
+          ${planState.plans.map((p,i)=>`<option value="${i}">${escapeHtml(p.name)}</option>`).join("")}
+        </select>
+        <button id="addPlanBtn" class="btn sm pri">+ New</button>
+        <button class="btn sm" onclick="renamePlan(${planState.selectedPlanIdx})">Rename</button>
+        <button class="btn sm warn deletePlanBtn" data-idx="${planState.selectedPlanIdx}">Delete</button>
+      </div>
+      <div class="hint" style="margin-top:8px">Changes here apply every time this template is used. Add as many as you like and name them whatever you want.</div>
+    </div>`;
+  }
+
+  const slotAttrs=slot=>`ondragover="event.preventDefault();event.dataTransfer.dropEffect='copy';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='1px'" ondragleave="this.style.outline=''" ondrop="this.style.outline='';planDrop(event,'${slot}')" onclick="openPlanSlotModal('${slot}')"`;
+
   if(isMobile){
-    // Mobile: 2-column grid
-    html+=`<div>
-      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Time Blocks</label>
+    html+=`<div><label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Time blocks</label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
-    
-    hours.forEach(({h,m,display})=>{
-      const slot=h+":"+(m===0?"00":m);
-      const chId=plan?.schedule?.[slot];
-      const ch=chId?state.channels.find(x=>x.id===chId):null;
-      
-      html+=`<button onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" 
-        style="padding:12px;background:${ch?ch.color+'33':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:6px;font-weight:600;font-size:12px;cursor:pointer;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;transition:all .15s">
-        <div style="font-size:10px;opacity:0.7">${display}</div>
-        <div style="font-weight:700;margin-top:2px">${ch?ch.label.substring(0,12):'—'}</div>
-      </button>`;
+    hours.forEach(o=>{
+      const slot=o.h+":"+(o.m===0?"00":o.m);
+      const ch=sched[slot]?(state.channels||[]).find(x=>x.id===sched[slot]):null;
+      html+=`<button ${slotAttrs(slot)} style="padding:12px;background:${ch?ch.color+"33":"var(--panel2)"};border:2px solid ${ch?ch.color:"var(--line)"};color:${ch?ch.color:"var(--ink2)"};border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s">
+        <div style="opacity:.75;font-size:10px">${o.display}</div>
+        <div style="margin-top:2px">${ch?escapeHtml(ch.label):"&mdash;"}</div></button>`;
     });
-    
     html+=`</div></div>`;
   }else{
-    // Desktop: table view
-    html+=`<div style="overflow-x:auto">
-      <div style="display:grid;grid-template-columns:80px 1fr 60px;gap:8px;min-width:400px">`;
-    
-    // Headers
-    html+=`<div style="font-size:11px;font-weight:600;color:var(--muted);padding:8px;text-align:center">Time</div>`;
-    html+=`<div style="font-size:11px;font-weight:600;color:var(--muted);padding:8px">Channel</div>`;
-    html+=`<div></div>`;
-    
-    hours.forEach(({h,m,display})=>{
-      const slot=h+":"+(m===0?"00":m);
-      const chId=plan?.schedule?.[slot];
-      const ch=chId?state.channels.find(x=>x.id===chId):null;
-      
-      html+=`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--ink2);padding:8px">${display}</div>`;
-      html+=`<div onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" 
-        style="padding:8px;background:${ch?ch.color+'22':'var(--panel2)'};border:1px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center">${ch?ch.label:'—'}</div>`;
-      html+=`<button onclick="clearPlanSlot(${planState.selectedPlanIdx},'${slot}')" style="background:none;border:1px solid var(--line);color:var(--muted);padding:4px 6px;border-radius:3px;cursor:pointer;font-size:9px;height:fit-content">✕</button>`;
+    html+=`<div style="overflow-x:auto"><div style="display:grid;grid-template-columns:80px 1fr 60px;gap:8px;min-width:400px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);padding:8px;text-align:center">Time</div>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);padding:8px">Channel</div><div></div>`;
+    hours.forEach(o=>{
+      const slot=o.h+":"+(o.m===0?"00":o.m);
+      const ch=sched[slot]?(state.channels||[]).find(x=>x.id===sched[slot]):null;
+      html+=`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--ink2);padding:8px">${o.display}</div>
+        <div ${slotAttrs(slot)} style="padding:8px;background:${ch?ch.color+"22":"var(--panel2)"};border:1px solid ${ch?ch.color:"var(--line)"};color:${ch?ch.color:"var(--ink2)"};border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center">${ch?escapeHtml(ch.label):"&mdash;"}</div>
+        <button onclick="clearPlanSlot('${slot}')" style="background:none;border:1px solid var(--line);color:var(--muted);padding:4px 6px;border-radius:3px;cursor:pointer;font-size:9px;height:fit-content">&#10005;</button>`;
     });
-    
     html+=`</div></div>`;
   }
-  
-  // Channels section
-  html+=`<div>
-    <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Channels (drag on desktop)</label>
+
+  html+=`<div><label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Channels &mdash; drag onto a slot, or tap a slot</label>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px">`;
-  
   (state.channels||[]).filter(c=>!c.archived&&!c.parentChannelId).forEach(ch=>{
-    html+=`<div draggable="true" data-ch-id="${ch.id}" 
-      style="padding:10px;background:${ch.color}33;border:1px solid ${ch.color};color:${ch.color};border-radius:6px;font-weight:600;font-size:11px;text-align:center;cursor:grab;transition:all .15s;user-select:none"
-      ondragstart="event.dataTransfer.effectAllowed='copy';event.dataTransfer.setData('text/plain',this.dataset.chId)">${ch.label}</div>`;
+    html+=`<div draggable="true" data-ch-id="${ch.id}" style="padding:10px;background:${ch.color}33;border:1px solid ${ch.color};color:${ch.color};border-radius:6px;font-weight:600;font-size:11px;text-align:center;cursor:grab;user-select:none;transition:all .15s" ondragstart="event.dataTransfer.effectAllowed='copy';event.dataTransfer.setData('text/plain',this.dataset.chId)">${escapeHtml(ch.label)}</div>`;
   });
-  
   html+=`</div></div></div>`;
-  
+
   stage.innerHTML=html;
-  
-  // Setup plan select listener
+
   const planSelect=document.getElementById("planSelect");
   if(planSelect){
     planSelect.value=planState.selectedPlanIdx;
@@ -1650,63 +2156,50 @@ let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selected
   }
 }
 
-function openPlanSlotModal(planIdx,slot){
-  const plan=planState.plans[planIdx];
-  if(!plan)return;
-  
+async function planDrop(e,slot){
+  e.preventDefault();
+  const chId=e.dataTransfer.getData("text/plain");
+  if(!chId) return;
+  await setPlanSlot(slot,chId);
+  const ch=(state.channels||[]).find(c=>c.id===chId);
+  toast(ch?("Planned "+ch.label):"Planned");
+}
+async function clearPlanSlot(slot){ await setPlanSlot(slot,null); }
+
+function openPlanSlotModal(slot){
   const modal=document.createElement("div");
   modal.className="scrim";
   modal.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.66);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px";
-  
   const card=document.createElement("div");
-  card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:320px;width:100%";
-  
+  card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:320px;width:100%;max-height:80vh;overflow-y:auto";
   const header=document.createElement("div");
-  header.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px";
-  header.innerHTML=`<h3 style="margin:0;font-size:16px">${slot}</h3><button onclick="this.closest('.scrim').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">✕</button>`;
+  header.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px";
+  header.innerHTML=`<h3 style="margin:0;font-size:16px">${slot}</h3><button class="planModalX" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">&#10005;</button>`;
   card.appendChild(header);
-  
+  const sub=document.createElement("div");
+  sub.className="hint"; sub.style.margin="0 0 14px";
+  sub.textContent=planState.mode==="today"?"Applies to today only":"Applies to the template";
+  card.appendChild(sub);
   const options=document.createElement("div");
   options.style.cssText="display:flex;flex-direction:column;gap:8px;margin-bottom:16px";
-  
   (state.channels||[]).filter(c=>!c.archived&&!c.parentChannelId).forEach(ch=>{
     const btn=document.createElement("button");
-    btn.style.cssText=`padding:12px;background:${ch.color}33;border:1px solid ${ch.color};color:${ch.color};border-radius:6px;font-weight:600;cursor:pointer;transition:all .15s`;
+    btn.style.cssText="padding:12px;background:"+ch.color+"33;border:1px solid "+ch.color+";color:"+ch.color+";border-radius:6px;font-weight:600;cursor:pointer;transition:all .15s";
     btn.textContent=ch.label;
-    btn.onclick=async ()=>{
-      plan.schedule[slot]=ch.id;
-      await saveLocal("plans",plan);
-      modal.remove();
-      renderPlanPageUI();
-    };
+    btn.onclick=async()=>{ modal.remove(); await setPlanSlot(slot,ch.id); };
     options.appendChild(btn);
   });
-  
   card.appendChild(options);
-  
   const clearBtn=document.createElement("button");
   clearBtn.style.cssText="width:100%;padding:10px;background:rgba(240,68,68,.15);border:1px solid rgba(240,68,68,.5);color:#f87171;border-radius:6px;font-weight:600;cursor:pointer";
-  clearBtn.textContent="Clear Slot";
-  clearBtn.onclick=async ()=>{
-    delete plan.schedule[slot];
-    await saveLocal("plans",plan);
-    modal.remove();
-    renderPlanPageUI();
-  };
+  clearBtn.textContent="Clear slot";
+  clearBtn.onclick=async()=>{ modal.remove(); await setPlanSlot(slot,null); };
   card.appendChild(clearBtn);
-  
   modal.appendChild(card);
-  modal.onclick=e=>{if(e.target===modal)modal.remove();};
-  
+  const x=header.querySelector(".planModalX");
+  if(x) x.onclick=()=>modal.remove();
+  modal.onclick=e=>{ if(e.target===modal) modal.remove(); };
   document.body.appendChild(modal);
-}
-
-function clearPlanSlot(planIdx,slot){
-  const plan=planState.plans[planIdx];
-  if(!plan)return;
-  delete plan.schedule[slot];
-  saveLocal("plans",plan);
-  renderPlanPageUI();
 }
 
 function renderPlanSelect(){
@@ -1722,44 +2215,168 @@ function renderPlanSelect(){
   });
   planSelect.value=curVal;
 }
-function renderPlanSelect(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const curVal=planSelect.value;planSelect.innerHTML="";planState.plans.forEach((p,i)=>{const opt=document.createElement("option");opt.value=i;opt.textContent=p.name;planSelect.appendChild(opt);});planSelect.value=curVal;}async function setForTodayPlan(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const idx=parseInt(planSelect.value);if(idx<0||!planState.plans[idx])return;const plan=planState.plans[idx];planState.selectedPlanIdx=idx;const dayKey=todayKey();await saveLocal("selected_plan",{date:dayKey,profileId:state.profileId,planId:plan.id});toast("Plan '"+plan.name+"' set for today");}async function addPlan(){const newPlan={id:uid(),profileId:state.profileId,name:"New Plan",schedule:{},order:planState.plans.length};await saveLocal("plans",newPlan);planState.plans.push(newPlan);await renderPlanPageUI();toast("Plan added");}async function deletePlan(idx){if(planState.plans.length<=1){toast("Cannot delete the last plan");return;}const plan=planState.plans[idx];await db.transaction(["plans"],"readwrite").objectStore("plans").delete(plan.id);planState.plans.splice(idx,1);if(planState.selectedPlanIdx>=planState.plans.length)planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Plan deleted");}
+function renderPlanSelect(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const curVal=planSelect.value;planSelect.innerHTML="";planState.plans.forEach((p,i)=>{const opt=document.createElement("option");opt.value=i;opt.textContent=p.name;planSelect.appendChild(opt);});planSelect.value=curVal;}async function setForTodayPlan(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const idx=parseInt(planSelect.value);if(idx<0||!planState.plans[idx])return;const plan=planState.plans[idx];planState.selectedPlanIdx=idx;const dayKey=todayKey();await saveLocal("selected_plan",{date:dayKey,profileId:state.profileId,planId:plan.id});toast("Plan '"+plan.name+"' set for today");}async function addPlan(){const newPlan={id:uid(),profileId:state.profileId,name:"New Template",schedule:{},order:planState.plans.length};await saveLocal("plans",newPlan);planState.plans.push(newPlan);planState.mode="templates";planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Template added - use Rename to name it");}async function deletePlan(idx){if(planState.plans.length<=1){toast("Cannot delete the last plan");return;}const plan=planState.plans[idx];await db.transaction(["plans"],"readwrite").objectStore("plans").delete(plan.id);planState.plans.splice(idx,1);if(planState.selectedPlanIdx>=planState.plans.length)planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Plan deleted");}
 function renderPlanSlots(){const times=document.getElementById("planSlots");const schedules=document.getElementById("planSchedule");let timesHtml='';let schedHtml='';for(let h=planState.startHour;h<planState.endHour;h++){for(let m=0;m<60;m+=planState.increment){const slot=h+':'+(m===0?'00':m);const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+planState.increment>=60?h+1:h)%12||12;const endMin=String((m+planState.increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;const scheduled=planState.schedule[slot];const ch=scheduled?state.channels.find(x=>x.id===scheduled):null;timesHtml+=`<div style="padding:8px 4px;text-align:center;font-size:11px;font-weight:600;color:var(--ink2);flex-shrink:0;border-bottom:1px solid var(--line)">${timeStr}</div>`;schedHtml+=`<div class="time-block-target" data-slot="${slot}" style="padding:8px;min-height:42px;background:${ch?ch.color+'15':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};border-radius:6px;display:flex;align-items:center;justify-content:center;text-align:center;color:${ch?ch.color:'var(--ink2)'};font-size:11px;font-weight:${ch?'700':'500'};cursor:move;flex-shrink:0;transition:all .15s;word-break:break-word">${ch?ch.label:''}</div>`;}}times.innerHTML=timesHtml;schedules.innerHTML=schedHtml;}
 function renderPlanChannels(){const ch=document.getElementById("planChannels");let html='';if(state.channels){state.channels.filter(c=>!c.archived).forEach(c=>{html+=`<div draggable="true" data-ch="${c.id}" style="padding:6px 4px;border:2px solid ${c.color};background:${c.color}15;color:${c.color};border-radius:5px;cursor:move;font-weight:700;font-size:11px;text-align:center;flex-shrink:0;transition:all .15s;word-break:break-word">${escapeHtml(c.label)}</div>`;});}ch.innerHTML=html;ch.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',el.dataset.ch);});el.addEventListener('dragend',e=>{el.style.opacity='1';});});}
-async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();const selPlan=await idbGet("selected_plan",dayKey);let plan=null;if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId);}const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",openEditsModal);}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;flex-wrap:wrap;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;min-height:36px;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
-  
-  // Calculate and display daily score
-  (async ()=>{
-    let totalSlots=0,matchCount=0;
-    // Count slots from plan
-    if(plan){
-      for(let h=planState.startHour;h<planState.endHour;h++){
-        for(let m=0;m<60;m+=planState.increment){
-          const slot=h+':'+String(m).padStart(2,'0');
-          if(plan.schedule&&plan.schedule[slot]){totalSlots++;}
-        }
-      }
+async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",openEditsModal);}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}/* ===== daily scoring =====
+   Two independent measures, because they answer different questions:
+
+     Timing  - did you do the planned channel in the planned block.
+               Sensitive to WHEN. Saved as day_notes.matchScore with its
+               original {matches,total} shape, so every summary view keeps
+               working unchanged.
+
+     Budget  - did you spend the planned AMOUNT on each channel that day,
+               whenever you did it. Per-channel credit is capped at what
+               was planned, so overdoing one channel cannot mask skipping
+               another.
+
+   Both count only blocks that have already elapsed, so an in-progress day
+   is not scored against hours that have not happened. A finished day has
+   every block elapsed, so historical numbers are unaffected.
+
+   Kept as a pure function because both the Tracker and the Summary need
+   the same answer. day_notes is only written when something recomputes;
+   without the Summary refreshing today on open, it would keep showing
+   whatever snapshot the Tracker last wrote. */
+function computeDayScores(plan,dateKey,sessions){
+  const startHour=planState.startHour||8, endHour=planState.endHour||18, increment=planState.increment||30;
+  const slotMs=increment*60000;
+  const parts=String(dateKey).split("-").map(Number);
+  const dayStartMs=new Date(parts[0],parts[1]-1,parts[2]).getTime();
+  const nowMs=now();
+  const dayList=(sessions||[]).filter(s=>s.date===dateKey);
+  const rollup=chId=>{ const c=(state.channels||[]).find(x=>x.id===chId); return (c&&c.parentChannelId)||chId; };
+
+  const plannedByCh={}, actualByCh={};
+  let plannedSlotsElapsed=0, matchedSlots=0;
+  for(let h=startHour;h<endHour;h++){
+    for(let m=0;m<60;m+=increment){
+      const slot=h+":"+String(m).padStart(2,"0");
+      const chId=plan&&plan.schedule?plan.schedule[slot]:null;
+      if(!chId) continue;
+      const blockStart=dayStartMs+(h*60+m)*60000, blockEnd=blockStart+slotMs;
+      if(blockEnd>nowMs) continue;
+      plannedSlotsElapsed++;
+      const id=rollup(chId);
+      plannedByCh[id]=(plannedByCh[id]||0)+slotMs;
+      const hit=dayList.some(s=>{
+        const st=parseInt(s.startTs||0), et=parseInt(s.endTs||s.startTs||0);
+        return rollup(s.channelId)===id && st<blockEnd && et>blockStart;
+      });
+      if(hit) matchedSlots++;
     }
-    // Count matches from matchHtml
-    const matchDivs=document.getElementById("adhMatch").querySelectorAll("div");
-    matchDivs.forEach(div=>{if(div.textContent.includes("✓")){matchCount++;}});
-    
-    // Display footer
+  }
+  dayList.forEach(s=>{
+    const dur=s.endTs?(s.durMs||(s.endTs-s.startTs)):(nowMs-s.startTs);
+    if(!(dur>0)) return;
+    const id=rollup(s.channelId);
+    actualByCh[id]=(actualByCh[id]||0)+dur;
+  });
+
+  let creditedMs=0, plannedTotalMs=0, unplannedMs=0;
+  const rows=[];
+  Object.keys(plannedByCh).forEach(id=>{
+    const p=plannedByCh[id], a=actualByCh[id]||0;
+    plannedTotalMs+=p; creditedMs+=Math.min(p,a);
+    const ch=(state.channels||[]).find(x=>x.id===id);
+    rows.push({id:id,label:ch?ch.label:"(deleted channel)",color:ch?ch.color:"var(--muted)",planned:p,actual:a,pct:p?Math.round(Math.min(p,a)/p*100):0});
+  });
+  Object.keys(actualByCh).forEach(id=>{ if(!plannedByCh[id]) unplannedMs+=actualByCh[id]; });
+  rows.sort((a,b)=>b.planned-a.planned);
+
+  return { matchedSlots:matchedSlots, plannedSlotsElapsed:plannedSlotsElapsed,
+           creditedMs:creditedMs, plannedTotalMs:plannedTotalMs, unplannedMs:unplannedMs, rows:rows,
+           timingPct: plannedSlotsElapsed?Math.round(matchedSlots/plannedSlotsElapsed*100):null,
+           budgetPct: plannedTotalMs?Math.round(creditedMs/plannedTotalMs*100):null };
+}
+async function persistDayScores(dateKey,s){
+  const existing=await idbGet("day_notes",dateKey)||{date:dateKey,profileId:state.profileId};
+  existing.matchScore={matches:s.matchedSlots,total:s.plannedSlotsElapsed};
+  existing.budgetScore={credited:s.creditedMs,planned:s.plannedTotalMs,pct:s.budgetPct,unplanned:s.unplannedMs};
+  await saveLocal("day_notes",existing);
+}
+/* Resolve today's effective plan the same way the Tracker does: the
+   materialised day first, falling back to the older selected_plan pointer. */
+async function todaysEffectivePlan(dateKey){
+  const dayRec=await idbGet("dayplans",state.profileId+"|"+dateKey);
+  if(dayRec&&dayRec.schedule) return {name:dayRec.planName||"Today",schedule:dayRec.schedule};
+  const sel=await idbGet("selected_plan",dateKey);
+  if(sel&&sel.planId&&sel.profileId===state.profileId){
+    const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));
+    return plans.find(p=>p.id===sel.planId)||null;
+  }
+  return null;
+}
+async function refreshTodayScores(){
+  try{
+    if(!db||!state.profileId) return;
+    const dateKey=todayKey();
+    const plan=await todaysEffectivePlan(dateKey);
+    if(!plan) return;
+    const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
+    await persistDayScores(dateKey,computeDayScores(plan,dateKey,sessions));
+  }catch(e){ console.warn("refreshTodayScores failed",e); }
+}
+
+async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;flex-wrap:wrap;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;min-height:36px;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
+  
+  (async ()=>{
+    const S=computeDayScores(plan,today,todaySessions);
+    const rows=S.rows, unplannedMs=S.unplannedMs;
+    const timingPct=S.timingPct, budgetPct=S.budgetPct;
+    const tone=pct=>pct>=80?'var(--good)':pct>=50?'var(--warn)':'var(--bad)';
+
     const footer=document.getElementById("trackerFooter");
     if(footer){
-      if(totalSlots===0){
-        footer.textContent="No planned sessions";
+      if(!S.plannedSlotsElapsed){
+        footer.innerHTML='<div style="color:var(--ink2);font-weight:600">Nothing planned has elapsed yet today</div>';
       }else{
-        const pct=Math.round((matchCount/totalSlots)*100);
-        const color=pct>=80?'var(--good)':pct>=50?'var(--warn)':'var(--bad)';
-        footer.innerHTML=`<div style="color:${color}">${matchCount} / ${totalSlots} matched</div><div style="font-size:12px;color:var(--ink2);">${pct}%</div>`;
+        let h='<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:stretch">';
+        h+='<div style="flex:1;min-width:150px;background:var(--panel);border:1px solid '+tone(timingPct)+';border-radius:10px;padding:10px">'+
+             '<div style="font-size:10px;font-weight:800;letter-spacing:.6px;color:var(--muted);text-transform:uppercase">Timing</div>'+
+             '<div style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><div style="font-size:20px;font-weight:800;color:'+tone(timingPct)+'">'+timingPct+'%</div>'+
+             '<div style="font-size:11px;color:var(--ink2)">'+S.matchedSlots+' / '+S.plannedSlotsElapsed+' blocks</div></div>'+
+             '<div style="font-size:10px;color:var(--muted);margin-top:2px">right channel, right block</div></div>';
+        h+='<div style="flex:1;min-width:150px;background:var(--panel);border:1px solid '+tone(budgetPct)+';border-radius:10px;padding:10px">'+
+             '<div style="font-size:10px;font-weight:800;letter-spacing:.6px;color:var(--muted);text-transform:uppercase">Budget</div>'+
+             '<div style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><div style="font-size:20px;font-weight:800;color:'+tone(budgetPct)+'">'+budgetPct+'%</div>'+
+             '<div style="font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap">'+fmtHM(S.creditedMs)+'/'+fmtHM(S.plannedTotalMs)+'</div></div>'+
+             '<div style="font-size:10px;color:var(--muted);margin-top:2px">planned amount, any time</div></div>';
+        h+='</div>';
+
+        if(rows.length){
+          const cols='grid-template-columns:12px minmax(0,1fr) 62px 62px 44px;gap:8px;align-items:center';
+          h+='<div style="margin-top:12px;text-align:left;display:grid;'+cols+'">';
+          const head='font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding-bottom:2px';
+          h+='<div></div>'+
+             '<div style="'+head+'">Channel</div>'+
+             '<div style="'+head+';text-align:right">Planned</div>'+
+             '<div style="'+head+';text-align:right">Actual</div>'+
+             '<div style="'+head+';text-align:right">Met</div>';
+          const cell='font-size:11px;padding:5px 0;border-top:1px solid var(--line)';
+          const num=cell+';text-align:right;font-variant-numeric:tabular-nums;color:var(--ink2)';
+          rows.forEach(r=>{
+            const pill=r.pct>=100?'var(--good)':r.pct>=60?'var(--warn)':'var(--bad)';
+            h+='<div style="'+cell+';display:flex;align-items:center"><span style="width:10px;height:10px;border-radius:3px;background:'+r.color+'"></span></div>'+
+               '<div style="'+cell+';min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)">'+escapeHtml(r.label)+'</div>'+
+               '<div style="'+num+'">'+fmtHM(r.planned)+'</div>'+
+               '<div style="'+num+'">'+fmtHM(r.actual)+'</div>'+
+               '<div style="'+num+';font-weight:800;color:'+pill+'">'+r.pct+'%</div>';
+          });
+          if(unplannedMs>0){
+            h+='<div style="'+cell+';display:flex;align-items:center;opacity:.75"><span style="width:10px;height:10px;border-radius:3px;background:var(--muted)"></span></div>'+
+               '<div style="'+cell+';color:var(--ink2);opacity:.85;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Unplanned</div>'+
+               '<div style="'+num+';opacity:.6">&mdash;</div>'+
+               '<div style="'+num+';opacity:.85">'+fmtHM(unplannedMs)+'</div>'+
+               '<div style="'+num+';opacity:.6">&mdash;</div>';
+          }
+          h+='</div>';
+        }
+        footer.innerHTML=h;
       }
     }
-    
-    // Save to day_notes
-    const dayKey=today;
-    const existing=await idbGet("day_notes",dayKey)||{date:dayKey,profileId:state.profileId};
-    existing.matchScore={matches:matchCount,total:totalSlots};
-    await saveLocal("day_notes",existing);
+    await persistDayScores(today,S);
   })();}
 
 /* ===== CSV ===== */
@@ -1841,7 +2458,7 @@ async function checkDeletedDaysCount(){
 }
 
 async function restoreDeletedDays(){
-  if(!confirm("Restore all deleted days to your history?"))return;
+  if(!await uiConfirm("Restore all deleted days to your history?"))return;
   const allNotes=await idbAll("day_notes","profile",IDBKeyRange.only(state.profileId));
   const deletedNotes=allNotes.filter(n=>n.deleted);
   for(const note of deletedNotes){
@@ -1853,9 +2470,9 @@ async function restoreDeletedDays(){
 }
 
 async function showDeleteRangePrompt(){
-  const startDateStr=prompt("Delete from (YYYY-MM-DD):");
+  const startDateStr=await uiPrompt("Delete from (YYYY-MM-DD):");
   if(!startDateStr)return;
-  const endDateStr=prompt("Delete to (YYYY-MM-DD):");
+  const endDateStr=await uiPrompt("Delete to (YYYY-MM-DD):");
   if(!endDateStr)return;
   
   const startDate=new Date(startDateStr);
@@ -1881,7 +2498,7 @@ async function showDeleteRangePrompt(){
     }
   }
   
-  if(!confirm("This will soft-delete "+deleteCount+" day(s). You can restore them later. Continue?"))return;
+  if(!await uiConfirm("This will soft-delete "+deleteCount+" day(s). You can restore them later. Continue?"))return;
   
   for(const note of allNotes){
     const noteDate=new Date(note.dateKey.replace(/(\d{4})-(\d{2})-(\d{2})/,"$1/$2/$3"));
@@ -1896,13 +2513,13 @@ async function showDeleteRangePrompt(){
 }
 
 async function showCompleteResetConfirm(){
-  const step1=confirm("⚠️ WARNING: You are about to delete ALL your data.\n\nClick OK to go to step 2.");
+  const step1=await uiConfirm("⚠️ WARNING: You are about to delete ALL your data.\n\nClick OK to go to step 2.");
   if(!step1)return;
   
-  const step2=confirm("This will delete:\n- All sessions\n- All ratings and notes\n- All settings\n\nThis CANNOT be undone. Are you absolutely sure?");
+  const step2=await uiConfirm("This will delete:\n- All sessions\n- All ratings and notes\n- All settings\n\nThis CANNOT be undone. Are you absolutely sure?");
   if(!step2)return;
   
-  const step3=prompt("Type 'RESET ALL' to confirm permanent deletion:");
+  const step3=await uiPrompt("Type 'RESET ALL' to confirm permanent deletion:");
   if(step3!=="RESET ALL")return;
   
   toast("Resetting your data...");
@@ -2027,7 +2644,7 @@ async function renderDashboard(){const body=document.getElementById("dashBody");
     const dayAdherence={};
     const dayRatings={};
     const dayNotes={};
-    for(const k of dayKeys){const n=await idbGet("day_notes",k);if(n&&n.matchScore){dayAdherence[k]=n.matchScore;}if(n&&n.rating){dayRatings[k]=n.rating;}if(n&&n.notes){dayNotes[k]=n.notes;}}
+    for(const k of dayKeys){const n=await idbGet("day_notes",k);if(n&&n.matchScore){dayAdherence[k]=Object.assign({},n.matchScore,{budgetPct:n.budgetScore?n.budgetScore.pct:undefined});}if(n&&n.rating){dayRatings[k]=n.rating;}if(n&&n.notes){dayNotes[k]=n.notes;}}
     const totalAdherence=Object.values(dayAdherence).reduce((a,x)=>({matches:(a.matches||0)+x.matches,total:(a.total||0)+x.total}),{matches:0,total:0});
     const weekAdhScore=totalAdherence.total>0?Math.round(totalAdherence.matches/totalAdherence.total*100):0;
     html+=`<div class="card"><h3>Daily trend & Adherence</h3><div class="sub">Tracked time per day with daily adherence scores and ratings</div>${dailyTrendChart(dayKeys,byDay,dayAdherence,dayRatings,dayNotes)}<div style="margin-top:12px;padding:12px;background:var(--panel);border-radius:6px;border-left:3px solid var(--accent)"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Adherence Score</div><div style="font-size:24px;font-weight:800;color:${weekAdhScore>=80?"var(--good)":weekAdhScore>=50?"var(--warn)":"var(--bad)"}">${totalAdherence.matches}/${totalAdherence.total} matched (${weekAdhScore}%)</div></div></div>`;
@@ -2060,7 +2677,7 @@ function dailyTrendChart(dayKeys,byDay,byAdherence,byRating,byNotes){
       </div>
       <div style="font-size:20px;color:#fbbf24;margin-bottom:8px">${starStr}</div>
       ${notes?`<div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-style:italic">"${escapeHtml(notes)}"</div>`:""}
-      <div style="font-size:12px;color:${adhColor};font-weight:700">Adherence: ${adhStr} (${adhPct}%)</div>
+      <div style="font-size:12px">${adhCellHtml(adh,adh&&adh.budgetPct)}</div>
     </div>`;
   });
   html+='</div>';
@@ -2069,20 +2686,137 @@ function dailyTrendChart(dayKeys,byDay,byAdherence,byRating,byNotes){
 function hourChart(byHour){const w=720,h=170,pad=26;const max=Math.max(...byHour,1);const bw=(w-pad*2)/24-3;let bars="",labels="";byHour.forEach((v,hh)=>{const x=pad+hh*((w-pad*2)/24);const bh=(h-pad*2)*(v/max);const y=h-pad-bh;const peak=v===max&&v>0;bars+=`<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="3" fill="${peak?'#22c55e':'var(--accent)'}"><title>${hourLabel(hh)}: ${fmtDurShort(v)}</title></rect>`;if(hh%3===0)labels+=`<text x="${x+bw/2}" y="${h-8}" text-anchor="middle">${hourLabel(hh)}</text>`;});return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">${bars}${labels}<line x1="${pad-6}" y1="${h-pad}" x2="${w-pad+6}" y2="${h-pad}" stroke="var(--line)"/></svg>`;}
 
 /* ===== auth ===== */
-document.getElementById("loginBtn").addEventListener("click",doLogin);
-document.getElementById("loginPass").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin();});
-async function doLogin(){const email=document.getElementById("loginEmail").value.trim();const pass=document.getElementById("loginPass").value;const err=document.getElementById("loginErr");err.textContent="";
-  if(!email||!pass){err.textContent="Enter your email and password.";return;}
-  document.getElementById("loginBtn").textContent="Signing in…";
-  const {data,error}=await SB.auth.signInWithPassword({email,password:pass});
-  document.getElementById("loginBtn").textContent="Sign in";
-  if(error){err.textContent=error.message;return;}
-  window._acctEmail=data.user.email; await enterApp();}
-document.getElementById("signOutBtn").addEventListener("click",async()=>{await SB.auth.signOut();location.reload();});
+/* Modes: signin | signup | reset | newpass */
+let authMode="signin";
+const AUTH_UI={
+  signin :{sub:"Sign in to sync your time across every device.",btn:"Sign in",        passLabel:"Password",    email:true, pass:true, pass2:false,forgot:"Forgot password?",mode:"Create account"},
+  signup :{sub:"Create an account to start tracking your time.",btn:"Create account", passLabel:"Password",    email:true, pass:true, pass2:true, forgot:"",                mode:"Back to sign in"},
+  reset  :{sub:"Enter your email and we will send you a reset link.",btn:"Send reset link",passLabel:"Password",email:true, pass:false,pass2:false,forgot:"",                mode:"Back to sign in"},
+  newpass:{sub:"Choose a new password for your account.",       btn:"Update password",passLabel:"New password",email:false,pass:true, pass2:true, forgot:"",                mode:""}
+};
+function setAuthMode(m){
+  authMode=m; const u=AUTH_UI[m]; if(!u) return;
+  const show=(id,on)=>{const el=document.getElementById(id); if(el) el.style.display=on?"":"none";};
+  document.getElementById("authSub").textContent=u.sub;
+  document.getElementById("loginBtn").textContent=u.btn;
+  document.getElementById("loginBtn").disabled=false;
+  document.getElementById("passLabel").textContent=u.passLabel;
+  show("emailWrap",u.email); show("passWrap",u.pass); show("pass2Wrap",u.pass2);
+  const fl=document.getElementById("forgotLink"); fl.textContent=u.forgot; show("forgotLink",!!u.forgot);
+  const ml=document.getElementById("modeLink");   ml.textContent=u.mode;   show("modeLink",!!u.mode);
+  document.getElementById("loginErr").textContent="";
+  document.getElementById("loginOk").textContent="";
+  document.getElementById("loginPass").setAttribute("autocomplete",m==="signin"?"current-password":"new-password");
+  if(!u.pass)  document.getElementById("loginPass").value="";
+  if(!u.pass2) document.getElementById("loginPass2").value="";
+}
+document.getElementById("loginBtn").addEventListener("click",doAuth);
+["loginEmail","loginPass","loginPass2"].forEach(id=>{
+  document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();doAuth();}});
+});
+document.getElementById("forgotLink").addEventListener("click",e=>{e.preventDefault();setAuthMode("reset");});
+document.getElementById("modeLink").addEventListener("click",e=>{e.preventDefault();setAuthMode(authMode==="signin"?"signup":"signin");});
+
+let appEntered=false;
+async function enterAppSafe(email){
+  if(appEntered) return;
+  appEntered=true;
+  if(email) window._acctEmail=email;
+  await enterApp();
+}
+async function doAuth(){
+  const btn=document.getElementById("loginBtn");
+  const err=document.getElementById("loginErr"), ok=document.getElementById("loginOk");
+  const email=document.getElementById("loginEmail").value.trim();
+  const pass=document.getElementById("loginPass").value;
+  const pass2=document.getElementById("loginPass2").value;
+  const restore=AUTH_UI[authMode].btn;
+  err.textContent=""; ok.textContent="";
+  const fail=m=>{err.textContent=m; btn.textContent=restore; btn.disabled=false;};
+  if(btn.disabled) return;
+  btn.disabled=true;
+  try{
+    if(authMode==="signin"){
+      if(!email||!pass) return fail("Enter your email and password.");
+      btn.textContent="Signing in…";
+      const {data,error}=await SB.auth.signInWithPassword({email,password:pass});
+      if(error) return fail(error.message);
+      await enterAppSafe(data.user.email); return;
+    }
+    if(authMode==="signup"){
+      if(!email) return fail("Enter your email.");
+      if(pass.length<6) return fail("Password must be at least 6 characters.");
+      if(pass!==pass2) return fail("Those passwords do not match.");
+      btn.textContent="Creating account…";
+      const {data,error}=await SB.auth.signUp({email,password:pass,options:{emailRedirectTo:location.origin}});
+      if(error) return fail(error.message);
+      if(data&&data.session){ await enterAppSafe(data.user.email); return; }
+      ok.textContent="Account created. Check "+email+" for a confirmation link, then sign in.";
+      btn.textContent=restore; btn.disabled=false; return;
+    }
+    if(authMode==="reset"){
+      if(!email) return fail("Enter your email.");
+      btn.textContent="Sending…";
+      const {error}=await SB.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
+      if(error) return fail(error.message);
+      ok.textContent="If an account exists for "+email+", a reset link is on its way.";
+      btn.textContent=restore; btn.disabled=false; return;
+    }
+    if(authMode==="newpass"){
+      if(pass.length<6) return fail("Password must be at least 6 characters.");
+      if(pass!==pass2) return fail("Those passwords do not match.");
+      btn.textContent="Updating…";
+      const {error}=await SB.auth.updateUser({password:pass});
+      if(error) return fail(error.message);
+      history.replaceState(null,"",location.pathname+location.search);
+      const {data}=await SB.auth.getSession();
+      if(data&&data.session){ await enterAppSafe(data.session.user.email); return; }
+      ok.textContent="Password updated. Sign in with your new password.";
+      btn.disabled=false; setTimeout(()=>setAuthMode("signin"),1400); return;
+    }
+  }catch(ex){ return fail((ex&&ex.message)||"Something went wrong. Please try again."); }
+}
+function doLogin(){ return doAuth(); } /* back-compat alias (function decl so window.doLogin resolves) */
+
+/* Local IndexedDB is shared per-browser, so clear it when the account changes. */
+function idbClear(s){return new Promise((res,rej)=>{
+  try{ const r=tx(s).clear(); r.onsuccess=()=>res(true); r.onerror=()=>rej(new Error("idbClear error on "+s)); }
+  catch(e){ rej(e); }
+});}
+async function wipeLocalData(){
+  const names=["profiles","channels","sessions","plans","dayplans","meta","selected_plan","day_notes"];
+  for(const n of names){ try{ await idbClear(n); }catch(e){ console.warn("wipeLocalData:",n,e); } }
+}
+async function doSignOut(){
+  if(!await uiConfirm("Sign out of this account?")) return;
+  /* Sign-out clears local data, so push anything unsynced first. */
+  try{
+    if(navigator.onLine){ await runSync(); }
+    const dirty=await dirtyRecords();
+    if(dirty.length){
+      const msg="Warning: "+dirty.length+" change(s) have not synced to the cloud yet.\n\nSigning out clears local data and those changes will be lost. Sign out anyway?";
+      if(!await uiConfirm(msg)) return;
+    }
+  }catch(e){ console.warn("pre-sign-out sync check failed",e); }
+  try{ await wipeLocalData(); }catch(e){ console.warn("sign-out wipe failed",e); }
+  await SB.auth.signOut(); location.reload();
+}
+/* Legacy Settings button is gone (sign out now lives in the avatar menu); stay null-safe. */
+const _signOutBtn=document.getElementById("signOutBtn");
+if(_signOutBtn) _signOutBtn.addEventListener("click",doSignOut);
 
 async function enterApp(){
   document.getElementById("loginGate").style.display="none";
   document.getElementById("appRoot").style.display="flex";
+  try{
+    const who=(window._acctEmail||"").toLowerCase();
+    const prev=await idbGet("meta","acctUser");
+    if(who&&prev&&prev.v&&prev.v!==who){
+      console.log("enterApp: account changed",prev.v,"->",who,"- clearing local data");
+      await wipeLocalData();
+    }
+    if(who) await idbPut("meta",{k:"acctUser",v:who});
+  }catch(e){ console.warn("enterApp: account scope check failed",e); }
   await seedIfEmpty();
   const last=await idbGet("meta","lastProfile"); const profs=await idbAll("profiles");
   const pid=(last&&profs.find(p=>p.id===last.v))?last.v:(profs[0]&&profs[0].id);
@@ -2097,10 +2831,31 @@ setInterval(()=>{ if(navigator.onLine) runSync(); },15000); // periodic push+pul
 document.addEventListener("visibilitychange",()=>{if(!document.hidden){renderGrid();updateStatus();if(navigator.onLine)runSync();}});
 
 /* ===== boot ===== */
+function hashParam(h,k){
+  const parts=String(h||"").replace("#","").split("&");
+  for(const p of parts){ const i=p.indexOf("="); if(i>0&&p.slice(0,i)===k) return decodeURIComponent(p.slice(i+1).split("+").join(" ")); }
+  return "";
+}
 (async function(){ await openDB();
+  const gate=document.getElementById("loginGate");
+  const hash=location.hash||"";
+  SB.auth.onAuthStateChange((ev,session)=>{
+    if(ev==="PASSWORD_RECOVERY"){ gate.style.display="flex"; setAuthMode("newpass"); return; }
+    /* getSession() can transiently return null while a token refresh is in flight.
+       If a valid session shows up afterwards, enter the app instead of stranding
+       the user on the login screen. */
+    if(session&&!appEntered&&authMode!=="newpass"){ enterAppSafe(session.user.email); }
+  });
+  if(hashParam(hash,"error")||hashParam(hash,"error_code")){
+    gate.style.display="flex"; setAuthMode("signin");
+    document.getElementById("loginErr").textContent=hashParam(hash,"error_description")||"That link is invalid or has expired. Please request a new one.";
+    history.replaceState(null,"",location.pathname+location.search);
+    return;
+  }
+  if(hashParam(hash,"type")==="recovery"){ gate.style.display="flex"; setAuthMode("newpass"); return; }
   const {data}=await SB.auth.getSession();
-  if(data&&data.session){ window._acctEmail=data.session.user.email; await enterApp(); }
-  else { document.getElementById("loginGate").style.display="flex"; }
+  if(data&&data.session){ await enterAppSafe(data.session.user.email); }
+  else { gate.style.display="flex"; setAuthMode("signin"); }
 })();
 </script>
 </body>
