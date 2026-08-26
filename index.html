@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Time Tracker">
@@ -21,7 +21,8 @@
     --tile-min: 210px;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-  html,body{margin:0;height:100%}
+  html,html{-webkit-text-size-adjust:100%; text-size-adjust:100%}
+  body{margin:0;height:100%; font-size:16px}
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     background:radial-gradient(1200px 800px at 70% -10%,#16233c 0%,var(--bg) 55%);
@@ -104,6 +105,17 @@
     .row.chan .act-up,.row.chan .act-down{padding:9px 16px; font-size:15px; min-width:44px}
     .row.chan .act-edit,.row.chan .act-add{padding:9px 14px; font-size:13px}
     .row.chan .swatch{width:26px;height:26px}
+    /* Tracker breakdown is built with inline styles, so its type is raised
+       here rather than by editing every generated string. Value columns
+       widen to match so the columns stay aligned. */
+    #trackerFooter .tf-row{font-size:12px !important}
+    #trackerFooter .tf-head{font-size:10px !important}
+    #trackerFooter .tf-grid{grid-template-columns:12px minmax(0,1fr) 70px 70px 48px !important}
+    /* Plan page is inline-styled too. Selects go to 16px so iOS does not zoom
+       on focus; [ondrop] targets the time-block slots without needing a class. */
+    .stage label{font-size:13px !important}
+    .stage select{font-size:16px !important}
+    .stage [ondrop]{font-size:12px !important}
   }
   .swatch{width:34px;height:34px;border-radius:9px; flex:none; border:2px solid rgba(255,255,255,.25)}
   input,select{font-family:inherit; font-size:15px; color:var(--ink); background:#0a1424; border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none}
@@ -125,7 +137,7 @@
 
   .menu{position:absolute; top:64px; right:20px; background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:8px; min-width:240px; display:none; z-index:45}
   .menu.open{display:block}
-  .menu-item{display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:10px; font-weight:600}
+  .menu-item{display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:10px; font-weight:600; font-size:13px}
   .menu-item:hover{background:var(--panel2)}
   .menu-item .av{width:28px;height:28px;border-radius:50%; display:grid; place-items:center; color:#fff; font-weight:800; font-size:12px}
   .menu-sep{height:1px;background:var(--line);margin:6px 4px}
@@ -176,6 +188,28 @@
     .tile .foot .sess{font-size:11px; letter-spacing:0}
     .tile .state{letter-spacing:.3px}
     .tile.on .runbadge{display:none}
+  }
+  /* Mobile typography: small type was legible but tight on a phone.
+     Form controls sit at 16px because iOS zooms the page when a focused
+     field is smaller than that. */
+  @media (max-width:640px){
+    input,select{font-size:16px}
+    textarea{font-size:16px}
+    .hint{font-size:14px; line-height:1.55}
+    .sect-title{font-size:13px}
+    .btn{font-size:15px}
+    .btn.sm{font-size:14px}
+    .menu-item{font-size:15px; padding:13px 14px}
+    #avatarMenu{min-width:215px}
+    .login p{font-size:15px}
+    .login label{font-size:13px}
+    .login input{font-size:16px}
+    .tab{font-size:15px}
+    .tile .foot{font-size:11px}
+    .tile .foot .sess{font-size:12px}
+    .row.chan .btn{font-size:14px}
+    .row.chan.sub .grow{font-size:14px}
+    .archived-tag{font-size:11px}
   }
   @media (max-width:640px){:root{--tile-min:150px} .topmeta{gap:12px} .kv .v.big{font-size:18px} .ctl{min-width:56px; padding:4px 6px; font-size:10px; height:44px} .barrow .nm{width:88px}}
   /* Bottom nav: four buttons sharing the full width, with a comfortable tap target. */
@@ -866,7 +900,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=2;
+const APP_RELEASE=3;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -992,29 +1026,29 @@ function toast(m){const t=document.getElementById("toast");t.textContent=m;t.cla
 function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.innerHTML="";
   const profInitial=state.profile?state.profile.name[0].toUpperCase():"?";
   document.getElementById("avatarBtn").textContent=profInitial;
-  const pendingItem=document.createElement("div");pendingItem.className="menu-item";pendingItem.style="padding:10px 12px;font-size:12px;color:var(--ink2);border-bottom:1px solid var(--line)";pendingItem.innerHTML='<span style="color:var(--warn);font-weight:700">● </span><span id="pendingCount">Synced</span>';m.appendChild(pendingItem);updatePendingCount();
-  if(state.profiles&&state.profiles.length>1){const profilesTitle=document.createElement("div");profilesTitle.style="padding:8px 12px;font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;border-bottom:1px solid var(--line)";profilesTitle.textContent="Profiles";m.appendChild(profilesTitle);
-    for(const p of state.profiles){const it=document.createElement("div");it.className="menu-item";it.style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px";
+  const pendingItem=document.createElement("div");pendingItem.className="menu-item";pendingItem.style="padding:10px 12px;color:var(--ink2);border-bottom:1px solid var(--line)";pendingItem.innerHTML='<span style="color:var(--warn);font-weight:700">● </span><span id="pendingCount">Synced</span>';m.appendChild(pendingItem);updatePendingCount();
+  if(state.profiles&&state.profiles.length>1){const profilesTitle=document.createElement("div");profilesTitle.style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;border-bottom:1px solid var(--line)";profilesTitle.textContent="Profiles";m.appendChild(profilesTitle);
+    for(const p of state.profiles){const it=document.createElement("div");it.className="menu-item";it.style="padding:9px 12px;cursor:pointer;display:flex;align-items:center;gap:8px";
       it.innerHTML=`<span style="width:24px;height:24px;border-radius:50%;background:${strColor(p.name)};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white">${p.name[0].toUpperCase()}</span><span class="grow">${escapeHtml(p.name)}</span>${p.id===state.profileId?"✓":""}`;
       it.addEventListener("click",()=>{loadProfile(p.id);document.getElementById("avatarMenu").style.display="none";renderAvatarMenu();});m.appendChild(it);}}
   const sep=document.createElement("div");sep.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep);
-  const channelsItem=document.createElement("div");channelsItem.className="menu-item";channelsItem.style="padding:10px 12px;cursor:pointer;font-size:12px;color:var(--ink)";channelsItem.textContent="🎨 Channels";channelsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openChannels();});m.appendChild(channelsItem);
+  const channelsItem=document.createElement("div");channelsItem.className="menu-item";channelsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";channelsItem.textContent="🎨 Channels";channelsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openChannels();});m.appendChild(channelsItem);
   
-  const settingsItem=document.createElement("div");settingsItem.className="menu-item";settingsItem.style="padding:10px 12px;cursor:pointer;font-size:12px;color:var(--ink)";settingsItem.textContent="⚙️ Settings";settingsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openSettings();});m.appendChild(settingsItem);
+  const settingsItem=document.createElement("div");settingsItem.className="menu-item";settingsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";settingsItem.textContent="⚙️ Settings";settingsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openSettings();});m.appendChild(settingsItem);
 
   const sep2=document.createElement("div");sep2.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep2);
   if(window._acctEmail){
     const who=document.createElement("div");
-    who.style="padding:6px 12px 2px;font-size:10px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+    who.style="padding:7px 12px 3px;font-size:12px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
     who.textContent=window._acctEmail;
     m.appendChild(who);
   }
-  const signOutItem=document.createElement("div");signOutItem.className="menu-item";signOutItem.style="padding:10px 12px;cursor:pointer;font-size:12px;color:var(--warn)";signOutItem.textContent="🚪 Sign out";
+  const signOutItem=document.createElement("div");signOutItem.className="menu-item";signOutItem.style="padding:10px 12px;cursor:pointer;color:var(--warn)";signOutItem.textContent="🚪 Sign out";
   signOutItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";doSignOut();});
   m.appendChild(signOutItem);
 
   const ver=document.createElement("div");
-  ver.style="padding:8px 12px 10px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:6px";
+  ver.style="padding:9px 12px 11px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px";
   ver.innerHTML='<span>Version</span><span style="font-variant-numeric:tabular-nums;color:var(--ink2)">v'+APP_RELEASE+'</span><span style="font-variant-numeric:tabular-nums;opacity:.75">'+fmtBuild(BUILD_ID)+'</span>';
   ver.title="Release v"+APP_RELEASE+"  build "+String(BUILD_ID);
   m.appendChild(ver);
@@ -2375,29 +2409,31 @@ async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';le
 
         if(rows.length){
           const cols='grid-template-columns:12px minmax(0,1fr) 62px 62px 44px;gap:8px;align-items:center';
-          h+='<div style="margin-top:12px;text-align:left;display:grid;'+cols+'">';
+          h+='<div class="tf-grid" style="margin-top:12px;text-align:left;display:grid;'+cols+'">';
           const head='font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding-bottom:2px';
+          const HEAD=' class="tf-head"';
           h+='<div></div>'+
-             '<div style="'+head+'">Channel</div>'+
-             '<div style="'+head+';text-align:right">Planned</div>'+
-             '<div style="'+head+';text-align:right">Actual</div>'+
-             '<div style="'+head+';text-align:right">Met</div>';
+             '<div'+HEAD+' style="'+head+'">Channel</div>'+
+             '<div'+HEAD+' style="'+head+';text-align:right">Planned</div>'+
+             '<div'+HEAD+' style="'+head+';text-align:right">Actual</div>'+
+             '<div'+HEAD+' style="'+head+';text-align:right">Met</div>';
           const cell='font-size:11px;padding:5px 0;border-top:1px solid var(--line)';
+          const CELL=' class="tf-row"';
           const num=cell+';text-align:right;font-variant-numeric:tabular-nums;color:var(--ink2)';
           rows.forEach(r=>{
             const pill=r.pct>=100?'var(--good)':r.pct>=60?'var(--warn)':'var(--bad)';
-            h+='<div style="'+cell+';display:flex;align-items:center"><span style="width:10px;height:10px;border-radius:3px;background:'+r.color+'"></span></div>'+
-               '<div style="'+cell+';min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)">'+escapeHtml(r.label)+'</div>'+
-               '<div style="'+num+'">'+fmtHM(r.planned)+'</div>'+
-               '<div style="'+num+'">'+fmtHM(r.actual)+'</div>'+
-               '<div style="'+num+';font-weight:800;color:'+pill+'">'+r.pct+'%</div>';
+            h+='<div'+CELL+' style="'+cell+';display:flex;align-items:center"><span style="width:10px;height:10px;border-radius:3px;background:'+r.color+'"></span></div>'+
+               '<div'+CELL+' style="'+cell+';min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)">'+escapeHtml(r.label)+'</div>'+
+               '<div'+CELL+' style="'+num+'">'+fmtHM(r.planned)+'</div>'+
+               '<div'+CELL+' style="'+num+'">'+fmtHM(r.actual)+'</div>'+
+               '<div'+CELL+' style="'+num+';font-weight:800;color:'+pill+'">'+r.pct+'%</div>';
           });
           if(unplannedMs>0){
-            h+='<div style="'+cell+';display:flex;align-items:center;opacity:.75"><span style="width:10px;height:10px;border-radius:3px;background:var(--muted)"></span></div>'+
-               '<div style="'+cell+';color:var(--ink2);opacity:.85;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Unplanned</div>'+
-               '<div style="'+num+';opacity:.6">&mdash;</div>'+
-               '<div style="'+num+';opacity:.85">'+fmtHM(unplannedMs)+'</div>'+
-               '<div style="'+num+';opacity:.6">&mdash;</div>';
+            h+='<div'+CELL+' style="'+cell+';display:flex;align-items:center;opacity:.75"><span style="width:10px;height:10px;border-radius:3px;background:var(--muted)"></span></div>'+
+               '<div'+CELL+' style="'+cell+';color:var(--ink2);opacity:.85;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Unplanned</div>'+
+               '<div'+CELL+' style="'+num+';opacity:.6">&mdash;</div>'+
+               '<div'+CELL+' style="'+num+';opacity:.85">'+fmtHM(unplannedMs)+'</div>'+
+               '<div'+CELL+' style="'+num+';opacity:.6">&mdash;</div>';
           }
           h+='</div>';
         }
