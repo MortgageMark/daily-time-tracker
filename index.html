@@ -4,7 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- NOT black-translucent. That mode lifts the web view up under the status
+     bar but does NOT extend its height, so the view ends up short at the
+     BOTTOM by exactly the status-bar height. Measured on an iPhone 16 Pro:
+     screen.height 874, innerHeight 812, difference 62 = safe-area-top - and a
+     62px dead band under the bottom bar that the page could not paint into,
+     because it was outside the web view entirely. The bottom bar could be
+     dragged down and would vanish at that boundary.
+     "black" keeps the dark status bar but lets the view run to the bottom
+     edge. Three earlier fixes missed this by treating it as a CSS problem. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Time Tracker">
 <meta name="theme-color" content="#0f172a">
 <link rel="manifest" href="/manifest.json">
@@ -100,7 +109,7 @@
      and taps would trigger its swipe gesture - so it is scaled back to ~62%
      and the top padding raised to meet it. The buttons end up optically
      centred in the bar instead of pinned to its top edge. */
-  .bottombar{display:flex; align-items:center; gap:10px; padding:14px 18px max(10px, calc(env(safe-area-inset-bottom) * 0.3)) 18px; border-top:1px solid var(--line); background:#0a101c; backdrop-filter:blur(8px)}
+  .bottombar{display:flex; align-items:center; gap:10px; padding:14px 18px max(12px, calc(env(safe-area-inset-bottom) * 0.55)) 18px; border-top:1px solid var(--line); background:#0a101c; backdrop-filter:blur(8px)}
   .ctl{display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 14px; border-radius:14px; border:1px solid var(--line); background:var(--panel); font-size:12px; font-weight:700; min-width:76px; color:var(--ink2)}
   .ctl svg{width:22px;height:22px}
   .ctl:active{transform:scale(.96)}
@@ -251,7 +260,7 @@
        inset, 21px (0.62) was still obviously empty, so it drops to ~10px:
        enough that the home indicator is not sitting on the buttons, little
        enough that the bar reads as flush. */
-    .bottombar{gap:8px; padding:12px 12px max(10px, calc(env(safe-area-inset-bottom) * 0.3)) 12px}
+    .bottombar{gap:8px; padding:12px 12px max(12px, calc(env(safe-area-inset-bottom) * 0.55)) 12px}
     .bottombar .ctl{flex:1 1 0; min-width:0; height:58px; padding:8px 4px; gap:5px; font-size:11px; border-radius:16px}
     .bottombar .ctl svg{width:24px; height:24px}
   }
@@ -1666,7 +1675,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=8;
+const APP_RELEASE=9;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
