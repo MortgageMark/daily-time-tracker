@@ -1343,6 +1343,16 @@ function updateChanPreview(){const col=document.getElementById("chanColor").valu
 /* ===== timeline ===== */
 async function openEditsModal(){try{const content=document.getElementById("editsContent");if(!content){console.error("editsContent not found");return;}content.innerHTML="";if(!state.profileId){console.error("No profile ID set");content.innerHTML='<div class="hint" style="padding:20px">Error: No profile selected.</div>';openScrim("editsScrim");return;}const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const today=todayKey();const filtered=all.filter(s=>s.date===today).sort((a,b)=>a.startTs-b.startTs);if(!filtered.length){content.innerHTML='<div class="hint" style="padding:20px">No sessions yet today.</div>';}else{filtered.forEach(s=>{const c=state.channels.find(x=>x.id===s.channelId)||{label:"(deleted)",color:"#64748b"};const dur=s.endTs?s.durMs:(now()-s.startTs);const open=!s.endTs;const row=document.createElement("div");row.style.display="flex";row.style.alignItems="center";row.style.gap="12px";row.style.padding="12px 14px";row.style.borderBottom="1px solid var(--line)";const leftDiv=document.createElement("div");leftDiv.style.display="flex";leftDiv.style.alignItems="center";leftDiv.style.gap="8px";leftDiv.style.flex="0 1 auto";const colorDot=document.createElement("div");colorDot.style.width="12px";colorDot.style.height="12px";colorDot.style.borderRadius="50%";colorDot.style.background=c.color;colorDot.style.flexShrink="0";leftDiv.appendChild(colorDot);const infoDiv=document.createElement("div");infoDiv.style.minWidth="0";const labelDiv=document.createElement("div");labelDiv.style.fontSize="12px";labelDiv.style.fontWeight="600";labelDiv.style.color="var(--ink)";labelDiv.innerHTML=`${escapeHtml(c.label)}${open?' <span style="color:var(--good);font-size:11px">● running</span>':''}`;infoDiv.appendChild(labelDiv);const timeDiv=document.createElement("div");timeDiv.style.fontSize="11px";timeDiv.style.color="var(--ink2)";timeDiv.textContent=`${fmtClock(s.startTs,state.profile.hourFmt)} — ${s.endTs?fmtClock(s.endTs,state.profile.hourFmt):"now"}`;infoDiv.appendChild(timeDiv);leftDiv.appendChild(infoDiv);row.appendChild(leftDiv);const durDiv=document.createElement("div");durDiv.style.fontSize="11px";durDiv.style.fontWeight="600";durDiv.style.color="var(--ink2)";durDiv.style.whiteSpace="nowrap";durDiv.textContent=fmtDur(dur);row.appendChild(durDiv);if(s.endTs){const adjBtn=document.createElement("button");adjBtn.className="btn sm";adjBtn.textContent="Adjust";adjBtn.addEventListener("click",()=>{closeScrim("editsScrim");openAdjustModal(s);});row.appendChild(adjBtn);}content.appendChild(row);});}openScrim("editsScrim");}catch(e){console.error("Error in openEditsModal:",e);const content=document.getElementById("editsContent");if(content)content.innerHTML='<div class="hint" style="padding:20px">Error loading sessions: '+escapeHtml(e.message)+'</div>';openScrim("editsScrim");}}
 async function openTimeline(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';const today=new Date();const dayName=today.toLocaleDateString('en-US',{weekday:'short'});const dateStr=today.toLocaleDateString('en-US',{month:'short',day:'numeric'});html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)">';html+='<div style="display:flex;align-items:center;gap:12px">';html+='<div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">'+dayName+' '+dateStr+'</div>';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Edits</h2>';html+='</div>';html+='<button class="btn sm" onclick="closeTimelineView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:0" id="tlContent"></div>';html+='</div>';stage.innerHTML=html;window.closeTimelineView=()=>{stage.innerHTML=origStage;renderGrid();};const all=(await idbAll("sessions","profile",IDBKeyRange.only(state.profileId))).filter(s=>s.date===todayKey()).sort((a,b)=>a.startTs-b.startTs);const tlContent=document.getElementById("tlContent");if(!all.length){tlContent.innerHTML='<div class="hint" style="padding:20px">No sessions yet today.</div>';}else{tlContent.innerHTML="";all.forEach(s=>{const c=state.channels.find(x=>x.id===s.channelId)||{label:"(deleted)",color:"#64748b"};const dur=s.endTs?s.durMs:(now()-s.startTs);const open=!s.endTs;const row=document.createElement("div");row.style.display="flex";row.style.alignItems="center";row.style.gap="12px";row.style.padding="12px 14px";row.style.borderBottom="1px solid var(--line)";const leftDiv=document.createElement("div");leftDiv.style.display="flex";leftDiv.style.alignItems="center";leftDiv.style.gap="8px";leftDiv.style.flex="0 1 auto";const colorDot=document.createElement("div");colorDot.style.width="12px";colorDot.style.height="12px";colorDot.style.borderRadius="50%";colorDot.style.background=c.color;colorDot.style.flexShrink="0";leftDiv.appendChild(colorDot);const infoDiv=document.createElement("div");infoDiv.style.minWidth="0";const labelDiv=document.createElement("div");labelDiv.style.fontSize="12px";labelDiv.style.fontWeight="600";labelDiv.style.color="var(--ink)";labelDiv.innerHTML=`${escapeHtml(c.label)}${open?' <span style="color:var(--good);font-size:11px">● running</span>':''}`;infoDiv.appendChild(labelDiv);const timeDiv=document.createElement("div");timeDiv.style.fontSize="11px";timeDiv.style.color="var(--ink2)";timeDiv.textContent=`${fmtClock(s.startTs,state.profile.hourFmt)} — ${s.endTs?fmtClock(s.endTs,state.profile.hourFmt):"now"}`;infoDiv.appendChild(timeDiv);leftDiv.appendChild(infoDiv);row.appendChild(leftDiv);const durDiv=document.createElement("div");durDiv.style.fontSize="11px";durDiv.style.fontWeight="600";durDiv.style.color="var(--ink2)";durDiv.style.whiteSpace="nowrap";durDiv.textContent=fmtDur(dur);row.appendChild(durDiv);if(s.endTs){const adjBtn=document.createElement("button");adjBtn.className="btn sm";adjBtn.textContent="Adjust";adjBtn.addEventListener("click",()=>openAdjustModal(s));row.appendChild(adjBtn);}tlContent.appendChild(row);});}}
+/* Adherence cell: Timing on top, Budget beneath. Returns HTML so it drops
+   into the existing <td>/<div> WITHOUT changing any table column count. */
+function adhTone(p){ return p>=80?"var(--good)":p>=50?"var(--warn)":"var(--bad)"; }
+function adhCellHtml(match,budgetPct){
+  if(!match||!match.total) return '<span style="color:var(--muted)">&mdash;</span>';
+  const tp=Math.round(match.matches/match.total*100);
+  let h='<div style="font-weight:700;color:'+adhTone(tp)+'">'+match.matches+'/'+match.total+'<span style="font-size:10px;font-weight:600;color:var(--ink2);margin-left:4px">timing</span></div>';
+  if(typeof budgetPct==="number") h+='<div style="font-size:11px;font-weight:700;color:'+adhTone(budgetPct)+'">'+budgetPct+'%<span style="font-size:10px;font-weight:600;color:var(--ink2);margin-left:4px">budget</span></div>';
+  return h;
+}
 async function openCombinedSummary(){
   try{
     console.log("openCombinedSummary: Starting, db=",db,"profileId=",state.profileId);
@@ -1450,10 +1460,10 @@ async function openCombinedSummary(){
       
       const notesDisplay=dNotes?`<div style="font-size:10px;color:var(--ink2);margin:6px 0;font-style:italic;cursor:pointer" onclick="window.editWeekNotes('${dKey}')" data-edit-notes data-week-date="${dKey}" data-rating="${dRating}" title="Click to edit notes">"${escapeHtml(dNotes)}"</div>`:`<div style='font-size:10px;color:var(--muted);cursor:pointer' onclick="window.editWeekNotes('${dKey}')" data-edit-notes data-week-date="${dKey}" data-rating="${dRating}" title="Click to add notes">No notes</div>`;
       
-      const adhStr=dayNote.matchScore?dayNote.matchScore.matches+"/"+dayNote.matchScore.total:"—";
+      const adhStr=adhCellHtml(dayNote.matchScore,dayNote.budgetScore?dayNote.budgetScore.pct:undefined);
       
       weekTotal+=day.total;
-      content+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)">${dName}</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">${fmtDur(day.total)}</div><div style="font-size:11px;color:var(--ink2);margin-bottom:6px">Adherence: ${adhStr}</div><div style="margin:8px 0">${starHtml}</div>${notesDisplay}<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:9px">${chRows||'<div style="color:var(--muted)">No sessions</div>'}</div></div>`;
+      content+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)">${dName}</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">${fmtDur(day.total)}</div><div style="font-size:11px;color:var(--ink2);margin-bottom:6px">${adhStr}</div><div style="margin:8px 0">${starHtml}</div>${notesDisplay}<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:9px">${chRows||'<div style="color:var(--muted)">No sessions</div>'}</div></div>`;
     }
     content+='</div>';
     content+=`<div style="margin-top:14px;padding:12px;background:linear-gradient(180deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.3);border-radius:12px"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Total</div><div style="font-size:22px;font-weight:800;color:var(--good)">${fmtDur(weekTotal)}</div></div>`;
@@ -1480,7 +1490,7 @@ async function openCombinedSummary(){
       }).join('');
       
       const adhData=await idbGet("day_notes",dKey);
-      const adhStr=adhData&&adhData.matchScore?adhData.matchScore.matches+"/"+adhData.matchScore.total:"—";
+      const adhStr=adhCellHtml(adhData&&adhData.matchScore,adhData&&adhData.budgetScore?adhData.budgetScore.pct:undefined);
       
       weekTotal+=day.total;
       content+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink)">${dName}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editWeekNotes('${dKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
@@ -1544,7 +1554,7 @@ async function openCombinedSummary(){
         if(dayNote.deleted)continue;
         const dRating=dayNote.rating||0;
         const dNotes=dayNote.notes||"";
-        const adhStr=dayNote.matchScore?dayNote.matchScore.matches+"/"+dayNote.matchScore.total:"—";
+        const adhStr=adhCellHtml(dayNote.matchScore,dayNote.budgetScore?dayNote.budgetScore.pct:undefined);
         const dayDate=allDates[dateKey].date;
         const dayOfWeek=dayDate.getDay();
         const isWeekend=dayOfWeek===0||dayOfWeek===6;
@@ -1702,7 +1712,7 @@ async function openCombinedSummary(){
       
       let allDayNotes=[];
       try{allDayNotes=await idbAll("day_notes");}catch(e){}
-      let totalMatches=0,totalTrackedSlots=0,daysWithTrackerData=0;
+      let totalMatches=0,totalTrackedSlots=0,daysWithTrackerData=0,totalBudgetCredited=0,totalBudgetPlanned=0;
       
       // Count days in range for adherence
       const dayInRange=new Date(startDate);
@@ -1712,6 +1722,7 @@ async function openCombinedSummary(){
         if(dayNote&&dayNote.matchScore){
           totalMatches+=dayNote.matchScore.matches||0;
           totalTrackedSlots+=dayNote.matchScore.total||0;
+          if(dayNote.budgetScore){ totalBudgetCredited+=dayNote.budgetScore.credited||0; totalBudgetPlanned+=dayNote.budgetScore.planned||0; }
           daysWithTrackerData++;
         }
         dayInRange.setDate(dayInRange.getDate()+1);
@@ -1728,6 +1739,17 @@ async function openCombinedSummary(){
         adhHtml+=`<div style="font-size:12px;color:var(--ink2)">/&nbsp;${totalTrackedSlots}</div>`;
         adhHtml+=`<div style="font-size:11px;color:var(--muted);margin-left:auto">${adhPct}%</div>`;
         adhHtml+=`</div>`;
+        adhHtml+=`<div style="font-size:10px;color:var(--muted);margin-bottom:6px">blocks hit at the planned time</div>`;
+        if(totalBudgetPlanned>0){
+          const bPct=Math.round(totalBudgetCredited/totalBudgetPlanned*100);
+          const bColor=bPct>=80?'var(--good)':bPct>=50?'var(--warn)':'var(--bad)';
+          adhHtml+=`<div style="display:flex;align-items:baseline;gap:8px;padding-top:8px;border-top:1px solid var(--line)">`;
+          adhHtml+=`<div style="font-size:20px;font-weight:800;color:${bColor}">${bPct}%</div>`;
+          adhHtml+=`<div style="font-size:12px;color:var(--ink2)">${fmtDurShort(totalBudgetCredited)}&nbsp;/&nbsp;${fmtDurShort(totalBudgetPlanned)}</div>`;
+          adhHtml+=`<div style="font-size:11px;color:var(--muted);margin-left:auto">budget</div>`;
+          adhHtml+=`</div>`;
+          adhHtml+=`<div style="font-size:10px;color:var(--muted)">planned amount met, any time</div>`;
+        }
         adhHtml+=`<div style="font-size:11px;color:var(--ink2)">Matched ${daysWithTrackerData} day${daysWithTrackerData>1?'s':''}</div>`;
         adhHtml+=`</div>`;
       }
@@ -2498,7 +2520,7 @@ async function renderDashboard(){const body=document.getElementById("dashBody");
     const dayAdherence={};
     const dayRatings={};
     const dayNotes={};
-    for(const k of dayKeys){const n=await idbGet("day_notes",k);if(n&&n.matchScore){dayAdherence[k]=n.matchScore;}if(n&&n.rating){dayRatings[k]=n.rating;}if(n&&n.notes){dayNotes[k]=n.notes;}}
+    for(const k of dayKeys){const n=await idbGet("day_notes",k);if(n&&n.matchScore){dayAdherence[k]=Object.assign({},n.matchScore,{budgetPct:n.budgetScore?n.budgetScore.pct:undefined});}if(n&&n.rating){dayRatings[k]=n.rating;}if(n&&n.notes){dayNotes[k]=n.notes;}}
     const totalAdherence=Object.values(dayAdherence).reduce((a,x)=>({matches:(a.matches||0)+x.matches,total:(a.total||0)+x.total}),{matches:0,total:0});
     const weekAdhScore=totalAdherence.total>0?Math.round(totalAdherence.matches/totalAdherence.total*100):0;
     html+=`<div class="card"><h3>Daily trend & Adherence</h3><div class="sub">Tracked time per day with daily adherence scores and ratings</div>${dailyTrendChart(dayKeys,byDay,dayAdherence,dayRatings,dayNotes)}<div style="margin-top:12px;padding:12px;background:var(--panel);border-radius:6px;border-left:3px solid var(--accent)"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Adherence Score</div><div style="font-size:24px;font-weight:800;color:${weekAdhScore>=80?"var(--good)":weekAdhScore>=50?"var(--warn)":"var(--bad)"}">${totalAdherence.matches}/${totalAdherence.total} matched (${weekAdhScore}%)</div></div></div>`;
@@ -2531,7 +2553,7 @@ function dailyTrendChart(dayKeys,byDay,byAdherence,byRating,byNotes){
       </div>
       <div style="font-size:20px;color:#fbbf24;margin-bottom:8px">${starStr}</div>
       ${notes?`<div style="font-size:12px;color:var(--ink2);margin-bottom:8px;font-style:italic">"${escapeHtml(notes)}"</div>`:""}
-      <div style="font-size:12px;color:${adhColor};font-weight:700">Adherence: ${adhStr} (${adhPct}%)</div>
+      <div style="font-size:12px">${adhCellHtml(adh,adh&&adh.budgetPct)}</div>
     </div>`;
   });
   html+='</div>';
