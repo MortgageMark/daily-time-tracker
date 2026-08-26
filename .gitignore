@@ -6,3 +6,13 @@ version.json
 _*.txt
 _*.sh
 _*.py
+
+# Per-machine Claude Code state (permission grants, local overrides).
+# .claude/launch.json IS committed — it is shared, generic dev-server config.
+.claude/settings.local.json
+.claude/*.local.json
+
+# OS cruft
+Thumbs.db
+desktop.ini
+.DS_Store
