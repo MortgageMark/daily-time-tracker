@@ -780,6 +780,79 @@ async function dirtyRecords(){
 }
 function scheduleSync(){ if(syncTimer)return; syncTimer=setTimeout(()=>{syncTimer=null;runSync();},400); }
 
+/* ===== stale-device protection (backlog 7.7) =====
+   A browser that has not been opened in a long time holds an old snapshot.
+   pullRemote() refuses to overwrite a local row marked _dirty, and the push
+   loop sends that row up regardless - so the stale copy wins and good data is
+   destroyed. This happened for real: a dormant Safari was holding channels
+   many revisions out of date while Chrome was correct.
+
+   Before pushing, the server's updated_at is compared against the local _u for
+   the same rows. Anything where the server is NEWER is a real conflict, and
+   the user is asked once instead of being silently overwritten.
+
+   The threshold is deliberately generous. _u comes from the device clock and
+   updated_at from the server's, so a few minutes of skew must never read as a
+   conflict. A genuinely dormant device is days or weeks stale - nowhere near
+   this line. */
+const STALE_CONFLICT_MS=5*60*1000;
+let staleConflictAsked=false;
+
+async function remoteUpdatedAt(store,ids){
+  const map={};
+  try{
+    /* Chunked: a few hundred ids in one .in() makes an unreasonable URL. */
+    for(let i=0;i<ids.length;i+=200){
+      const { data, error } = await SB.from(store).select("id,updated_at").in("id",ids.slice(i,i+200));
+      if(error) return null;                       /* cannot verify -> fail open */
+      (data||[]).forEach(r=>{ map[r.id]=r.updated_at?Date.parse(r.updated_at):0; });
+    }
+    return map;
+  }catch(e){ console.warn("staleness check failed",store,e.message||e); return null; }
+}
+
+/* The subset of `dirty` whose server copy is meaningfully newer than ours. */
+async function findStaleConflicts(dirty){
+  const byStore={};
+  dirty.forEach(d=>{ (byStore[d.store]=byStore[d.store]||[]).push(d); });
+  const out=[];
+  for(const store in byStore){
+    if(tableSkipped(store)) continue;
+    const recs=byStore[store];
+    const map=await remoteUpdatedAt(store,recs.map(d=>d.rec.id));
+    if(!map) continue;                             /* verification failed, allow the push */
+    recs.forEach(d=>{
+      const remote=map[d.rec.id];
+      if(remote===undefined) return;               /* not on the server yet - a genuine new row */
+      if(remote-(d.rec._u||0) > STALE_CONFLICT_MS) out.push(d);
+    });
+  }
+  return out;
+}
+
+/* Drops the local edit so the next pull brings the server's row down.
+   _u=0 rather than just clearing _dirty, so the pull comparison always wins. */
+async function discardLocalEdits(items){
+  for(const {store,rec} of items){
+    rec._dirty=false; rec._u=0;
+    await idbPut(store,rec);
+  }
+}
+
+/* Replaces everything on this device with the cloud copy. The safe way to
+   reset a stale browser: sign-out cannot do this job because it syncs first,
+   which is the very push being avoided. */
+async function refreshFromCloud(){
+  const dirty=await dirtyRecords();
+  const extra=dirty.length?("\n\n"+dirty.length+" unsynced change(s) on this device will be discarded."):"";
+  const ok=await uiConfirm("Replace everything on this device with the cloud copy?"+extra,
+    {title:"Refresh from cloud",okLabel:"Replace",danger:true});
+  if(!ok) return;
+  try{ await wipeLocalData(); }catch(e){ console.warn("refreshFromCloud wipe failed",e); }
+  toast("Refreshing\u2026");
+  location.reload();
+}
+
 async function runSync(){
   if(!db){ return; }   /* 15s timer can fire before openDB() resolves */
   if(!navigator.onLine){ setSync("offline"); return; }
@@ -787,6 +860,42 @@ async function runSync(){
   if(!sess || !sess.session){ setSync("offline"); return; }
   const dirty=await dirtyRecords();
   if(dirty.length) setSync("syncing"); else if(syncState!=="synced") setSync("syncing");
+
+  /* Never let an out-of-date device silently overwrite newer data. */
+  if(dirty.length){
+    const stale=await findStaleConflicts(dirty);
+    if(stale.length){
+      if(staleConflictAsked){ setSync("pending",dirty.length); return; }
+      staleConflictAsked=true;
+      const stamps=stale.map(d=>d.rec._u||0).filter(Boolean);
+      const when=stamps.length?new Date(Math.min.apply(null,stamps)).toLocaleString():"an unknown date";
+      const choice=await uiChoice({
+        title:"This device is out of date",
+        message:"This browser has "+stale.length+" change(s) last edited around "+when+
+                ", but newer versions of the same records are already in the cloud.\n\n"+
+                "Uploading them would overwrite that newer data everywhere.",
+        choices:[
+          {label:"Use the cloud version",value:"cloud"},
+          {label:"Decide later",value:"later"},
+          {label:"Upload this device anyway",value:"local",danger:true}
+        ]
+      });
+      if(choice==="cloud"){
+        await discardLocalEdits(stale);
+        await pullRemote();
+        staleConflictAsked=false;
+        const left=(await dirtyRecords()).length;
+        setSync(left?"pending":"synced",left);
+        toast("Using the cloud version");
+        return;
+      }
+      if(choice!=="local"){ setSync("pending",dirty.length); return; }
+      /* "Upload anyway": restamp so these rows legitimately win, rather than
+         pushing them with a timestamp that will look stale again next sync. */
+      for(const {store,rec} of stale){ rec._u=now(); await idbPut(store,rec); }
+      staleConflictAsked=false;
+    }
+  }
   // PUSH
   for(const {store,rec} of dirty){
     if(tableSkipped(store)) continue;
@@ -1625,7 +1734,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=10;
+const APP_RELEASE=11;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -2290,6 +2399,18 @@ function renderDangerZone(){
   const host=document.getElementById("dangerZone2")||document.getElementById("dangerZone");
   if(!host) return;
   host.innerHTML="";
+  /* The safe reset for a browser holding an old snapshot. Signing out cannot
+     do this: it syncs first, which is the push being avoided. */
+  const rTitle=document.createElement("div");rTitle.className="sect-title";rTitle.style.marginTop="0";
+  rTitle.textContent="Refresh from cloud";host.appendChild(rTitle);
+  const rHint=document.createElement("div");rHint.className="hint";rHint.style.margin="0 0 10px";
+  rHint.textContent="Replaces this device's copy with the cloud version. Use it if this browser has been unused for a while and is showing old data.";
+  host.appendChild(rHint);
+  const rBtn=document.createElement("button");
+  rBtn.className="btn sm";rBtn.style.cssText="width:100%;padding:12px;font-weight:700;margin-bottom:6px";
+  rBtn.textContent="Refresh from cloud";
+  rBtn.addEventListener("click",refreshFromCloud);
+  host.appendChild(rBtn);
   const title=document.createElement("div");title.className="sect-title";title.textContent="Danger zone";host.appendChild(title);
   const hint=document.createElement("div");hint.className="hint";hint.style.margin="0 0 10px";
   hint.textContent="Removes every channel and subcategory everywhere. Archiving keeps your history — this does not.";
@@ -3815,22 +3936,31 @@ async function wipeLocalData(){
 }
 async function doSignOut(){
   if(!await uiConfirm("Sign out of this account?")) return;
-  /* Sign-out clears local data, so push anything unsynced first.
-
-     CAREFUL: this push is exactly the hazard described in Landmines. A browser
-     that has not been opened in a long time holds an old snapshot, and any of
-     its rows still marked _dirty will be pushed over the good server copy.
-     Signing out - the obvious way to "clean up" such a browser - is therefore
-     the one action that can destroy data. The count is surfaced below so the
-     decision is at least informed; the real fix is in the backlog. */
+  /* Sign-out clears local data, so unsynced changes have to be dealt with
+     first - but it must NOT push automatically. On a browser holding an old
+     snapshot that push is exactly what overwrites good data everywhere, which
+     made signing out the most dangerous way to tidy up a stale device. The
+     choice is the user's now. */
   try{
-    if(navigator.onLine){ await runSync(); }
     const dirty=await dirtyRecords();
     if(dirty.length){
-      const msg="Warning: "+dirty.length+" change(s) have not synced to the cloud yet.\n\nSigning out clears local data and those changes will be lost. Sign out anyway?";
-      if(!await uiConfirm(msg)) return;
+      const choice=await uiChoice({
+        title:"Unsynced changes",
+        message:dirty.length+" change(s) on this device have not reached the cloud yet.\n\n"+
+                "Signing out clears local data. If this browser has been sitting unused, its "+
+                "changes may be older than what is already saved.",
+        choices:[
+          {label:"Upload them, then sign out",value:"push"},
+          {label:"Discard them and sign out",value:"discard",danger:true},
+          {label:"Cancel",value:"cancel"}
+        ]
+      });
+      if(choice!=="push"&&choice!=="discard") return;
+      /* runSync() still applies the staleness gate, so "upload" cannot blindly
+         clobber newer data either. */
+      if(choice==="push"&&navigator.onLine) await runSync();
     }
-  }catch(e){ console.warn("pre-sign-out sync check failed",e); }
+  }catch(e){ console.warn("pre-sign-out check failed",e); }
   try{ await wipeLocalData(); }catch(e){ console.warn("sign-out wipe failed",e); }
   await SB.auth.signOut(); location.reload();
 }
