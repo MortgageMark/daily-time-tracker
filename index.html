@@ -351,6 +351,20 @@
     <div style="display:flex; gap:10px; margin-top:22px"><button class="btn pri grow" id="chanSave">Save</button><button class="btn warn" id="chanArchive" style="display:none">Archive</button></div>
   </div></div></div>
 
+<!-- SESSION EDITOR (backfill: add or correct time on any day) -->
+<div class="scrim" id="sessScrim"><div class="sheet" style="max-width:520px"><div class="sheet-h"><h2 id="sessTitle">Add session</h2><button class="x" data-close>&times;</button></div>
+  <div class="sheet-b">
+    <div class="hint" id="sessDayHint" style="margin-top:0"></div>
+    <div class="sect-title">Channel</div>
+    <select id="sessChannel" style="width:100%;font-size:16px"></select>
+    <div style="display:flex; gap:12px; margin-top:4px">
+      <div class="grow"><div class="sect-title">Start</div><input type="time" id="sessStart" style="width:100%;font-size:16px"></div>
+      <div class="grow"><div class="sect-title">End</div><input type="time" id="sessEnd" style="width:100%;font-size:16px"></div>
+    </div>
+    <div class="hint" id="sessDurHint" style="margin-top:10px">&nbsp;</div>
+    <div style="display:flex; gap:10px; margin-top:18px"><button class="btn pri grow" id="sessSave">Save</button><button class="btn warn" id="sessDelete" style="display:none">Delete</button></div>
+  </div></div></div>
+
 <!-- TIMELINE -->
 <div class="scrim" id="tlScrim"><div class="sheet"><div class="sheet-h"><h2>Today's Timeline</h2><button class="x" data-close>×</button></div>
   <div class="sheet-b"><div class="hint" style="margin-bottom:14px">Every session in order. Use Undo on the tracker to instantly reverse an accidental switch.</div><div id="tlList"></div></div></div></div>
@@ -1023,6 +1037,159 @@ setInterval(async()=>{ if(!db||!state.profileId||!state.profile)return;
     if(s){ if(running&&running.startTs){ s.textContent=fmtDur(Math.max(0,now()-running.startTs)); } else { renderGrid(); } }});
 },1000);
 
+/* =====================================================================
+   DAY EDITOR  (backfill and retroactive correction)
+   The tracker is otherwise live-timer only: if a day was not tracked as it
+   happened there was no way to enter it afterwards. This view walks any date,
+   lists that day's sessions, and allows create / edit / delete, recomputing
+   and persisting that day's scores after every change.
+   ===================================================================== */
+let dayEditorDate=null, editingSessId=null;
+
+function dayStartTs(dk){ const p=String(dk).split("-").map(Number); return new Date(p[0],p[1]-1,p[2],0,0,0,0).getTime(); }
+function shiftDateKey(dk,days){ const d=new Date(dayStartTs(dk)); d.setDate(d.getDate()+days); return dateKey(d.getTime()); }
+function prettyDate(dk){ const d=new Date(dayStartTs(dk));
+  return d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})+(dk===todayKey()?" \u00b7 today":""); }
+/* A session is hidden once voided. Deleting outright is not safe: deletes do
+   not propagate to Supabase, so the row would come back on the next pull. */
+function liveSessions(list){ return (list||[]).filter(s=>!s.voided); }
+
+async function sessionsForDay(dk){
+  const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
+  return liveSessions(all).filter(s=>s.date===dk).sort((a,b)=>a.startTs-b.startTs);
+}
+
+async function openDayEditor(dk){
+  dayEditorDate=dk||todayKey();
+  const stage=document.querySelector(".app .stage");
+  stage.innerHTML='<div id="dayEditorRoot" style="display:flex;flex-direction:column;height:100%;overflow:hidden"></div>';
+  await renderDayEditor();
+}
+function closeDayEditor(){
+  dayEditorDate=null;
+  const stage=document.querySelector(".app .stage");
+  stage.innerHTML='<div class="grid" id="grid"></div>';
+  renderAll();
+}
+
+async function renderDayEditor(){
+  const root=document.getElementById("dayEditorRoot");
+  if(!root||!dayEditorDate) return;
+  const dk=dayEditorDate;
+  const sess=await sessionsForDay(dk);
+  const total=sess.reduce((a,s)=>a+(s.endTs?s.durMs:(now()-s.startTs)),0);
+  const isToday=dk===todayKey();
+
+  root.innerHTML="";
+
+  /* header */
+  const head=document.createElement("div");
+  head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap";
+  const prev=document.createElement("button"); prev.className="btn sm"; prev.textContent="\u2039";
+  const next=document.createElement("button"); next.className="btn sm"; next.textContent="\u203a"; next.disabled=isToday; if(isToday) next.style.opacity=".4";
+  const dateInput=document.createElement("input");
+  dateInput.type="date"; dateInput.value=dk; dateInput.max=todayKey();
+  dateInput.style.cssText="font-size:16px;background:#0a1424;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:7px 9px";
+  const lbl=document.createElement("div");
+  lbl.style.cssText="font-weight:700;font-size:13px;color:var(--ink2);white-space:nowrap";
+  lbl.textContent=prettyDate(dk);
+  const spacer=document.createElement("div"); spacer.style.flex="1";
+  const todayBtn=document.createElement("button"); todayBtn.className="btn sm"; todayBtn.textContent="Today"; todayBtn.disabled=isToday; if(isToday) todayBtn.style.opacity=".4";
+  const homeBtn=document.createElement("button"); homeBtn.className="btn sm"; homeBtn.textContent="Home";
+  prev.addEventListener("click",()=>{ dayEditorDate=shiftDateKey(dk,-1); renderDayEditor(); });
+  next.addEventListener("click",()=>{ if(!isToday){ dayEditorDate=shiftDateKey(dk,1); renderDayEditor(); } });
+  dateInput.addEventListener("change",()=>{ if(dateInput.value){ dayEditorDate=dateInput.value; renderDayEditor(); } });
+  todayBtn.addEventListener("click",()=>{ dayEditorDate=todayKey(); renderDayEditor(); });
+  homeBtn.addEventListener("click",closeDayEditor);
+  [prev,dateInput,next,lbl,spacer,todayBtn,homeBtn].forEach(n=>head.appendChild(n));
+  root.appendChild(head);
+
+  /* body */
+  const body=document.createElement("div");
+  body.style.cssText="flex:1;overflow-y:auto;padding:12px";
+  if(!sess.length){
+    const empty=document.createElement("div");
+    empty.className="hint"; empty.style.padding="18px 4px";
+    empty.textContent="No time recorded on this day yet. Use \u201cAdd session\u201d below to enter it.";
+    body.appendChild(empty);
+  }
+  sess.forEach(sn=>{
+    const ch=state.channels.find(c=>c.id===sn.channelId)||{label:"(deleted channel)",color:"#64748b"};
+    const row=document.createElement("div");
+    row.style.cssText="display:flex;align-items:center;gap:10px;padding:11px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--panel2)";
+    const dot=document.createElement("span");
+    dot.style.cssText="width:12px;height:12px;border-radius:50%;flex:none;background:"+ch.color;
+    const info=document.createElement("div"); info.style.cssText="flex:1;min-width:0";
+    const nm=document.createElement("div");
+    nm.style.cssText="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+    nm.textContent=ch.label;
+    const tm=document.createElement("div");
+    tm.className="hint"; tm.style.margin="2px 0 0";
+    const fmt=state.profile&&state.profile.hourFmt;
+    tm.textContent=fmtClock(sn.startTs,fmt)+" \u2013 "+(sn.endTs?fmtClock(sn.endTs,fmt):"running")+"  \u00b7  "+fmtDurShort(sn.endTs?sn.durMs:(now()-sn.startTs));
+    info.appendChild(nm); info.appendChild(tm);
+    const edit=document.createElement("button");
+    edit.className="btn sm"; edit.textContent="Edit";
+    edit.addEventListener("click",()=>openSessionEditor(dk,sn));
+    row.appendChild(dot); row.appendChild(info); row.appendChild(edit);
+    body.appendChild(row);
+  });
+  root.appendChild(body);
+
+  /* footer */
+  const foot=document.createElement("div");
+  foot.style.cssText="padding:10px 12px max(10px, env(safe-area-inset-bottom)) 12px;border-top:1px solid var(--line);background:rgba(10,16,28,.7);display:flex;align-items:center;gap:10px;flex-wrap:wrap";
+  const add=document.createElement("button");
+  add.className="btn pri sm"; add.textContent="+ Add session";
+  add.addEventListener("click",()=>openSessionEditor(dk,null));
+  const tot=document.createElement("div");
+  tot.style.cssText="margin-left:auto;font-size:13px;color:var(--ink2);text-align:right";
+  const scores=await refreshDayScores(dk);
+  let line="Total "+fmtDurShort(total);
+  if(scores&&scores.plannedSlotsElapsed) line+="  \u00b7  Timing "+scores.matchedSlots+"/"+scores.plannedSlotsElapsed;
+  if(scores&&typeof scores.budgetPct==="number") line+="  \u00b7  Budget "+Math.round(scores.budgetPct)+"%";
+  tot.textContent=line;
+  foot.appendChild(add); foot.appendChild(tot);
+  root.appendChild(foot);
+}
+
+function tsToTimeInput(ts){ const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
+
+function openSessionEditor(dk,sn){
+  editingSessId=sn?sn.id:null;
+  document.getElementById("sessTitle").textContent=sn?"Edit session":"Add session";
+  document.getElementById("sessDayHint").textContent=prettyDate(dk);
+  const sel=document.getElementById("sessChannel");
+  sel.innerHTML="";
+  state.channels.filter(c=>!c.archived).sort((a,b)=>a.order-b.order).forEach(c=>{
+    const parent=c.parentChannelId?state.channels.find(x=>x.id===c.parentChannelId):null;
+    const o=document.createElement("option");
+    o.value=c.id; o.textContent=parent?parent.label+" \u203a "+c.label:c.label;
+    sel.appendChild(o);
+  });
+  if(sn) sel.value=sn.channelId;
+  document.getElementById("sessStart").value=sn?tsToTimeInput(sn.startTs):"09:00";
+  document.getElementById("sessEnd").value=sn&&sn.endTs?tsToTimeInput(sn.endTs):"10:00";
+  document.getElementById("sessDelete").style.display=sn?"block":"none";
+  updateSessDurHint();
+  openScrim("sessScrim");
+}
+
+function readSessEditorTimes(dk){
+  const anchor=dayStartTs(dk);
+  const st=parseClockOnDay(anchor,document.getElementById("sessStart").value);
+  const en=parseClockOnDay(anchor,document.getElementById("sessEnd").value);
+  return {startTs:st,endTs:en};
+}
+function updateSessDurHint(){
+  const h=document.getElementById("sessDurHint");
+  if(!h||!dayEditorDate) return;
+  const t=readSessEditorTimes(dayEditorDate);
+  if(t.startTs===null||t.endTs===null){ h.textContent="Enter a start and end time."; return; }
+  if(t.endTs<=t.startTs){ h.textContent="End time must be after the start time."; return; }
+  h.textContent="Duration "+fmtDurShort(t.endTs-t.startTs)+".";
+}
+
 /* ===== toast ===== */
 let toastT; /* ===== build version + update detection =====
    BUILD_ID is rewritten at deploy time by the Netlify build command in
@@ -1209,6 +1376,7 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
       it.innerHTML=`<span style="width:24px;height:24px;border-radius:50%;background:${strColor(p.name)};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white">${p.name[0].toUpperCase()}</span><span class="grow">${escapeHtml(p.name)}</span>${p.id===state.profileId?"✓":""}`;
       it.addEventListener("click",()=>{loadProfile(p.id);document.getElementById("avatarMenu").style.display="none";renderAvatarMenu();});m.appendChild(it);}}
   const sep=document.createElement("div");sep.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep);
+  const pastDayItem=document.createElement("div");pastDayItem.className="menu-item";pastDayItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";pastDayItem.textContent="📅 Edit a day";pastDayItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openDayEditor(todayKey());});m.appendChild(pastDayItem);
   const channelsItem=document.createElement("div");channelsItem.className="menu-item";channelsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";channelsItem.textContent="🎨 Channels";channelsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openChannels();});m.appendChild(channelsItem);
   
   const settingsItem=document.createElement("div");settingsItem.className="menu-item";settingsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";settingsItem.textContent="⚙️ Settings";settingsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openSettings();});m.appendChild(settingsItem);
@@ -1242,6 +1410,77 @@ function initializeEventListeners(){
   // Top bar
   const topDateBtn=document.getElementById("topDateBtn");if(topDateBtn)topDateBtn.addEventListener("click",async()=>{const stage=document.querySelector('.stage');stage.innerHTML='<div class="grid" id="grid"></div>';if(!state.profileId && state.profiles && state.profiles.length>0){state.profileId=state.profiles[0].id;}await reloadFromLocal();});
   const avatarBtn=document.getElementById("avatarBtn");if(avatarBtn){avatarBtn.addEventListener("click",e=>{e.stopPropagation();const menu=document.getElementById("avatarMenu");menu.style.display=menu.style.display==="none"?"block":"none";renderAvatarMenu();});document.addEventListener("click",()=>document.getElementById("avatarMenu").style.display="none");}
+
+  /* ----- session editor (backfill) ----- */
+  ["sessStart","sessEnd"].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener("input",updateSessDurHint); });
+  const sessSave=document.getElementById("sessSave");
+  if(sessSave) sessSave.addEventListener("click",async()=>{
+    const dk=dayEditorDate; if(!dk) return;
+    const channelId=document.getElementById("sessChannel").value;
+    if(!channelId){ toast("Pick a channel"); return; }
+    const t=readSessEditorTimes(dk);
+    if(t.startTs===null||t.endTs===null){ toast("Enter a start and end time"); return; }
+    if(t.endTs<=t.startTs){ toast("End must be after start"); return; }
+    if(t.endTs>now()){ toast("That end time is in the future"); return; }
+
+    /* Overlaps would double-count the same minutes in every total, so they are
+       worth a question. They are still allowed - two things genuinely can be
+       worked at once, and it is the user's data. */
+    const others=(await sessionsForDay(dk)).filter(x=>x.id!==editingSessId);
+    const clash=others.find(x=>{ const xe=x.endTs||now(); return t.startTs<xe && x.startTs<t.endTs; });
+    if(clash){
+      const ch=state.channels.find(c=>c.id===clash.channelId);
+      const fmt=state.profile&&state.profile.hourFmt;
+      const ok=await uiConfirm("This overlaps "+(ch?ch.label:"another session")+" ("+
+        fmtClock(clash.startTs,fmt)+" \u2013 "+(clash.endTs?fmtClock(clash.endTs,fmt):"running")+
+        "). Both will be counted, so that time will be double counted in your totals.",
+        {title:"Overlapping session",okLabel:"Save anyway"});
+      if(!ok) return;
+    }
+
+    if(editingSessId){
+      const rec=await idbGet("sessions",editingSessId);
+      if(!rec){ toast("That session no longer exists"); closeScrim("sessScrim"); await renderDayEditor(); return; }
+      rec.channelId=channelId; rec.startTs=t.startTs; rec.endTs=t.endTs;
+      rec.durMs=t.endTs-t.startTs; rec.date=dateKey(t.startTs);
+      await saveLocal("sessions",rec);
+      /* Editing the live session gives it an end time, which stops it. */
+      if(running&&running.sessionId===rec.id){ running=null; toast("Timer stopped"); }
+    } else {
+      const rec={id:uid(),profileId:state.profileId,channelId:channelId,startTs:t.startTs,endTs:t.endTs,
+                 durMs:t.endTs-t.startTs,date:dateKey(t.startTs),voided:false};
+      await saveLocal("sessions",rec);
+    }
+    closeScrim("sessScrim");
+    await refreshDayScores(dk);
+    await updateTodayTotals();
+    await renderDayEditor();
+    toast("Saved");
+  });
+
+  const sessDelete=document.getElementById("sessDelete");
+  if(sessDelete) sessDelete.addEventListener("click",async()=>{
+    if(!editingSessId) return;
+    const ok=await uiConfirm("Remove this session from the day? Its time stops counting toward every total and score.",
+      {title:"Delete session",okLabel:"Delete",danger:true});
+    if(!ok) return;
+    const rec=await idbGet("sessions",editingSessId);
+    if(rec){
+      /* Voided AND zeroed on purpose. A real delete does not propagate to
+         Supabase, so the row would return on the next pull; voided hides it
+         from this view, and the zeroed duration means every older consumer
+         that predates the voided flag counts it as nothing. */
+      rec.voided=true; rec.endTs=rec.startTs; rec.durMs=0;
+      await saveLocal("sessions",rec);
+      if(running&&running.sessionId===rec.id) running=null;
+    }
+    closeScrim("sessScrim");
+    const dk=dayEditorDate;
+    await refreshDayScores(dk);
+    await updateTodayTotals();
+    await renderDayEditor();
+    toast("Session removed");
+  });
 
   // Settings
   const btnPause=document.getElementById("btnPause");if(btnPause)btnPause.addEventListener("click",async()=>{if(!running)return;const st=await stopRunning(now());undoStack.push({type:"pause",prev:st});toast("Paused");renderAll();});
@@ -2547,16 +2786,22 @@ async function todaysEffectivePlan(dateKey){
   }
   return null;
 }
-async function refreshTodayScores(){
+/* Recompute and store the scores for ANY day. refreshTodayScores() only ever
+   handled today, so a day edited after the fact kept whatever score it had
+   when it was last live. computeDayScores() and todaysEffectivePlan() both
+   already accept an arbitrary dateKey - only the caller was hard-wired. */
+async function refreshDayScores(dk){
   try{
-    if(!db||!state.profileId) return;
-    const dateKey=todayKey();
-    const plan=await todaysEffectivePlan(dateKey);
-    if(!plan) return;
+    if(!db||!state.profileId) return null;
+    const plan=await todaysEffectivePlan(dk);
+    if(!plan) return null;
     const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
-    await persistDayScores(dateKey,computeDayScores(plan,dateKey,sessions));
-  }catch(e){ console.warn("refreshTodayScores failed",e); }
+    const scores=computeDayScores(plan,dk,sessions);
+    await persistDayScores(dk,scores);
+    return scores;
+  }catch(e){ console.warn("refreshDayScores failed",dk,e); return null; }
 }
+async function refreshTodayScores(){ return refreshDayScores(todayKey()); }
 
 async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;flex-wrap:wrap;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;min-height:36px;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
   
