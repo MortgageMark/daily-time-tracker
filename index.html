@@ -2118,38 +2118,118 @@ function renderPlanSlots(){const times=document.getElementById("planSlots");cons
 function renderPlanChannels(){const ch=document.getElementById("planChannels");let html='';if(state.channels){state.channels.filter(c=>!c.archived).forEach(c=>{html+=`<div draggable="true" data-ch="${c.id}" style="padding:6px 4px;border:2px solid ${c.color};background:${c.color}15;color:${c.color};border-radius:5px;cursor:move;font-weight:700;font-size:11px;text-align:center;flex-shrink:0;transition:all .15s;word-break:break-word">${escapeHtml(c.label)}</div>`;});}ch.innerHTML=html;ch.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',el.dataset.ch);});el.addEventListener('dragend',e=>{el.style.opacity='1';});});}
 async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",openEditsModal);}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;flex-wrap:wrap;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;min-height:36px;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
   
-  // Calculate and display daily score
+  /* ===== daily scoring =====
+     Two independent measures, because they answer different questions:
+
+       Timing  - did you do the planned channel in the planned block.
+                 Sensitive to WHEN. Unchanged in meaning and still saved
+                 as day_notes.matchScore so every summary view keeps
+                 working exactly as before.
+
+       Budget  - did you spend the planned AMOUNT on each channel today,
+                 whenever you did it. Per-channel credit is capped at
+                 what was planned, so overdoing one channel cannot mask
+                 skipping another.
+
+     Both only count blocks that have already elapsed, so an in-progress
+     day is not penalised for hours that have not happened yet. For a
+     finished day every block has elapsed, so historical numbers are
+     unaffected. */
   (async ()=>{
-    let totalSlots=0,matchCount=0;
-    // Count slots from plan
-    if(plan){
-      for(let h=planState.startHour;h<planState.endHour;h++){
-        for(let m=0;m<60;m+=planState.increment){
-          const slot=h+':'+String(m).padStart(2,'0');
-          if(plan.schedule&&plan.schedule[slot]){totalSlots++;}
-        }
+    const rollup=chId=>{ const c=(state.channels||[]).find(x=>x.id===chId); return (c&&c.parentChannelId)||chId; };
+
+    const plannedByCh={}, actualByCh={};
+    let plannedSlotsElapsed=0, matchedSlots=0;
+    const slotMs=increment*60000;
+
+    for(let h=startHour;h<endHour;h++){
+      for(let m=0;m<60;m+=increment){
+        const slot=h+':'+String(m).padStart(2,'0');
+        const chId=plan&&plan.schedule?plan.schedule[slot]:null;
+        if(!chId) continue;
+        const blockStart=todayStartMs+(h*60+m)*60000;
+        const blockEnd=blockStart+slotMs;
+        if(blockEnd>nowMs) continue;               // not yet elapsed
+        plannedSlotsElapsed++;
+        const id=rollup(chId);
+        plannedByCh[id]=(plannedByCh[id]||0)+slotMs;
+        const hit=todaySessions.some(s=>{
+          const st=parseInt(s.startTs||0), et=parseInt(s.endTs||s.startTs||0);
+          return rollup(s.channelId)===id && st<blockEnd && et>blockStart;
+        });
+        if(hit) matchedSlots++;
       }
     }
-    // Count matches from matchHtml
-    const matchDivs=document.getElementById("adhMatch").querySelectorAll("div");
-    matchDivs.forEach(div=>{if(div.textContent.includes("✓")){matchCount++;}});
-    
-    // Display footer
+
+    todaySessions.forEach(s=>{
+      const dur=s.endTs?(s.durMs||(s.endTs-s.startTs)):(nowMs-s.startTs);
+      if(!(dur>0)) return;
+      const id=rollup(s.channelId);
+      actualByCh[id]=(actualByCh[id]||0)+dur;
+    });
+
+    let creditedMs=0, plannedTotalMs=0, unplannedMs=0;
+    const rows=[];
+    Object.keys(plannedByCh).forEach(id=>{
+      const p=plannedByCh[id], a=actualByCh[id]||0;
+      plannedTotalMs+=p; creditedMs+=Math.min(p,a);
+      const ch=(state.channels||[]).find(x=>x.id===id);
+      rows.push({id:id,label:ch?ch.label:"(deleted channel)",color:ch?ch.color:"var(--muted)",planned:p,actual:a,pct:p?Math.round(Math.min(p,a)/p*100):0});
+    });
+    Object.keys(actualByCh).forEach(id=>{ if(!plannedByCh[id]) unplannedMs+=actualByCh[id]; });
+    rows.sort((a,b)=>b.planned-a.planned);
+
+    const timingPct=plannedSlotsElapsed?Math.round(matchedSlots/plannedSlotsElapsed*100):null;
+    const budgetPct=plannedTotalMs?Math.round(creditedMs/plannedTotalMs*100):null;
+    const tone=pct=>pct>=80?'var(--good)':pct>=50?'var(--warn)':'var(--bad)';
+
     const footer=document.getElementById("trackerFooter");
     if(footer){
-      if(totalSlots===0){
-        footer.textContent="No planned sessions";
+      if(!plannedSlotsElapsed){
+        footer.innerHTML='<div style="color:var(--ink2);font-weight:600">Nothing planned has elapsed yet today</div>';
       }else{
-        const pct=Math.round((matchCount/totalSlots)*100);
-        const color=pct>=80?'var(--good)':pct>=50?'var(--warn)':'var(--bad)';
-        footer.innerHTML=`<div style="color:${color}">${matchCount} / ${totalSlots} matched</div><div style="font-size:12px;color:var(--ink2);">${pct}%</div>`;
+        let h='<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">';
+        h+='<div style="flex:1;min-width:150px;background:var(--panel);border:1px solid '+tone(timingPct)+';border-radius:10px;padding:10px">'+
+             '<div style="font-size:10px;font-weight:800;letter-spacing:.6px;color:var(--muted);text-transform:uppercase">Timing</div>'+
+             '<div style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><div style="font-size:20px;font-weight:800;color:'+tone(timingPct)+'">'+timingPct+'%</div>'+
+             '<div style="font-size:11px;color:var(--ink2)">'+matchedSlots+' / '+plannedSlotsElapsed+' blocks</div></div>'+
+             '<div style="font-size:10px;color:var(--muted);margin-top:2px">right channel, right block</div></div>';
+        h+='<div style="flex:1;min-width:150px;background:var(--panel);border:1px solid '+tone(budgetPct)+';border-radius:10px;padding:10px">'+
+             '<div style="font-size:10px;font-weight:800;letter-spacing:.6px;color:var(--muted);text-transform:uppercase">Budget</div>'+
+             '<div style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><div style="font-size:20px;font-weight:800;color:'+tone(budgetPct)+'">'+budgetPct+'%</div>'+
+             '<div style="font-size:11px;color:var(--ink2)">'+fmtDurShort(creditedMs)+' / '+fmtDurShort(plannedTotalMs)+'</div></div>'+
+             '<div style="font-size:10px;color:var(--muted);margin-top:2px">planned amount, any time</div></div>';
+        h+='</div>';
+
+        if(rows.length){
+          h+='<div style="margin-top:10px;text-align:left">';
+          rows.forEach(r=>{
+            const pill=r.pct>=100?'var(--good)':r.pct>=60?'var(--warn)':'var(--bad)';
+            h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-top:1px solid var(--line);font-size:11px">'+
+                 '<span style="width:10px;height:10px;border-radius:3px;background:'+r.color+';flex:0 0 auto"></span>'+
+                 '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)">'+escapeHtml(r.label)+'</span>'+
+                 '<span style="color:var(--ink2)">planned '+fmtDurShort(r.planned)+'</span>'+
+                 '<span style="color:var(--ink2)">actual '+fmtDurShort(r.actual)+'</span>'+
+                 '<span style="min-width:38px;text-align:right;font-weight:800;color:'+pill+'">'+r.pct+'%</span>'+
+               '</div>';
+          });
+          if(unplannedMs>0){
+            h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-top:1px solid var(--line);font-size:11px;opacity:.8">'+
+                 '<span style="width:10px;height:10px;border-radius:3px;background:var(--muted);flex:0 0 auto"></span>'+
+                 '<span style="flex:1;color:var(--ink2)">Unplanned time</span>'+
+                 '<span style="color:var(--ink2)">actual '+fmtDurShort(unplannedMs)+'</span>'+
+                 '<span style="min-width:38px"></span></div>';
+          }
+          h+='</div>';
+        }
+        footer.innerHTML=h;
       }
     }
-    
-    // Save to day_notes
+
     const dayKey=today;
     const existing=await idbGet("day_notes",dayKey)||{date:dayKey,profileId:state.profileId};
-    existing.matchScore={matches:matchCount,total:totalSlots};
+    existing.matchScore={matches:matchedSlots,total:plannedSlotsElapsed};
+    existing.budgetScore={credited:creditedMs,planned:plannedTotalMs,pct:budgetPct,unplanned:unplannedMs};
     await saveLocal("day_notes",existing);
   })();}
 
