@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v10
-- **Last deployed:** v9, 2026-08-26 (v10 adds no user-facing change)
+- **Current release:** v11
+- **Last deployed:** v11, 2026-08-26
 - **Status:** stable, in daily use
 
 ---
@@ -208,6 +208,43 @@ the whole row, so `OPTIONAL_COLUMNS` / `rowForPush()` detect that once, retry
 the push without those columns, and retry the full set every 10 minutes -
 meaning running a migration starts the sync without a reload.
 
+### Stale-device protection
+
+A browser that has not been opened in a long time holds an old snapshot.
+`pullRemote()` refuses to overwrite a local row marked `_dirty`, but the push
+loop sent that row up regardless, so the stale copy won and good data was
+destroyed. This was not theoretical: a dormant Safari was holding channels many
+revisions out of date while Chrome was correct, one sync away from overwriting
+everything.
+
+`findStaleConflicts()` now runs before the push. It fetches the server's
+`updated_at` for exactly the rows about to be pushed and flags any where the
+server is newer than the local `_u` by more than `STALE_CONFLICT_MS` (5 min).
+The user is then asked once - use the cloud version, decide later, or upload
+anyway - instead of being silently overwritten.
+
+Three details that matter if this is ever changed:
+
+- **The threshold is deliberately generous.** `_u` comes from the device clock
+  and `updated_at` from the server's, so a few minutes of skew must not read
+  as a conflict. A genuinely dormant device is days or weeks stale.
+- **It fails open.** If the check cannot run (offline, error, missing table)
+  the push proceeds as before. A verification failure must not block syncing.
+- **A row absent from the server is never a conflict** - that is just a new
+  record that has not been pushed yet.
+
+"Upload anyway" restamps `_u` to now, so those rows legitimately win rather
+than being flagged again on the next sync.
+
+**`doSignOut()` no longer pushes automatically.** It used to sync before
+wiping, to avoid losing unsynced work - which made signing out the single most
+dangerous thing to do on a stale browser. It now asks: upload, discard, or
+cancel.
+
+**`refreshFromCloud()`** (Settings > Refresh from cloud) is the safe reset for
+a stale browser: it wipes local data and reloads WITHOUT syncing first. Sign-out
+cannot do this job, because syncing first is the exact push being avoided.
+
 ### Non-working days
 
 Marking a day Vacation / Holiday / Sick / Personal excludes it from adherence
@@ -408,15 +445,10 @@ attach to `window`; function declarations do.
 - `day_notes` and `selected_plan` are keyed by date only — two profiles on one
   device share them. Needs a composite-key migration.
 - Deletes do not propagate to Supabase; deleted rows can return on next pull.
-- **A dormant browser can overwrite good server data.** `pullRemote()` refuses
-  to overwrite a local row marked `_dirty`, but `runSync()` pushes that same
-  dirty row up. So a browser left unopened for weeks holds a stale snapshot
-  that wins on the next sync. Seen for real: Safari on Mark's phone showed
-  channels many revisions out of date while Chrome was correct - separate
-  browsers keep entirely separate IndexedDB stores. **Signing out makes it
-  worse, not better:** `doSignOut()` runs a sync before wiping, so the obvious
-  cleanup is what triggers the overwrite. To reset a stale browser safely,
-  clear its website data from the OS instead. See backlog 7.7.
+- Separate browsers keep entirely separate IndexedDB stores, so the same
+  account can look completely different in Safari and Chrome on one phone.
+  That is expected. What used to make it dangerous was fixed in v11 - see
+  Architecture > Stale-device protection.
 - iOS caches the home screen icon and name at install. Changing them requires
   removing and re-adding the shortcut, once.
 - Supabase's built-in mailer is rate-limited to a few messages an hour and often
@@ -508,30 +540,23 @@ account boundary, so it needs real design:
 
 Do not bolt this on. It deserves its own session.
 
-### 7.7 Stale-device sync protection — *real bug, not a feature*
+### 7.7 Stale-device sync protection — *FIXED in v11*
 
-A browser holding an old snapshot can push it over good server data, because
-`runSync()` pushes any `_dirty` row while `pullRemote()` refuses to overwrite
-one. Signing out triggers exactly this, since it syncs before wiping.
+Shipped. See Architecture > Stale-device protection for how it works and what
+to preserve if it is ever changed.
 
-Worth considering, roughly in order of effort:
-
-- Record a `_u` timestamp on every dirty row and refuse to push one that is
-  older than the server's `updated_at` unless the user confirms.
-- Show what would be overwritten - "this device has 14 changes from 3 weeks
-  ago" - instead of silently pushing.
-- A "this device is out of date, pull fresh" path that wipes locally WITHOUT
-  syncing first, which is the missing safe reset.
-- Reconsider whether `_dirty` should really outrank a newer server row at all.
-
-The current merge rule is not wrong so much as asymmetric: local always wins
-on push, server never wins over dirty on pull. Pick one and make it coherent.
+One piece of the original analysis was deliberately NOT done: the underlying
+merge rule is still asymmetric - local always wins on push, the server never
+wins over a dirty row on pull. v11 gates the dangerous case rather than
+resolving that asymmetry. If conflicts ever become common rather than
+exceptional, that is the thing to revisit.
 
 ### What is left
 
-1. **Stale-device sync protection** — the only actual bug on this list
-2. **Perfect Week** — needs a scoping conversation first
-3. **Coach access** — needs a security design session
+1. **Perfect Week** — needs a scoping conversation first
+2. **Coach access** — needs a security design session
+
+Both need a conversation before any code. Neither is a bug.
 
 Items 1, 3, 4 and 5 shipped in v4. The generic channel-attribute mechanism
 they share is `CHANNEL_ATTRS` - see Architecture > Channel attributes.
@@ -590,6 +615,11 @@ point the four separate star renderers had drifted away from), ratings can be
 cleared, and the day-type picker appears on every Summary row.
 
 **v10** — removes the diagnostic panel; no user-facing change.
+
+**v11** — fixes backlog 7.7. A stale device can no longer silently overwrite
+newer data: the push is gated by a comparison against the server's
+`updated_at`, sign-out no longer force-pushes, and Settings gains "Refresh from
+cloud" as the safe reset that sign-out could never be.
 
 ---
 
