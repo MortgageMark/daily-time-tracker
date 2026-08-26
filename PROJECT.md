@@ -32,7 +32,9 @@ supabase-plans-migration.sql    already run; kept for reference / new envs
 apple-touch-icon.png            180px, iOS home screen
 icon-192.png / icon-512.png     manifest icons (512 doubles as maskable)
 favicon-32.png                  browser tab
-.gitignore                      ignores version.json and scratch files
+.gitignore                      ignores version.json, scratch files, local state
+CLAUDE.md                       session orientation; points here
+.claude/launch.json             local static-server config (port 8888)
 ```
 
 ### Credentials
@@ -52,9 +54,17 @@ should be treated as burned.
 
 ## 2. Running it locally
 
-A `daily-time-tracker` entry already exists in `.claude/launch.json` (in the
-parent `Claude Folder`). Start it through the preview tooling rather than a
-raw shell.
+A `daily-time-tracker` entry exists in **two** `.claude/launch.json` files and
+both work — which one applies depends on the working directory:
+
+- `daily-time-tracker/.claude/launch.json` — used when the cwd is the repo.
+  Committed, so the repo is self-contained.
+- `Claude Folder/.claude/launch.json` — used when the cwd is the parent folder
+  (the usual case). Adds `--directory daily-time-tracker`. That file also
+  serves `mortgage-toolkit`, so do not edit it for this project's sake.
+
+Both serve port 8888. Start it through the preview tooling rather than a raw
+shell.
 
 Manually, it is just a static server:
 
