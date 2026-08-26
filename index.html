@@ -1423,6 +1423,7 @@ function adhCellHtml(match,budgetPct){
   return h;
 }
 async function openCombinedSummary(){
+  await refreshTodayScores();
   try{
     console.log("openCombinedSummary: Starting, db=",db,"profileId=",state.profileId);
     const app=document.querySelector('.app');
@@ -2207,94 +2208,134 @@ function renderPlanSelect(){
 function renderPlanSelect(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const curVal=planSelect.value;planSelect.innerHTML="";planState.plans.forEach((p,i)=>{const opt=document.createElement("option");opt.value=i;opt.textContent=p.name;planSelect.appendChild(opt);});planSelect.value=curVal;}async function setForTodayPlan(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const idx=parseInt(planSelect.value);if(idx<0||!planState.plans[idx])return;const plan=planState.plans[idx];planState.selectedPlanIdx=idx;const dayKey=todayKey();await saveLocal("selected_plan",{date:dayKey,profileId:state.profileId,planId:plan.id});toast("Plan '"+plan.name+"' set for today");}async function addPlan(){const newPlan={id:uid(),profileId:state.profileId,name:"New Template",schedule:{},order:planState.plans.length};await saveLocal("plans",newPlan);planState.plans.push(newPlan);planState.mode="templates";planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Template added - use Rename to name it");}async function deletePlan(idx){if(planState.plans.length<=1){toast("Cannot delete the last plan");return;}const plan=planState.plans[idx];await db.transaction(["plans"],"readwrite").objectStore("plans").delete(plan.id);planState.plans.splice(idx,1);if(planState.selectedPlanIdx>=planState.plans.length)planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Plan deleted");}
 function renderPlanSlots(){const times=document.getElementById("planSlots");const schedules=document.getElementById("planSchedule");let timesHtml='';let schedHtml='';for(let h=planState.startHour;h<planState.endHour;h++){for(let m=0;m<60;m+=planState.increment){const slot=h+':'+(m===0?'00':m);const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+planState.increment>=60?h+1:h)%12||12;const endMin=String((m+planState.increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;const scheduled=planState.schedule[slot];const ch=scheduled?state.channels.find(x=>x.id===scheduled):null;timesHtml+=`<div style="padding:8px 4px;text-align:center;font-size:11px;font-weight:600;color:var(--ink2);flex-shrink:0;border-bottom:1px solid var(--line)">${timeStr}</div>`;schedHtml+=`<div class="time-block-target" data-slot="${slot}" style="padding:8px;min-height:42px;background:${ch?ch.color+'15':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};border-radius:6px;display:flex;align-items:center;justify-content:center;text-align:center;color:${ch?ch.color:'var(--ink2)'};font-size:11px;font-weight:${ch?'700':'500'};cursor:move;flex-shrink:0;transition:all .15s;word-break:break-word">${ch?ch.label:''}</div>`;}}times.innerHTML=timesHtml;schedules.innerHTML=schedHtml;}
 function renderPlanChannels(){const ch=document.getElementById("planChannels");let html='';if(state.channels){state.channels.filter(c=>!c.archived).forEach(c=>{html+=`<div draggable="true" data-ch="${c.id}" style="padding:6px 4px;border:2px solid ${c.color};background:${c.color}15;color:${c.color};border-radius:5px;cursor:move;font-weight:700;font-size:11px;text-align:center;flex-shrink:0;transition:all .15s;word-break:break-word">${escapeHtml(c.label)}</div>`;});}ch.innerHTML=html;ch.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',el.dataset.ch);});el.addEventListener('dragend',e=>{el.style.opacity='1';});});}
-async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",openEditsModal);}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;flex-wrap:wrap;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;min-height:36px;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
-  
-  /* ===== daily scoring =====
-     Two independent measures, because they answer different questions:
+async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",openEditsModal);}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}/* ===== daily scoring =====
+   Two independent measures, because they answer different questions:
 
-       Timing  - did you do the planned channel in the planned block.
-                 Sensitive to WHEN. Unchanged in meaning and still saved
-                 as day_notes.matchScore so every summary view keeps
-                 working exactly as before.
+     Timing  - did you do the planned channel in the planned block.
+               Sensitive to WHEN. Saved as day_notes.matchScore with its
+               original {matches,total} shape, so every summary view keeps
+               working unchanged.
 
-       Budget  - did you spend the planned AMOUNT on each channel today,
-                 whenever you did it. Per-channel credit is capped at
-                 what was planned, so overdoing one channel cannot mask
-                 skipping another.
+     Budget  - did you spend the planned AMOUNT on each channel that day,
+               whenever you did it. Per-channel credit is capped at what
+               was planned, so overdoing one channel cannot mask skipping
+               another.
 
-     Both only count blocks that have already elapsed, so an in-progress
-     day is not penalised for hours that have not happened yet. For a
-     finished day every block has elapsed, so historical numbers are
-     unaffected. */
-  (async ()=>{
-    const rollup=chId=>{ const c=(state.channels||[]).find(x=>x.id===chId); return (c&&c.parentChannelId)||chId; };
+   Both count only blocks that have already elapsed, so an in-progress day
+   is not scored against hours that have not happened. A finished day has
+   every block elapsed, so historical numbers are unaffected.
 
-    const plannedByCh={}, actualByCh={};
-    let plannedSlotsElapsed=0, matchedSlots=0;
-    const slotMs=increment*60000;
+   Kept as a pure function because both the Tracker and the Summary need
+   the same answer. day_notes is only written when something recomputes;
+   without the Summary refreshing today on open, it would keep showing
+   whatever snapshot the Tracker last wrote. */
+function computeDayScores(plan,dateKey,sessions){
+  const startHour=planState.startHour||8, endHour=planState.endHour||18, increment=planState.increment||30;
+  const slotMs=increment*60000;
+  const parts=String(dateKey).split("-").map(Number);
+  const dayStartMs=new Date(parts[0],parts[1]-1,parts[2]).getTime();
+  const nowMs=now();
+  const dayList=(sessions||[]).filter(s=>s.date===dateKey);
+  const rollup=chId=>{ const c=(state.channels||[]).find(x=>x.id===chId); return (c&&c.parentChannelId)||chId; };
 
-    for(let h=startHour;h<endHour;h++){
-      for(let m=0;m<60;m+=increment){
-        const slot=h+':'+String(m).padStart(2,'0');
-        const chId=plan&&plan.schedule?plan.schedule[slot]:null;
-        if(!chId) continue;
-        const blockStart=todayStartMs+(h*60+m)*60000;
-        const blockEnd=blockStart+slotMs;
-        if(blockEnd>nowMs) continue;               // not yet elapsed
-        plannedSlotsElapsed++;
-        const id=rollup(chId);
-        plannedByCh[id]=(plannedByCh[id]||0)+slotMs;
-        const hit=todaySessions.some(s=>{
-          const st=parseInt(s.startTs||0), et=parseInt(s.endTs||s.startTs||0);
-          return rollup(s.channelId)===id && st<blockEnd && et>blockStart;
-        });
-        if(hit) matchedSlots++;
-      }
+  const plannedByCh={}, actualByCh={};
+  let plannedSlotsElapsed=0, matchedSlots=0;
+  for(let h=startHour;h<endHour;h++){
+    for(let m=0;m<60;m+=increment){
+      const slot=h+":"+String(m).padStart(2,"0");
+      const chId=plan&&plan.schedule?plan.schedule[slot]:null;
+      if(!chId) continue;
+      const blockStart=dayStartMs+(h*60+m)*60000, blockEnd=blockStart+slotMs;
+      if(blockEnd>nowMs) continue;
+      plannedSlotsElapsed++;
+      const id=rollup(chId);
+      plannedByCh[id]=(plannedByCh[id]||0)+slotMs;
+      const hit=dayList.some(s=>{
+        const st=parseInt(s.startTs||0), et=parseInt(s.endTs||s.startTs||0);
+        return rollup(s.channelId)===id && st<blockEnd && et>blockStart;
+      });
+      if(hit) matchedSlots++;
     }
+  }
+  dayList.forEach(s=>{
+    const dur=s.endTs?(s.durMs||(s.endTs-s.startTs)):(nowMs-s.startTs);
+    if(!(dur>0)) return;
+    const id=rollup(s.channelId);
+    actualByCh[id]=(actualByCh[id]||0)+dur;
+  });
 
-    todaySessions.forEach(s=>{
-      const dur=s.endTs?(s.durMs||(s.endTs-s.startTs)):(nowMs-s.startTs);
-      if(!(dur>0)) return;
-      const id=rollup(s.channelId);
-      actualByCh[id]=(actualByCh[id]||0)+dur;
-    });
+  let creditedMs=0, plannedTotalMs=0, unplannedMs=0;
+  const rows=[];
+  Object.keys(plannedByCh).forEach(id=>{
+    const p=plannedByCh[id], a=actualByCh[id]||0;
+    plannedTotalMs+=p; creditedMs+=Math.min(p,a);
+    const ch=(state.channels||[]).find(x=>x.id===id);
+    rows.push({id:id,label:ch?ch.label:"(deleted channel)",color:ch?ch.color:"var(--muted)",planned:p,actual:a,pct:p?Math.round(Math.min(p,a)/p*100):0});
+  });
+  Object.keys(actualByCh).forEach(id=>{ if(!plannedByCh[id]) unplannedMs+=actualByCh[id]; });
+  rows.sort((a,b)=>b.planned-a.planned);
 
-    let creditedMs=0, plannedTotalMs=0, unplannedMs=0;
-    const rows=[];
-    Object.keys(plannedByCh).forEach(id=>{
-      const p=plannedByCh[id], a=actualByCh[id]||0;
-      plannedTotalMs+=p; creditedMs+=Math.min(p,a);
-      const ch=(state.channels||[]).find(x=>x.id===id);
-      rows.push({id:id,label:ch?ch.label:"(deleted channel)",color:ch?ch.color:"var(--muted)",planned:p,actual:a,pct:p?Math.round(Math.min(p,a)/p*100):0});
-    });
-    Object.keys(actualByCh).forEach(id=>{ if(!plannedByCh[id]) unplannedMs+=actualByCh[id]; });
-    rows.sort((a,b)=>b.planned-a.planned);
+  return { matchedSlots:matchedSlots, plannedSlotsElapsed:plannedSlotsElapsed,
+           creditedMs:creditedMs, plannedTotalMs:plannedTotalMs, unplannedMs:unplannedMs, rows:rows,
+           timingPct: plannedSlotsElapsed?Math.round(matchedSlots/plannedSlotsElapsed*100):null,
+           budgetPct: plannedTotalMs?Math.round(creditedMs/plannedTotalMs*100):null };
+}
+async function persistDayScores(dateKey,s){
+  const existing=await idbGet("day_notes",dateKey)||{date:dateKey,profileId:state.profileId};
+  existing.matchScore={matches:s.matchedSlots,total:s.plannedSlotsElapsed};
+  existing.budgetScore={credited:s.creditedMs,planned:s.plannedTotalMs,pct:s.budgetPct,unplanned:s.unplannedMs};
+  await saveLocal("day_notes",existing);
+}
+/* Resolve today's effective plan the same way the Tracker does: the
+   materialised day first, falling back to the older selected_plan pointer. */
+async function todaysEffectivePlan(dateKey){
+  const dayRec=await idbGet("dayplans",state.profileId+"|"+dateKey);
+  if(dayRec&&dayRec.schedule) return {name:dayRec.planName||"Today",schedule:dayRec.schedule};
+  const sel=await idbGet("selected_plan",dateKey);
+  if(sel&&sel.planId&&sel.profileId===state.profileId){
+    const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));
+    return plans.find(p=>p.id===sel.planId)||null;
+  }
+  return null;
+}
+async function refreshTodayScores(){
+  try{
+    if(!db||!state.profileId) return;
+    const dateKey=todayKey();
+    const plan=await todaysEffectivePlan(dateKey);
+    if(!plan) return;
+    const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
+    await persistDayScores(dateKey,computeDayScores(plan,dateKey,sessions));
+  }catch(e){ console.warn("refreshTodayScores failed",e); }
+}
 
-    const timingPct=plannedSlotsElapsed?Math.round(matchedSlots/plannedSlotsElapsed*100):null;
-    const budgetPct=plannedTotalMs?Math.round(creditedMs/plannedTotalMs*100):null;
+async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;flex-wrap:wrap;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;min-height:36px;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
+  
+  (async ()=>{
+    const S=computeDayScores(plan,today,todaySessions);
+    const rows=S.rows, unplannedMs=S.unplannedMs;
+    const timingPct=S.timingPct, budgetPct=S.budgetPct;
     const tone=pct=>pct>=80?'var(--good)':pct>=50?'var(--warn)':'var(--bad)';
 
     const footer=document.getElementById("trackerFooter");
     if(footer){
-      if(!plannedSlotsElapsed){
+      if(!S.plannedSlotsElapsed){
         footer.innerHTML='<div style="color:var(--ink2);font-weight:600">Nothing planned has elapsed yet today</div>';
       }else{
         let h='<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:stretch">';
         h+='<div style="flex:1;min-width:150px;background:var(--panel);border:1px solid '+tone(timingPct)+';border-radius:10px;padding:10px">'+
              '<div style="font-size:10px;font-weight:800;letter-spacing:.6px;color:var(--muted);text-transform:uppercase">Timing</div>'+
              '<div style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><div style="font-size:20px;font-weight:800;color:'+tone(timingPct)+'">'+timingPct+'%</div>'+
-             '<div style="font-size:11px;color:var(--ink2)">'+matchedSlots+' / '+plannedSlotsElapsed+' blocks</div></div>'+
+             '<div style="font-size:11px;color:var(--ink2)">'+S.matchedSlots+' / '+S.plannedSlotsElapsed+' blocks</div></div>'+
              '<div style="font-size:10px;color:var(--muted);margin-top:2px">right channel, right block</div></div>';
         h+='<div style="flex:1;min-width:150px;background:var(--panel);border:1px solid '+tone(budgetPct)+';border-radius:10px;padding:10px">'+
              '<div style="font-size:10px;font-weight:800;letter-spacing:.6px;color:var(--muted);text-transform:uppercase">Budget</div>'+
              '<div style="display:flex;align-items:baseline;gap:6px;margin-top:2px"><div style="font-size:20px;font-weight:800;color:'+tone(budgetPct)+'">'+budgetPct+'%</div>'+
-             '<div style="font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap">'+fmtHM(creditedMs)+'/'+fmtHM(plannedTotalMs)+'</div></div>'+
+             '<div style="font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap">'+fmtHM(S.creditedMs)+'/'+fmtHM(S.plannedTotalMs)+'</div></div>'+
              '<div style="font-size:10px;color:var(--muted);margin-top:2px">planned amount, any time</div></div>';
         h+='</div>';
 
         if(rows.length){
-          /* One shared grid so every column lines up across all rows, with a
-             fixed h/m format and tabular figures so the digits align too. */
           const cols='grid-template-columns:12px minmax(0,1fr) 62px 62px 44px;gap:8px;align-items:center';
           h+='<div style="margin-top:12px;text-align:left;display:grid;'+cols+'">';
           const head='font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding-bottom:2px';
@@ -2325,12 +2366,7 @@ async function openPlanAdherence(){const app=document.querySelector('.app');cons
         footer.innerHTML=h;
       }
     }
-
-    const dayKey=today;
-    const existing=await idbGet("day_notes",dayKey)||{date:dayKey,profileId:state.profileId};
-    existing.matchScore={matches:matchedSlots,total:plannedSlotsElapsed};
-    existing.budgetScore={credited:creditedMs,planned:plannedTotalMs,pct:budgetPct,unplanned:unplannedMs};
-    await saveLocal("day_notes",existing);
+    await persistDayScores(today,S);
   })();}
 
 /* ===== CSV ===== */
