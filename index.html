@@ -21,11 +21,26 @@
     --tile-min: 210px;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-  html,html{-webkit-text-size-adjust:100%; text-size-adjust:100%}
-  body{margin:0;height:100%; font-size:16px}
+  html,body{-webkit-text-size-adjust:100%; text-size-adjust:100%}
+  /* The login screen is position:fixed and .app is display:none until sign-in,
+     so <body> can end up with no in-flow content and collapse to zero height.
+     A zero-height background positioning area paints no gradient at all, so
+     the canvas falls back to its default white. On iOS that white is visible
+     in the safe-area strip below .app (which is only 100dvh tall) - the blank
+     band at the bottom of the screen.
+
+     Two independent guards, deliberately redundant:
+       1. give html and body a real height so the gradient has somewhere to paint
+       2. set a solid background-color underneath the gradient, so the canvas
+          is never white even if the height ever collapses again.
+     Keep background-color and background-image separate here - the `background`
+     shorthand would reset the color back to transparent. */
+  html{height:100%; background-color:var(--bg)}
+  body{margin:0; min-height:100%; font-size:16px}
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    background:radial-gradient(1200px 800px at 70% -10%,#16233c 0%,var(--bg) 55%);
+    background-color:var(--bg);
+    background-image:radial-gradient(1200px 800px at 70% -10%,#16233c 0%,var(--bg) 55%);
     color:var(--ink); overflow:hidden; user-select:none; -webkit-user-select:none;
   }
   button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
@@ -740,6 +755,9 @@ async function reloadFromLocal(){
   const open=sess.find(s=>s.endTs===null||s.endTs===undefined);
   running=open?{sessionId:open.id,channelId:open.channelId,startTs:open.startTs}:null;
   renderAll();
+  /* Paint first, then reconcile: an overnight session raises a dialog, and it
+     should appear over the rendered app rather than over a blank screen. */
+  if(open) await reconcileOpenSession(open);
 }
 async function loadProfile(pid){ state.profileId=pid; await idbPut("meta",{k:"lastProfile",v:pid}); await reloadFromLocal(); }
 
@@ -763,6 +781,120 @@ async function seedIfEmpty(){
 
 /* ===== timer logic ===== */
 async function stopRunning(atTs){ if(!running)return null; const s=await idbGet("sessions",running.sessionId); if(s){s.endTs=atTs;s.durMs=atTs-s.startTs;await saveLocal("sessions",s);} const prev=running;running=null;return prev; }
+
+/* ===== overnight and long-session reconciliation =====
+   A session records the date it STARTED on, and that stamp never changes. A
+   timer left running past midnight therefore behaved two ways at once: the
+   per-session clock on the tile counted straight through the night (it is just
+   now() - startTs, with no date filter), while today's totals ignored it
+   entirely (they filter on the date stamp, which still said yesterday). Worse,
+   stopping it wrote the whole overnight span onto YESTERDAY, silently changing
+   that day's Budget and Timing scores.
+
+   Two fixes:
+     - splitSessionAcrossDays() cuts an open session at every midnight it has
+       crossed, so each day holds only the time that actually elapsed in it.
+     - anything running longer than LONG_SESSION_MS asks before being counted,
+       because at that length it is far more likely to be a forgotten timer
+       than real work. */
+const LONG_SESSION_MS = 8*60*60*1000;
+let reconcilingSession = false;
+
+function endOfDay(ts){ const d=new Date(ts); d.setHours(23,59,59,999); return d.getTime(); }
+
+/* Parses "23:15" or "11:15 PM" onto the same calendar day as dayTs.
+   Returns a timestamp, or null if the text is not a time. */
+function parseClockOnDay(dayTs,str){
+  const t=String(str||"").trim();
+  let m=t.match(/^(\d{1,2}):(\d{2})\s*([ap])\.?m?\.?$/i);
+  let h,mi,ap=null;
+  if(m){ h=parseInt(m[1],10); mi=parseInt(m[2],10); ap=m[3].toLowerCase(); }
+  else {
+    m=t.match(/^(\d{1,2}):(\d{2})$/);
+    if(!m) return null;
+    h=parseInt(m[1],10); mi=parseInt(m[2],10);
+  }
+  if(mi>59) return null;
+  if(ap){ if(h<1||h>12) return null; h=h%12; if(ap==="p") h+=12; }
+  else if(h>23) return null;
+  const d=new Date(dayTs); d.setHours(h,mi,0,0); return d.getTime();
+}
+
+/* Closes `sess` at the end of its own day and opens a fresh one at each
+   following midnight. Returns whichever session is still open (today's). */
+async function splitSessionAcrossDays(sess){
+  let cur=sess, guard=0;
+  while(cur.date!==todayKey() && guard++<400){
+    const dayEnd=endOfDay(cur.startTs);
+    if(dayEnd>=now()) break;                 /* never close a session in the future */
+    cur.endTs=dayEnd; cur.durMs=dayEnd-cur.startTs;
+    await saveLocal("sessions",cur);
+    const nextStart=dayEnd+1;                /* 00:00:00.000 the following day */
+    const next={id:uid(),profileId:cur.profileId,channelId:cur.channelId,startTs:nextStart,endTs:null,durMs:0,date:dateKey(nextStart)};
+    await saveLocal("sessions",next);
+    cur=next;
+  }
+  return cur;
+}
+
+async function promptSessionEnd(sess){
+  const v=await uiPrompt(
+    "What time did it actually stop on "+sess.date+"?\nEnter a time like 23:15, or 11:15 PM.",
+    fmtClock(endOfDay(sess.startTs),"24"),
+    {title:"Set end time",okLabel:"Save"});
+  if(v===null) return false;
+  const ts=parseClockOnDay(sess.startTs,v);
+  if(ts===null||ts<=sess.startTs){ toast("Could not read that time"); return false; }
+  sess.endTs=Math.min(ts,now()); sess.durMs=sess.endTs-sess.startTs;
+  await saveLocal("sessions",sess);
+  toast("Set to "+fmtDurShort(sess.durMs));
+  return true;
+}
+
+async function reconcileOpenSession(open){
+  if(!open||reconcilingSession) return;
+  reconcilingSession=true;
+  try{
+    const crossedMidnight = open.date!==todayKey();
+    const elapsed = now()-open.startTs;
+    if(!crossedMidnight && elapsed<LONG_SESSION_MS) return;
+
+    let sess=open;
+    if(elapsed>=LONG_SESSION_MS){
+      const ch=state.channels.find(c=>c.id===sess.channelId);
+      const choice=await uiChoice({
+        title:"Timer left running",
+        message:(ch?ch.label:"A channel")+" has been running for "+fmtDurShort(elapsed)+
+                ", since "+fmtClock(sess.startTs,state.profile&&state.profile.hourFmt)+" on "+sess.date+".\n\n"+
+                "That is long enough that it was probably left on by accident. Counting it "+
+                "would change that day's totals and its adherence score.",
+        choices:[
+          {label:"Keep all of it",value:"keep"},
+          {label:"Set the end time\u2026",value:"edit"},
+          {label:"Discard it",value:"discard",danger:true}
+        ]
+      });
+      if(choice==="discard"){
+        /* Zeroed rather than deleted on purpose: deletes do not propagate to
+           Supabase, so a deleted row can reappear on the next pull. A
+           zero-length session syncs correctly and contributes nothing. */
+        sess.endTs=sess.startTs; sess.durMs=0;
+        await saveLocal("sessions",sess);
+        running=null; await updateTodayTotals(); renderAll(); toast("Session discarded");
+        return;
+      }
+      if(choice==="edit" && await promptSessionEnd(sess)){
+        running=null; await updateTodayTotals(); renderAll();
+        return;
+      }
+      /* "Keep all of it", or a cancelled prompt: fall through and split it so
+         that at least it lands on the correct days. */
+    }
+    sess=await splitSessionAcrossDays(sess);
+    running={sessionId:sess.id,channelId:sess.channelId,startTs:sess.startTs};
+    await updateTodayTotals(); renderAll();
+  } finally { reconcilingSession=false; }
+}
 async function switchTo(channelId){
   const t=now();
   if(running&&running.channelId===channelId){ toast("Use Pause button to stop"); return; }
@@ -878,7 +1010,11 @@ async function updateTodayTotals(){if(totalsUpdateInProgress)return;totalsUpdate
   try{const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const tk=todayKey();const map={};let total=0;
   all.filter(s=>s.date===tk).forEach(s=>{const ch=state.channels.find(c=>c.id===s.channelId);const trackId=ch?.parentChannelId||s.channelId;map[trackId]=(map[trackId]||0)+(s.endTs?s.durMs:(now()-s.startTs));total+=(s.endTs?s.durMs:(now()-s.startTs));});
   state.todayMap=map;state.todayTotal=total;}finally{totalsUpdateInProgress=false;}}
-setInterval(async()=>{ if(!db||!state.profileId||!state.profile)return; await updateTodayTotals(); if(!state.todayMap){state.todayMap={};}const map=state.todayMap;if(!state.todayTotal){state.todayTotal=0;}const total=state.todayTotal;
+setInterval(async()=>{ if(!db||!state.profileId||!state.profile)return;
+  /* The app can also be sitting open when midnight passes. reconcileOpenSession
+     guards its own re-entrancy, so this cannot stack up on the 1s tick. */
+  if(running&&dateKey(running.startTs)!==todayKey()){ const rs=await idbGet("sessions",running.sessionId); if(rs&&!rs.endTs) await reconcileOpenSession(rs); }
+  await updateTodayTotals(); if(!state.todayMap){state.todayMap={};}const map=state.todayMap;if(!state.todayTotal){state.todayTotal=0;}const total=state.todayTotal;
   document.getElementById("topTotal").textContent=fmtDur(total);
   document.querySelectorAll(".time[data-ch]").forEach(n=>{n.textContent=fmtDur(map[n.getAttribute("data-ch")]||0);});
   const active=state.channels.filter(c=>!c.archived&&!c.parentChannelId).sort((a,b)=>a.order-b.order);
@@ -900,7 +1036,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=3;
+const APP_RELEASE=4;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -1018,6 +1154,47 @@ function uiConfirm(message,opts){
 function uiPrompt(message,value,opts){
   const o=opts||{};
   return uiDialog({kind:"prompt",message:message,value:value||"",title:o.title||"",okLabel:o.okLabel||"Save",cancelLabel:o.cancelLabel||"Cancel"});
+}
+/* uiDialog is hard-wired to exactly two buttons (cancel / ok). uiChoice is a
+   separate function rather than a third `kind` so that the dialog every other
+   feature already depends on is left completely untouched. Resolves to the
+   chosen value, or null if dismissed. */
+function uiChoice(opts){
+  return new Promise(resolve=>{
+    const o=opts||{}; let settled=false;
+    const done=v=>{ if(settled)return; settled=true; cleanup(); resolve(v); };
+    const scrim=document.createElement("div");
+    scrim.className="scrim";
+    scrim.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.7);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px";
+    const card=document.createElement("div");
+    card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:400px;width:100%;box-shadow:var(--shadow)";
+    if(o.title){
+      const h=document.createElement("div");
+      h.style.cssText="font-size:16px;font-weight:800;margin-bottom:8px;color:var(--ink)";
+      h.textContent=o.title; card.appendChild(h);
+    }
+    const msg=document.createElement("div");
+    msg.style.cssText="font-size:14px;line-height:1.55;color:var(--ink2);white-space:pre-wrap";
+    msg.textContent=o.message||""; card.appendChild(msg);
+    const row=document.createElement("div");
+    row.style.cssText="display:flex;flex-direction:column;gap:8px;margin-top:18px";
+    (o.choices||[]).forEach((c,i)=>{
+      const b=document.createElement("button");
+      b.className="btn sm "+(c.danger?"warn":(i===0?"pri":""));
+      b.textContent=c.label;
+      b.style.width="100%";
+      if(c.danger){ b.style.background="#dc2626"; b.style.borderColor="#dc2626"; b.style.color="#fff"; }
+      b.addEventListener("click",()=>done(c.value));
+      row.appendChild(b);
+    });
+    card.appendChild(row); scrim.appendChild(card);
+    const onKey=e=>{ if(e.key==="Escape"){ e.preventDefault(); done(null); } };
+    function cleanup(){ document.removeEventListener("keydown",onKey,true); if(scrim.parentNode) scrim.parentNode.removeChild(scrim); }
+    scrim.addEventListener("click",e=>{ if(e.target===scrim) done(null); });
+    document.addEventListener("keydown",onKey,true);
+    document.body.appendChild(scrim);
+    setTimeout(()=>{ const f=row.querySelector("button"); if(f) f.focus(); },30);
+  });
 }
 
 function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1500);}

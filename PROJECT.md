@@ -5,7 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v3 (`17919e2`), deployed 2026-08-26
+- **Current release:** v4, staged locally and not yet pushed
+- **Last deployed:** v3 (`17919e2`), 2026-08-26
 - **Status:** stable, in daily use
 
 ---
@@ -188,6 +189,35 @@ a template later cannot rewrite past days or corrupt adherence history.
 Today auto-materialises from the `selected_plan` pointer if present, otherwise
 from the template whose name matches the weekday.
 
+### Sessions crossing midnight
+
+A session stores the date it **started** on (`date`), and that stamp never
+changes. Before v4 a timer left running overnight behaved two ways at once:
+the per-session clock on the tile counted straight through the night (it is
+just `now() - startTs`, with no date filter) while today's totals ignored it
+entirely (they filter on `date`, which still said yesterday). Stopping it
+then wrote the whole overnight span onto **yesterday**, silently changing
+that day's Budget and Timing scores.
+
+`reconcileOpenSession()` now runs in two places: on load from
+`reloadFromLocal()` (after the first paint, so its dialog appears over the
+rendered app), and once per tick from the 1s interval so that an app left
+open across midnight rolls over too. It guards its own re-entrancy.
+
+- `splitSessionAcrossDays()` closes the session at `23:59:59.999` of its own
+  day and opens a fresh one at `00:00:00.000` of the next, repeating until it
+  reaches today. Each day then holds only the time that elapsed inside it.
+- Anything running longer than `LONG_SESSION_MS` (8h) raises a `uiChoice()`
+  prompt first: keep it, set the real end time, or discard it. At that length
+  a forgotten timer is likelier than real work.
+- **Discard zeroes the session rather than deleting it.** Deletes do not
+  propagate to Supabase, so a deleted row can reappear on the next pull. A
+  zero-length session syncs correctly and contributes nothing.
+
+`uiChoice()` is a deliberate sibling of `uiDialog()`, not a third `kind`,
+because `uiDialog` is hard-wired to two buttons and every other feature in
+the app depends on it.
+
 ### Scoring
 
 `computeDayScores(plan, dateKey, sessions)` is a pure function returning both:
@@ -214,7 +244,8 @@ snapshot left behind by the Tracker.
 | Plans | `renderPlanPageUI`, `ensureDayPlan`, `applyTemplateToToday`, `saveTodayToTemplate`, `setPlanSlot`, `todaysEffectivePlan` |
 | Scoring | `computeDayScores`, `persistDayScores`, `refreshTodayScores`, `renderAdheranceComparison`, `adhCellHtml` |
 | Dashboard | `renderGrid`, `switchTo`, `startSessionOnChannel`, `stopRunning` |
-| Dialogs | `uiConfirm`, `uiPrompt`, `uiDialog` |
+| Dialogs | `uiConfirm`, `uiPrompt`, `uiDialog`, `uiChoice` |
+| Overnight | `reconcileOpenSession`, `splitSessionAcrossDays`, `promptSessionEnd`, `parseClockOnDay`, `endOfDay` |
 | Versioning | `checkForUpdate`, `showUpdateBanner`, `fmtBuild` |
 
 ---
@@ -268,7 +299,10 @@ attach to `window`; function declarations do.
   removing and re-adding the shortcut, once.
 - Supabase's built-in mailer is rate-limited to a few messages an hour and often
   lands in spam. Fine for testing, needs real SMTP before onboarding users.
-- No timezone handling for sessions crossing midnight.
+- No timezone handling for *travel*: a session is split and stamped using
+  whatever local time the device reports, so crossing a timezone mid-session
+  shifts where the day boundary falls. Sessions crossing **midnight** are
+  handled correctly as of v4 - see Architecture > Sessions crossing midnight.
 - `ensureObjectStores()` is dead code that would recreate stores without
   indexes. Never called. Delete it if you are ever cleaning up.
 
@@ -375,6 +409,14 @@ blank, and any remaining boot failure shows an explanatory panel with a safe
 "reset this device" option.
 
 **v3** — larger mobile type, 16px form controls, pinch-zoom re-enabled.
+
+**v4** — two fixes. Sessions left running past midnight are now split at the
+day boundary instead of counting into today while scoring against yesterday,
+and anything running over 8h asks before it is counted. Separately, the white
+band at the bottom of the screen on iOS: `<body>` could collapse to zero
+height (the login screen is `position:fixed`), a gradient with no height
+paints nothing, and with no background-color behind it the canvas fell back
+to white. html and body now both carry a height and a solid background.
 
 ---
 
