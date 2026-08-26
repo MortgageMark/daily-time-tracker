@@ -30,6 +30,9 @@ index.html                      the entire app
 manifest.json                   PWA manifest
 netlify.toml                    build command, cache headers, SPA rewrite
 supabase-plans-migration.sql    already run; kept for reference / new envs
+supabase-channel-attributes-migration.sql
+                                NOT YET RUN - adds the four channel
+                                attribute columns. See Architecture.
 apple-touch-icon.png            180px, iOS home screen
 icon-192.png / icon-512.png     manifest icons (512 doubles as maskable)
 favicon-32.png                  browser tab
@@ -172,6 +175,36 @@ themselves, subcategories among siblings of the same parent. Moving a parent
 therefore carries its children automatically. `parentChannelId` is `null` for
 top-level.
 
+### Channel attributes
+
+Must/Will/Want, DRIP and the two Eisenhower axes are all one mechanism, not
+three features. `CHANNEL_ATTRS` declares them as data and every picker and
+report section is generated from it, so a fourth scheme is a few lines.
+
+| Field | Values |
+|---|---|
+| `tier` | `must` / `will` / `want` |
+| `drip` | `D` Delegate / `R` Replace / `I` Invest / `P` Produce |
+| `urgency` | 1-5 |
+| `importance` | 1-5 |
+
+`channelAttr(ch,key)` resolves a value, falling back to the parent channel, so
+a subcategory inherits its parent unless tagged itself. **Unset values are
+stored as `null`, never `""`** - an empty string counts as "set" and would
+break inheritance. The lookup carries a depth guard against a channel that
+somehow became its own ancestor.
+
+`HIGH_SCALE` (4) is the urgency/importance threshold for the quadrant view, so
+4 and 5 read as high. The Priorities view reports untagged time explicitly
+rather than dropping it, so coverage cannot be silently overstated.
+
+**`supabase-channel-attributes-migration.sql` has not been run yet.** Until it
+is, these four fields work fully on-device but do not sync. Supabase rejects
+an upsert naming a column it does not have and fails the whole row, so
+`OPTIONAL_COLUMNS` / `rowForPush()` detect that once, retry the push without
+those columns, and retry the full set every 10 minutes - meaning running the
+migration starts syncing them without a reload.
+
 ### Plans: templates vs days
 
 This is the most important concept in the app.
@@ -278,6 +311,19 @@ Budget line when absent rather than printing `undefined`.
 
 **Form controls must be ≥16px on mobile** or iOS zooms the page on focus.
 
+**A missing column and a missing table look alike.** Supabase reports a
+missing column as PGRST204 with "...in the schema cache" in the message -
+which is exactly what `isMissingTable()`'s regex matches. It is checked first
+in the push loop, so before this was guarded a missing column marked the whole
+*table* missing and stopped that store syncing for 10 minutes. `isMissingTable`
+now defers to `isMissingColumn` first. Keep that ordering.
+
+**Never let `<body>` lose its background-color.** The login screen is
+`position:fixed` and `.app` is `display:none` until sign-in, so body can
+collapse to zero height. A gradient with a zero-height positioning area paints
+nothing, and with no color behind it the canvas falls back to white - which
+showed on iOS as a white band in the bottom safe area.
+
 **Watch for duplicate function declarations.** A second `moveChannel` silently
 shadowed the new one. `renderPlanSelect` is still defined twice — both are dead,
 nothing calls them, left alone deliberately.
@@ -310,10 +356,15 @@ attach to `window`; function declarations do.
 
 ## 7. Backlog
 
-Mark's ideas, captured 2026-08-26. **Not yet started.** When he asks
-"what's next", these are the options.
+Captured 2026-08-26. **Backfill, Must/Will/Want, Urgent/Important and DRIP all
+shipped in v4** - 7.1, 7.3, 7.4 and 7.5 below are kept for context but are
+done. Two items remain, and both need a conversation before any code:
 
-### 7.1 Backfill and retroactive editing — *highest practical value*
+- **7.2 Perfect Week** - scope was partly garbled; confirm what it is first.
+- **7.6 Coach access** - crosses an account boundary; needs a security design
+  session of its own.
+
+### 7.1 Backfill and retroactive editing  — *SHIPPED v4* — *highest practical value*
 Add or correct time for a **past** day: "I forgot to track yesterday, let me
 enter it now." Today the app is strictly live-timer driven.
 
@@ -334,7 +385,7 @@ weekday-shaped version of this already, so the question is whether Perfect Week
 **Needs a conversation before any code.** Mark's description was partly cut off;
 confirm scope, whether it is one app or two, and where it lives.
 
-### 7.3 Must / Will / Want tiers
+### 7.3 Must / Will / Want tiers  — *SHIPPED v4*
 Tag every channel with one of three commitment levels:
 
 | Tier | Meaning | Mark's examples |
@@ -349,7 +400,7 @@ should read very differently from missing a Want.
 Implementation: one field on the channel record, a picker in the channel
 editor, grouping in reports. Small schema change, meaningful reporting change.
 
-### 7.4 Urgent / Important scoring → Eisenhower quadrant
+### 7.4 Urgent / Important scoring → Eisenhower quadrant  — *SHIPPED v4*
 Rate each channel 1–5 on **urgency** and 1–5 on **importance**, then plot time
 spent across the four Eisenhower quadrants. The coaching value is seeing how
 much time lands in "urgent but not important."
@@ -357,7 +408,7 @@ much time lands in "urgent but not important."
 Two integer fields per channel plus a quadrant visualisation. Composes
 naturally with Must/Will/Want — likely the same editor screen.
 
-### 7.5 DRIP categorisation
+### 7.5 DRIP categorisation  — *SHIPPED v4*
 Assign channels to DRIP buckets and report time per bucket.
 
 - **D** — Delegate
@@ -381,13 +432,13 @@ account boundary, so it needs real design:
 
 Do not bolt this on. It deserves its own session.
 
-### Suggested order
+### What is left
 
-1. **Backfill** — most immediate daily value, self-contained, scoring already supports it
-2. **Must/Will/Want** — small change, large reporting payoff
-3. **Urgent/Important + DRIP** — same generic mechanism, build once
-4. **Perfect Week** — needs a scoping conversation first
-5. **Coach access** — needs a security design session
+1. **Perfect Week** — needs a scoping conversation first
+2. **Coach access** — needs a security design session
+
+Items 1, 3, 4 and 5 shipped in v4. The generic channel-attribute mechanism
+they share is `CHANNEL_ATTRS` - see Architecture > Channel attributes.
 
 ---
 
@@ -417,6 +468,15 @@ band at the bottom of the screen on iOS: `<body>` could collapse to zero
 height (the login screen is `position:fixed`), a gradient with no height
 paints nothing, and with no background-color behind it the canvas fell back
 to white. html and body now both carry a height and a solid background.
+
+v4 also carries the first three backlog items. **Backfill:** a Day Editor
+(avatar menu) walks any past date and supports create / edit / delete, with
+the day rescored after every change - `refreshTodayScores()` is now a wrapper
+over `refreshDayScores(dk)`. Deleting voids and zeroes a session rather than
+removing it, because deletes do not propagate to Supabase and the row would
+return on the next pull. Overlaps are confirmed rather than silently accepted.
+**Channel attributes:** Must/Will/Want, DRIP and Urgency/Importance built as
+one generic mechanism, with a Priorities report and an Eisenhower quadrant.
 
 ---
 
