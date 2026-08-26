@@ -391,8 +391,8 @@ const SB = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth:{ persistSess
 const PALETTE = ["#22c55e","#ec4899","#3b82f6","#f97316","#a855f7","#14b8a6","#eab308","#ef4444","#06b6d4","#84cc16","#f43f5e","#8b5cf6","#0ea5e9","#f59e0b","#10b981","#d946ef"];
 
 /* ===== IndexedDB ===== */
-const DB_NAME="dtt2", DB_VER=4; let db;
-function ensureObjectStores(){if(!db)return;try{const names=["profiles","channels","sessions","plans","dayplans","meta","selected_plan","day_notes"];for(const name of names){if(!db.objectStoreNames.contains(name)){console.warn(`Object store ${name} missing, incrementing DB version`);closeDatabase();setTimeout(()=>{const r=indexedDB.open(DB_NAME,DB_VER+1);r.onupgradeneeded=e=>{const d=e.target.result;for(const n of names)if(!d.objectStoreNames.contains(n)){const keyPath=n==="dayplans"||n==="selected_plan"||n==="day_notes"?"date":"id";d.createObjectStore(n,{keyPath:keyPath});}};r.onsuccess=e=>{db=e.target.result;};},100);return false;}}}catch(e){console.error("Error checking object stores:",e);}return true;}
+const DB_NAME="dtt2", DB_VER=5; let db;
+function ensureObjectStores(){if(!db)return;try{const names=["profiles","channels","sessions","plans","dayplans","meta","selected_plan","day_notes"];for(const name of names){if(!db.objectStoreNames.contains(name)){console.warn(`Object store ${name} missing, incrementing DB version`);closeDatabase();setTimeout(()=>{const r=indexedDB.open(DB_NAME,DB_VER+1);r.onupgradeneeded=e=>{const d=e.target.result;for(const n of names)if(!d.objectStoreNames.contains(n)){const keyPath=n==="selected_plan"||n==="day_notes"?"date":(n==="meta"?"k":"id");d.createObjectStore(n,{keyPath:keyPath});}};r.onsuccess=e=>{db=e.target.result;};},100);return false;}}}catch(e){console.error("Error checking object stores:",e);}return true;}
 function closeDatabase(){if(db){db.close();db=null;}}
 function openDB(){return new Promise((res,rej)=>{
   console.log("openDB: Starting, DB_NAME=",DB_NAME,"DB_VER=",DB_VER);
@@ -408,11 +408,20 @@ function openDB(){return new Promise((res,rej)=>{
         {name:"channels",keyPath:"id"},
         {name:"sessions",keyPath:"id"},
         {name:"plans",keyPath:"id"},
-        {name:"dayplans",keyPath:"date"},
+        {name:"dayplans",keyPath:"id"},
         {name:"meta",keyPath:"k"},
         {name:"selected_plan",keyPath:"date"},
         {name:"day_notes",keyPath:"date"}
       ];
+
+      if(d.objectStoreNames.contains("dayplans")){
+        try{
+          if(txn.objectStore("dayplans").keyPath!=="id"){
+            console.log("openDB: rebuilding dayplans with keyPath id");
+            d.deleteObjectStore("dayplans");
+          }
+        }catch(err){ console.warn("openDB: dayplans keyPath check failed",err); }
+      }
 
       for(const store of stores){
         if(!d.objectStoreNames.contains(store.name)){
@@ -538,16 +547,35 @@ function toRow(store,r){
   if(store==="profiles")return {id:r.id,name:r.name,hour_fmt:r.hourFmt||"12",confirm_end:(r.confirmEnd!=="0")};
   if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived,parent_channel_id:r.parentChannelId||null};
   if(store==="sessions")return {id:r.id,profile_id:r.profileId,channel_id:r.channelId,start_ts:new Date(r.startTs).toISOString(),end_ts:r.endTs?new Date(r.endTs).toISOString():null,duration_seconds:r.endTs?Math.round((r.endTs-r.startTs)/1000):null,business_date:r.date,voided:!!r.voided,revision:r.revision||0};
+  if(store==="plans")return {id:r.id,profile_id:r.profileId,name:r.name,schedule:r.schedule||{},sort_order:r.order||0};
+  if(store==="dayplans")return {id:r.id,profile_id:r.profileId,date:r.date,plan_id:r.planId||null,plan_name:r.planName||null,schedule:r.schedule||{},edited:!!r.edited};
 }
 function fromRow(store,row){
   const u=row.updated_at?Date.parse(row.updated_at):now();
   if(store==="profiles")return {id:row.id,name:row.name,hourFmt:row.hour_fmt||"12",confirmEnd:row.confirm_end?"1":"0",_u:u,_dirty:false};
   if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,parentChannelId:row.parent_channel_id||null,_u:u,_dirty:false};
+  if(store==="plans")return {id:row.id,profileId:row.profile_id,name:row.name,schedule:row.schedule||{},order:row.sort_order||0,_u:u,_dirty:false};
+  if(store==="dayplans")return {id:row.id,profileId:row.profile_id,date:row.date,planId:row.plan_id||null,planName:row.plan_name||null,schedule:row.schedule||{},edited:!!row.edited,_u:u,_dirty:false};
   if(store==="sessions")return {id:row.id,profileId:row.profile_id,channelId:row.channel_id,startTs:Date.parse(row.start_ts),endTs:row.end_ts?Date.parse(row.end_ts):null,durMs:row.end_ts?(Date.parse(row.end_ts)-Date.parse(row.start_ts)):0,date:row.business_date,voided:!!row.voided,revision:row.revision||0,_u:u,_dirty:false};
 }
+/* Stores that round-trip to Supabase. plans/dayplans need the tables from
+   supabase-plans-migration.sql; until that runs they are skipped after the
+   first PGRST205 ("table not found") so sync does not spam errors. */
+const SYNC_STORES=["profiles","channels","sessions","plans","dayplans"];
+const missingRemoteTables=new Set();
+function isMissingTable(error){
+  return !!error&&(error.code==="PGRST205"||/schema cache|does not exist/i.test(error.message||""));
+}
+function noteMissingTable(store,error){
+  if(!missingRemoteTables.has(store)){
+    missingRemoteTables.add(store);
+    console.warn("sync: table '"+store+"' is missing in Supabase - skipping until it exists. Run supabase-plans-migration.sql.");
+  }
+}
+function syncableStores(){ return SYNC_STORES.filter(s=>!missingRemoteTables.has(s)); }
 async function dirtyRecords(){
   const out=[];
-  for(const store of ["profiles","channels","sessions"]){
+  for(const store of syncableStores()){
     const all=await idbAll(store); for(const r of all) if(r._dirty) out.push({store,rec:r});
   }
   return out;
@@ -562,8 +590,10 @@ async function runSync(){
   if(dirty.length) setSync("syncing"); else if(syncState!=="synced") setSync("syncing");
   // PUSH
   for(const {store,rec} of dirty){
+    if(missingRemoteTables.has(store)) continue;
     try{
       const { data, error } = await SB.from(store).upsert(toRow(store,rec)).select().single();
+      if(isMissingTable(error)){ noteMissingTable(store,error); continue; }
       if(error) throw error;
       rec._dirty=false; if(data&&data.updated_at) rec._u=Date.parse(data.updated_at);
       await idbPut(store,rec);
@@ -578,8 +608,9 @@ async function runSync(){
 async function pullRemote(){
   if(pulling) return; pulling=true;
   try{
-    for(const store of ["profiles","channels","sessions"]){
+    for(const store of syncableStores()){
       const { data, error } = await SB.from(store).select("*");
+      if(isMissingTable(error)){ noteMissingTable(store,error); continue; }
       if(error) throw error;
       for(const row of (data||[])){
         const local=await idbGet(store,row.id);
@@ -1725,108 +1756,213 @@ let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selected
   stage.innerHTML='<div style="display:flex;flex-direction:column;height:100%;background:var(--bg)"></div>';
   window.closeDayPlanner=()=>{stage.innerHTML=origStage;renderGrid();};
   await initializePlanPage();
-}async function initializePlanPage(){await loadPlans();await renderPlanPageUI();}async function loadPlans(){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));if(!plans||plans.length===0){const defaultPlans=["Monday","Tuesday","Wednesday","Thursday","Friday","Custom"].map((name,idx)=>({id:uid(),profileId:state.profileId,name,schedule:{},order:idx}));for(const p of defaultPlans)await saveLocal("plans",p);planState.plans=defaultPlans;}else{planState.plans=plans.sort((a,b)=>a.order-b.order);}}async function renderPlanPageUI(){
-  const app=document.querySelector(".app");const stage=app?app.querySelector(".stage"):document.getElementById("stage");
+}async function initializePlanPage(){await loadPlans();try{ planState.today=await ensureDayPlan(todayKey()); }catch(e){ console.warn("ensureDayPlan failed",e); }await renderPlanPageUI();}async function loadPlans(){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));if(!plans||plans.length===0){const defaultPlans=["Monday","Tuesday","Wednesday","Thursday","Friday","Custom"].map((name,idx)=>({id:uid(),profileId:state.profileId,name,schedule:{},order:idx}));for(const p of defaultPlans)await saveLocal("plans",p);planState.plans=defaultPlans;}else{planState.plans=plans.sort((a,b)=>a.order-b.order);}}/* ===== plans: templates vs. days =====
+   plans    = reusable templates (Monday, Heavy Pipeline Day, ...)
+   dayplans = one materialised schedule per profile per date, copied from a
+              template when applied. Editing a day never touches the template;
+              "Save to template" is the explicit way to push changes back. */
+
+function dayPlanKey(date){ return state.profileId+"|"+date; }
+function fmtDayLabel(date){
+  const parts=String(date).split("-").map(Number);
+  return new Date(parts[0],parts[1]-1,parts[2]).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+}
+function weekdayTemplate(date){
+  const names=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const parts=String(date).split("-").map(Number);
+  const nm=names[new Date(parts[0],parts[1]-1,parts[2]).getDay()].toLowerCase();
+  return (planState.plans||[]).find(p=>String(p.name).toLowerCase()===nm)||null;
+}
+async function ensureDayPlan(date){
+  const existing=await idbGet("dayplans",dayPlanKey(date));
+  if(existing) return existing;
+  let src=null;
+  const sel=await idbGet("selected_plan",date);
+  if(sel&&sel.profileId===state.profileId&&sel.planId) src=(planState.plans||[]).find(p=>p.id===sel.planId)||null;
+  if(!src) src=weekdayTemplate(date);
+  const dp={ id:dayPlanKey(date), profileId:state.profileId, date:date,
+             planId:src?src.id:null, planName:src?src.name:null,
+             schedule:src?JSON.parse(JSON.stringify(src.schedule||{})):{}, edited:false };
+  await saveLocal("dayplans",dp);
+  return dp;
+}
+async function applyTemplateToToday(planId){
+  const src=(planState.plans||[]).find(p=>p.id===planId);
+  if(!src) return;
+  const date=todayKey();
+  const cur=await idbGet("dayplans",dayPlanKey(date));
+  if(cur&&cur.edited&&!confirm("Today has edits that are not saved to any template. Replacing it with "+src.name+" will discard them. Continue?")) return;
+  const fresh={ id:dayPlanKey(date), profileId:state.profileId, date:date,
+                planId:src.id, planName:src.name,
+                schedule:JSON.parse(JSON.stringify(src.schedule||{})), edited:false };
+  await saveLocal("dayplans",fresh);
+  await saveLocal("selected_plan",{date:date,profileId:state.profileId,planId:src.id});
+  planState.today=fresh;
+  await renderPlanPageUI();
+  toast("Applied "+src.name+" to today");
+}
+async function saveTodayToTemplate(){
+  const dp=planState.today; if(!dp) return;
+  const tpl=(planState.plans||[]).find(p=>p.id===dp.planId);
+  if(!tpl){ toast("Today is not linked to a template"); return; }
+  if(!confirm("Save today into the template "+tpl.name+"? Every future day that uses it will change.")) return;
+  tpl.schedule=JSON.parse(JSON.stringify(dp.schedule||{}));
+  await saveLocal("plans",tpl);
+  dp.edited=false; await saveLocal("dayplans",dp);
+  await renderPlanPageUI();
+  toast("Template "+tpl.name+" updated");
+}
+async function resetTodayToTemplate(){
+  const dp=planState.today; if(!dp||!dp.planId) return;
+  if(!confirm("Discard today's edits and reload it from its template?")) return;
+  const src=(planState.plans||[]).find(p=>p.id===dp.planId); if(!src) return;
+  const fresh={ id:dayPlanKey(dp.date), profileId:state.profileId, date:dp.date,
+                planId:src.id, planName:src.name,
+                schedule:JSON.parse(JSON.stringify(src.schedule||{})), edited:false };
+  await saveLocal("dayplans",fresh);
+  planState.today=fresh;
+  await renderPlanPageUI();
+  toast("Reloaded from "+src.name);
+}
+/* Single write path for both modes. */
+async function setPlanSlot(slot,chId){
+  if(planState.mode==="today"){
+    const dp=planState.today; if(!dp) return;
+    if(!dp.schedule) dp.schedule={};
+    if(chId) dp.schedule[slot]=chId; else delete dp.schedule[slot];
+    dp.edited=true;
+    await saveLocal("dayplans",dp);
+  }else{
+    const plan=(planState.plans||[])[planState.selectedPlanIdx]; if(!plan) return;
+    if(!plan.schedule) plan.schedule={};
+    if(chId) plan.schedule[slot]=chId; else delete plan.schedule[slot];
+    await saveLocal("plans",plan);
+  }
+  await renderPlanPageUI();
+}
+function activeSchedule(){
+  if(planState.mode==="today") return (planState.today&&planState.today.schedule)||{};
+  const plan=(planState.plans||[])[planState.selectedPlanIdx];
+  return (plan&&plan.schedule)||{};
+}
+async function setPlanMode(mode){
+  planState.mode=mode;
+  if(mode==="today") planState.today=await ensureDayPlan(todayKey());
+  await renderPlanPageUI();
+}
+async function renamePlan(idx){
+  const plan=(planState.plans||[])[idx]; if(!plan) return;
+  const name=prompt("Template name:",plan.name);
+  if(name===null) return;
+  const clean=String(name).trim(); if(!clean) return;
+  plan.name=clean;
+  await saveLocal("plans",plan);
+  await renderPlanPageUI();
+  toast("Renamed");
+}
+
+async function renderPlanPageUI(){
+  const app=document.querySelector(".app");
+  const stage=app?app.querySelector(".stage"):document.getElementById("stage");
   if(!stage)return;
-  
-  const isMobile=window.innerWidth<768;
-  const startHour=planState.startHour||8;
-  const endHour=planState.endHour||18;
-  const increment=planState.increment||30;
-  
   if(!planState.plans||planState.plans.length===0){
-    stage.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted)">Loading plans...</div>';
+    stage.innerHTML=`<div style="padding:20px;text-align:center;color:var(--muted)">Loading plans...</div>`;
     return;
   }
-  
+  if(!planState.mode) planState.mode="today";
+  if(planState.mode==="today"&&!planState.today) planState.today=await ensureDayPlan(todayKey());
+  if(planState.selectedPlanIdx>=planState.plans.length) planState.selectedPlanIdx=0;
+
+  const isMobile=window.innerWidth<768;
+  const startHour=planState.startHour||8, endHour=planState.endHour||18, increment=planState.increment||30;
   const hours=[];
   for(let h=startHour;h<endHour;h++){
     for(let m=0;m<60;m+=increment){
-      const startHr=h%12||12;
-      const ampm=h<12?"AM":"PM";
-      const timeStr=startHr+":"+(m===0?"00":m)+" "+ampm;
-      hours.push({h,m,display:timeStr});
+      const startHr=h%12||12, ampm=h<12?"AM":"PM";
+      hours.push({h:h,m:m,display:startHr+":"+(m===0?"00":m)+" "+ampm});
     }
   }
-  
+  const sched=activeSchedule();
+  const today=planState.today;
+  const isToday=planState.mode==="today";
+
   let html=`<div style="display:flex;flex-direction:column;gap:16px;padding:16px;max-width:800px;margin:0 auto">`;
-  
-  // Plan selector
-  html+=`<div>
-    <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Active Plan</label>
-    <div style="display:flex;gap:8px">
-      <select id="planSelect" style="flex:1;padding:10px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:14px">`;
-  
-  planState.plans.forEach((p,i)=>{
-    html+=`<option value="${i}">${p.name}</option>`;
-  });
-  
-  html+=`</select>
-      <button onclick="setForTodayPlan()" style="padding:10px 16px;background:var(--accent);border:none;color:white;border-radius:6px;font-weight:600;cursor:pointer;white-space:nowrap">Set for Today</button>
-    </div>
+
+  const tabStyle=on=>`flex:1;padding:10px 12px;border-radius:8px;border:1px solid ${on?"var(--accent)":"var(--line)"};background:${on?"var(--accent)":"var(--panel)"};color:${on?"#fff":"var(--ink2)"};font-weight:700;font-size:13px;cursor:pointer;transition:all .15s`;
+  html+=`<div style="display:flex;gap:8px">
+    <button onclick="setPlanMode('today')" style="${tabStyle(isToday)}">Today &middot; ${fmtDayLabel(todayKey())}</button>
+    <button onclick="setPlanMode('templates')" style="${tabStyle(!isToday)}">Templates</button>
   </div>`;
-  
-  const plan=planState.plans[planState.selectedPlanIdx];
-  
+
+  if(isToday){
+    const linked=(today&&today.planId)?(planState.plans.find(p=>p.id===today.planId)||null):null;
+    const badge=(today&&today.edited)
+      ? `<span style="margin-left:8px;padding:2px 7px;border-radius:999px;background:rgba(245,158,11,.18);border:1px solid var(--warn);color:var(--warn);font-size:10px;font-weight:800;text-transform:uppercase">Edited</span>`
+      : ``;
+    const canPush=(today&&today.edited&&linked);
+    html+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--ink)">${linked?"From template: "+escapeHtml(linked.name):"No template applied"}${badge}</div>
+      <div class="hint" style="margin-top:4px">Changes here affect today only. The template stays as it is.</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <select id="applyTplSelect" style="flex:1;min-width:130px;padding:9px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:13px">
+          ${planState.plans.map(p=>`<option value="${p.id}"${linked&&linked.id===p.id?" selected":""}>${escapeHtml(p.name)}</option>`).join("")}
+        </select>
+        <button class="btn sm pri" onclick="applyTemplateToToday(document.getElementById('applyTplSelect').value)">Apply to today</button>
+        ${canPush?`<button class="btn sm" onclick="saveTodayToTemplate()">Save to template</button>`:``}
+        ${canPush?`<button class="btn sm warn" onclick="resetTodayToTemplate()">Discard edits</button>`:``}
+      </div>
+    </div>`;
+  }else{
+    html+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px">
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Editing template</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select id="planSelect" style="flex:1;min-width:130px;padding:9px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:13px">
+          ${planState.plans.map((p,i)=>`<option value="${i}">${escapeHtml(p.name)}</option>`).join("")}
+        </select>
+        <button id="addPlanBtn" class="btn sm pri">+ New</button>
+        <button class="btn sm" onclick="renamePlan(${planState.selectedPlanIdx})">Rename</button>
+        <button class="btn sm warn deletePlanBtn" data-idx="${planState.selectedPlanIdx}">Delete</button>
+      </div>
+      <div class="hint" style="margin-top:8px">Changes here apply every time this template is used. Add as many as you like and name them whatever you want.</div>
+    </div>`;
+  }
+
+  const slotAttrs=slot=>`ondragover="event.preventDefault();event.dataTransfer.dropEffect='copy';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='1px'" ondragleave="this.style.outline=''" ondrop="this.style.outline='';planDrop(event,'${slot}')" onclick="openPlanSlotModal('${slot}')"`;
+
   if(isMobile){
-    // Mobile: 2-column grid
-    html+=`<div>
-      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Time Blocks</label>
+    html+=`<div><label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Time blocks</label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
-    
-    hours.forEach(({h,m,display})=>{
-      const slot=h+":"+(m===0?"00":m);
-      const chId=plan?.schedule?.[slot];
-      const ch=chId?state.channels.find(x=>x.id===chId):null;
-      
-      html+=`<button onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" ondragover="event.preventDefault();event.dataTransfer.dropEffect='copy';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='1px'" ondragleave="this.style.outline=''" ondrop="this.style.outline='';planDrop(event,'${slot}')" 
-        style="padding:12px;background:${ch?ch.color+'33':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:6px;font-weight:600;font-size:12px;cursor:pointer;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;transition:all .15s">
-        <div style="font-size:10px;opacity:0.7">${display}</div>
-        <div style="font-weight:700;margin-top:2px">${ch?ch.label.substring(0,12):'—'}</div>
-      </button>`;
+    hours.forEach(o=>{
+      const slot=o.h+":"+(o.m===0?"00":o.m);
+      const ch=sched[slot]?(state.channels||[]).find(x=>x.id===sched[slot]):null;
+      html+=`<button ${slotAttrs(slot)} style="padding:12px;background:${ch?ch.color+"33":"var(--panel2)"};border:2px solid ${ch?ch.color:"var(--line)"};color:${ch?ch.color:"var(--ink2)"};border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s">
+        <div style="opacity:.75;font-size:10px">${o.display}</div>
+        <div style="margin-top:2px">${ch?escapeHtml(ch.label):"&mdash;"}</div></button>`;
     });
-    
     html+=`</div></div>`;
   }else{
-    // Desktop: table view
-    html+=`<div style="overflow-x:auto">
-      <div style="display:grid;grid-template-columns:80px 1fr 60px;gap:8px;min-width:400px">`;
-    
-    // Headers
-    html+=`<div style="font-size:11px;font-weight:600;color:var(--muted);padding:8px;text-align:center">Time</div>`;
-    html+=`<div style="font-size:11px;font-weight:600;color:var(--muted);padding:8px">Channel</div>`;
-    html+=`<div></div>`;
-    
-    hours.forEach(({h,m,display})=>{
-      const slot=h+":"+(m===0?"00":m);
-      const chId=plan?.schedule?.[slot];
-      const ch=chId?state.channels.find(x=>x.id===chId):null;
-      
-      html+=`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--ink2);padding:8px">${display}</div>`;
-      html+=`<div onclick="openPlanSlotModal(${planState.selectedPlanIdx},'${slot}')" ondragover="event.preventDefault();event.dataTransfer.dropEffect='copy';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='1px'" ondragleave="this.style.outline=''" ondrop="this.style.outline='';planDrop(event,'${slot}')" 
-        style="padding:8px;background:${ch?ch.color+'22':'var(--panel2)'};border:1px solid ${ch?ch.color:'var(--line)'};color:${ch?ch.color:'var(--ink2)'};border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center">${ch?ch.label:'—'}</div>`;
-      html+=`<button onclick="clearPlanSlot(${planState.selectedPlanIdx},'${slot}')" style="background:none;border:1px solid var(--line);color:var(--muted);padding:4px 6px;border-radius:3px;cursor:pointer;font-size:9px;height:fit-content">✕</button>`;
+    html+=`<div style="overflow-x:auto"><div style="display:grid;grid-template-columns:80px 1fr 60px;gap:8px;min-width:400px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);padding:8px;text-align:center">Time</div>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);padding:8px">Channel</div><div></div>`;
+    hours.forEach(o=>{
+      const slot=o.h+":"+(o.m===0?"00":o.m);
+      const ch=sched[slot]?(state.channels||[]).find(x=>x.id===sched[slot]):null;
+      html+=`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--ink2);padding:8px">${o.display}</div>
+        <div ${slotAttrs(slot)} style="padding:8px;background:${ch?ch.color+"22":"var(--panel2)"};border:1px solid ${ch?ch.color:"var(--line)"};color:${ch?ch.color:"var(--ink2)"};border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center">${ch?escapeHtml(ch.label):"&mdash;"}</div>
+        <button onclick="clearPlanSlot('${slot}')" style="background:none;border:1px solid var(--line);color:var(--muted);padding:4px 6px;border-radius:3px;cursor:pointer;font-size:9px;height:fit-content">&#10005;</button>`;
     });
-    
     html+=`</div></div>`;
   }
-  
-  // Channels section
-  html+=`<div>
-    <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Channels (drag on desktop)</label>
+
+  html+=`<div><label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Channels &mdash; drag onto a slot, or tap a slot</label>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px">`;
-  
   (state.channels||[]).filter(c=>!c.archived&&!c.parentChannelId).forEach(ch=>{
-    html+=`<div draggable="true" data-ch-id="${ch.id}" 
-      style="padding:10px;background:${ch.color}33;border:1px solid ${ch.color};color:${ch.color};border-radius:6px;font-weight:600;font-size:11px;text-align:center;cursor:grab;transition:all .15s;user-select:none"
-      ondragstart="event.dataTransfer.effectAllowed='copy';event.dataTransfer.setData('text/plain',this.dataset.chId)">${ch.label}</div>`;
+    html+=`<div draggable="true" data-ch-id="${ch.id}" style="padding:10px;background:${ch.color}33;border:1px solid ${ch.color};color:${ch.color};border-radius:6px;font-weight:600;font-size:11px;text-align:center;cursor:grab;user-select:none;transition:all .15s" ondragstart="event.dataTransfer.effectAllowed='copy';event.dataTransfer.setData('text/plain',this.dataset.chId)">${escapeHtml(ch.label)}</div>`;
   });
-  
   html+=`</div></div></div>`;
-  
+
   stage.innerHTML=html;
-  
-  // Setup plan select listener
+
   const planSelect=document.getElementById("planSelect");
   if(planSelect){
     planSelect.value=planState.selectedPlanIdx;
@@ -1841,72 +1977,46 @@ async function planDrop(e,slot){
   e.preventDefault();
   const chId=e.dataTransfer.getData("text/plain");
   if(!chId) return;
-  const plan=planState.plans[planState.selectedPlanIdx];
-  if(!plan) return;
-  if(!plan.schedule) plan.schedule={};
-  plan.schedule[slot]=chId;
-  await saveLocal("plans",plan);
-  await renderPlanPageUI();
-  const ch=state.channels.find(c=>c.id===chId);
+  await setPlanSlot(slot,chId);
+  const ch=(state.channels||[]).find(c=>c.id===chId);
   toast(ch?("Planned "+ch.label):"Planned");
 }
-function openPlanSlotModal(planIdx,slot){
-  const plan=planState.plans[planIdx];
-  if(!plan)return;
-  
+async function clearPlanSlot(slot){ await setPlanSlot(slot,null); }
+
+function openPlanSlotModal(slot){
   const modal=document.createElement("div");
   modal.className="scrim";
   modal.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.66);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px";
-  
   const card=document.createElement("div");
-  card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:320px;width:100%";
-  
+  card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:320px;width:100%;max-height:80vh;overflow-y:auto";
   const header=document.createElement("div");
-  header.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px";
-  header.innerHTML=`<h3 style="margin:0;font-size:16px">${slot}</h3><button onclick="this.closest('.scrim').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">✕</button>`;
+  header.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px";
+  header.innerHTML=`<h3 style="margin:0;font-size:16px">${slot}</h3><button class="planModalX" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">&#10005;</button>`;
   card.appendChild(header);
-  
+  const sub=document.createElement("div");
+  sub.className="hint"; sub.style.margin="0 0 14px";
+  sub.textContent=planState.mode==="today"?"Applies to today only":"Applies to the template";
+  card.appendChild(sub);
   const options=document.createElement("div");
   options.style.cssText="display:flex;flex-direction:column;gap:8px;margin-bottom:16px";
-  
   (state.channels||[]).filter(c=>!c.archived&&!c.parentChannelId).forEach(ch=>{
     const btn=document.createElement("button");
-    btn.style.cssText=`padding:12px;background:${ch.color}33;border:1px solid ${ch.color};color:${ch.color};border-radius:6px;font-weight:600;cursor:pointer;transition:all .15s`;
+    btn.style.cssText="padding:12px;background:"+ch.color+"33;border:1px solid "+ch.color+";color:"+ch.color+";border-radius:6px;font-weight:600;cursor:pointer;transition:all .15s";
     btn.textContent=ch.label;
-    btn.onclick=async ()=>{
-      plan.schedule[slot]=ch.id;
-      await saveLocal("plans",plan);
-      modal.remove();
-      renderPlanPageUI();
-    };
+    btn.onclick=async()=>{ modal.remove(); await setPlanSlot(slot,ch.id); };
     options.appendChild(btn);
   });
-  
   card.appendChild(options);
-  
   const clearBtn=document.createElement("button");
   clearBtn.style.cssText="width:100%;padding:10px;background:rgba(240,68,68,.15);border:1px solid rgba(240,68,68,.5);color:#f87171;border-radius:6px;font-weight:600;cursor:pointer";
-  clearBtn.textContent="Clear Slot";
-  clearBtn.onclick=async ()=>{
-    delete plan.schedule[slot];
-    await saveLocal("plans",plan);
-    modal.remove();
-    renderPlanPageUI();
-  };
+  clearBtn.textContent="Clear slot";
+  clearBtn.onclick=async()=>{ modal.remove(); await setPlanSlot(slot,null); };
   card.appendChild(clearBtn);
-  
   modal.appendChild(card);
-  modal.onclick=e=>{if(e.target===modal)modal.remove();};
-  
+  const x=header.querySelector(".planModalX");
+  if(x) x.onclick=()=>modal.remove();
+  modal.onclick=e=>{ if(e.target===modal) modal.remove(); };
   document.body.appendChild(modal);
-}
-
-function clearPlanSlot(planIdx,slot){
-  const plan=planState.plans[planIdx];
-  if(!plan)return;
-  delete plan.schedule[slot];
-  saveLocal("plans",plan);
-  renderPlanPageUI();
 }
 
 function renderPlanSelect(){
@@ -1922,10 +2032,10 @@ function renderPlanSelect(){
   });
   planSelect.value=curVal;
 }
-function renderPlanSelect(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const curVal=planSelect.value;planSelect.innerHTML="";planState.plans.forEach((p,i)=>{const opt=document.createElement("option");opt.value=i;opt.textContent=p.name;planSelect.appendChild(opt);});planSelect.value=curVal;}async function setForTodayPlan(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const idx=parseInt(planSelect.value);if(idx<0||!planState.plans[idx])return;const plan=planState.plans[idx];planState.selectedPlanIdx=idx;const dayKey=todayKey();await saveLocal("selected_plan",{date:dayKey,profileId:state.profileId,planId:plan.id});toast("Plan '"+plan.name+"' set for today");}async function addPlan(){const newPlan={id:uid(),profileId:state.profileId,name:"New Plan",schedule:{},order:planState.plans.length};await saveLocal("plans",newPlan);planState.plans.push(newPlan);await renderPlanPageUI();toast("Plan added");}async function deletePlan(idx){if(planState.plans.length<=1){toast("Cannot delete the last plan");return;}const plan=planState.plans[idx];await db.transaction(["plans"],"readwrite").objectStore("plans").delete(plan.id);planState.plans.splice(idx,1);if(planState.selectedPlanIdx>=planState.plans.length)planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Plan deleted");}
+function renderPlanSelect(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const curVal=planSelect.value;planSelect.innerHTML="";planState.plans.forEach((p,i)=>{const opt=document.createElement("option");opt.value=i;opt.textContent=p.name;planSelect.appendChild(opt);});planSelect.value=curVal;}async function setForTodayPlan(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const idx=parseInt(planSelect.value);if(idx<0||!planState.plans[idx])return;const plan=planState.plans[idx];planState.selectedPlanIdx=idx;const dayKey=todayKey();await saveLocal("selected_plan",{date:dayKey,profileId:state.profileId,planId:plan.id});toast("Plan '"+plan.name+"' set for today");}async function addPlan(){const newPlan={id:uid(),profileId:state.profileId,name:"New Template",schedule:{},order:planState.plans.length};await saveLocal("plans",newPlan);planState.plans.push(newPlan);planState.mode="templates";planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Template added - use Rename to name it");}async function deletePlan(idx){if(planState.plans.length<=1){toast("Cannot delete the last plan");return;}const plan=planState.plans[idx];await db.transaction(["plans"],"readwrite").objectStore("plans").delete(plan.id);planState.plans.splice(idx,1);if(planState.selectedPlanIdx>=planState.plans.length)planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Plan deleted");}
 function renderPlanSlots(){const times=document.getElementById("planSlots");const schedules=document.getElementById("planSchedule");let timesHtml='';let schedHtml='';for(let h=planState.startHour;h<planState.endHour;h++){for(let m=0;m<60;m+=planState.increment){const slot=h+':'+(m===0?'00':m);const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+planState.increment>=60?h+1:h)%12||12;const endMin=String((m+planState.increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;const scheduled=planState.schedule[slot];const ch=scheduled?state.channels.find(x=>x.id===scheduled):null;timesHtml+=`<div style="padding:8px 4px;text-align:center;font-size:11px;font-weight:600;color:var(--ink2);flex-shrink:0;border-bottom:1px solid var(--line)">${timeStr}</div>`;schedHtml+=`<div class="time-block-target" data-slot="${slot}" style="padding:8px;min-height:42px;background:${ch?ch.color+'15':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};border-radius:6px;display:flex;align-items:center;justify-content:center;text-align:center;color:${ch?ch.color:'var(--ink2)'};font-size:11px;font-weight:${ch?'700':'500'};cursor:move;flex-shrink:0;transition:all .15s;word-break:break-word">${ch?ch.label:''}</div>`;}}times.innerHTML=timesHtml;schedules.innerHTML=schedHtml;}
 function renderPlanChannels(){const ch=document.getElementById("planChannels");let html='';if(state.channels){state.channels.filter(c=>!c.archived).forEach(c=>{html+=`<div draggable="true" data-ch="${c.id}" style="padding:6px 4px;border:2px solid ${c.color};background:${c.color}15;color:${c.color};border-radius:5px;cursor:move;font-weight:700;font-size:11px;text-align:center;flex-shrink:0;transition:all .15s;word-break:break-word">${escapeHtml(c.label)}</div>`;});}ch.innerHTML=html;ch.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',el.dataset.ch);});el.addEventListener('dragend',e=>{el.style.opacity='1';});});}
-async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();const selPlan=await idbGet("selected_plan",dayKey);let plan=null;if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId);}const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",openEditsModal);}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;flex-wrap:wrap;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;min-height:36px;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
+async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",openEditsModal);}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;flex-wrap:wrap;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;min-height:36px;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
   
   // Calculate and display daily score
   (async ()=>{
