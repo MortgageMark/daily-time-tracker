@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v15
-- **Last deployed:** v15, 2026-08-27
+- **Current release:** v16
+- **Last deployed:** v16, 2026-08-27
 - **Status:** stable, in daily use
 
 > **Verify before believing any release claim in this file.** It has been
@@ -892,6 +892,26 @@ Reordered around what people actually come here to do, which is fix times.
   **`refreshDayScores(dk)` does more than feed that line: it persists the
   day’s scores.** Removing it along with the display would quietly stop a
   browsed day being rescored.
+
+### Tracker date navigation, v16
+
+`openPlanAdherence()` hardcoded `todayKey()` twice. It is now split into
+`openPlanAdherence(dk)` (entry) and `renderPlanAdherence()` (repaint), with
+`adhDate` holding the day being viewed, so the Tracker walks back through days
+the way the Day Editor does. `renderAdheranceComparison()` already took a
+`dateKey` and derived everything from it, so it needed no change; the Match
+column fills in completely on a past day because every block has elapsed.
+
+**The stage snapshot is captured once, on entry, and guarded.** Tapping Tracker
+while already on the Tracker would otherwise recapture the tracker as the thing
+Home returns to - the exact trap `openCombinedSummary()` hit. Verified by
+re-entering three times and confirming Home still lands on the dashboard.
+**Any full-page view that can be re-entered needs this guard.** That is now
+three of them.
+
+Also: the Day Editor shows the weekday beside the date, because a native date
+input renders `08/27/2026` and cannot be told to include it; and the zoom
+buttons are captioned "Zoom" so `1x 2x 4x` is not a riddle.
 
 ---
 
