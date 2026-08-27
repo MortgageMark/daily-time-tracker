@@ -656,6 +656,14 @@ end and duration. Gaps appear as dashed regions with the untracked time named.
 - **Every gap carries a `+`** that fills it with one channel, taking the whole
   gap — guessing at a partial fill would be inventing data. It is pinned to the
   right of the gap because the two drag grips own the middle of a short seam.
+- **The rail before the first block and after the last one also gets a `+`**,
+  so a day can be extended at either end. That space is deliberately *not*
+  drawn as a dashed "untracked" region: an empty afternoon is not untracked
+  time, it is simply the end of the day. These two add **at most an hour**
+  (`TL_EDGE_ADD_MS`), unlike a real gap which fills exactly — a gap has data on
+  both sides so its length is a fact, whereas the rail's far edge is only the
+  plan's boundary. Adding again after that is one more tap, since a fresh `+`
+  appears past whatever was just added.
 - **Dragging a block's body slides the whole block**, after a 280ms hold on
   touch. The hold is not optional: without it every attempt to scroll the day
   would pick up whatever block sat under the thumb. A body drag clamps at its

@@ -1600,6 +1600,7 @@ const TL_SNAP_MIN=5;           /* every drag lands on a 5-minute grid */
 const TL_MAGNET_MIN=10;        /* ...and jumps a neighbour's edge within 10 */
 const TL_MIN_BLOCK_MIN=5;      /* thinner than this and the block is absorbed */
 const TL_HANDLE=20;            /* tap height of a drag handle */
+const TL_EDGE_ADD_MS=3600000;  /* most a + adds beyond the first or last block */
 
 let tlRangeCur=null, tlSessions=[], tlFmt=null, tlDk=null;
 /* A finger down on a block before it is known to be a tap or a drag. */
@@ -1803,6 +1804,26 @@ function buildTimeline(dk,sess,fmt){
       wrap.appendChild(tlHandle(dk,sn.id,"start",top,ch.color));
   });
 
+  /* The rail runs on past the first and last block, and that space is not a
+     gap between two things - it is the rest of the planned day. It gets a +
+     but no dashed region: an empty afternoon is not "untracked", it is empty.
+     The + adds at most an hour, because unlike a real gap this span has data
+     on one side only and its far edge is the plan's boundary, not a fact. */
+  if(ordered.length){
+    const first=ordered[0], last=ordered[ordered.length-1];
+    if(first.startTs-tlRangeCur.startTs>=60000){
+      const st=Math.max(tlRangeCur.startTs,first.startTs-TL_EDGE_ADD_MS);
+      wrap.appendChild(tlEdgeAdd(dk,st,first.startTs,tlY(first.startTs)-30,"Add time before "+fmtClock(first.startTs,fmt)));
+    }
+    const le=tlEndOf(last), cap=tlMaxTs();
+    if(cap-le>=60000){
+      wrap.appendChild(tlEdgeAdd(dk,le,Math.min(cap,le+TL_EDGE_ADD_MS),tlY(le)+6,"Add time after "+fmtClock(le,fmt)));
+    }
+  } else {
+    const st=tlRangeCur.startTs, en=Math.min(tlMaxTs(),st+TL_EDGE_ADD_MS);
+    if(en>st) wrap.appendChild(tlEdgeAdd(dk,st,en,tlY(st)+6,"Add time"));
+  }
+
   const badge=document.createElement("div");
   badge.id="tlBadge";
   badge.style.cssText="position:absolute;left:"+TL_RAIL+"px;display:none;z-index:6;padding:3px 8px;"+
@@ -1828,6 +1849,19 @@ function tlHandle(dk,sid,edge,y,color){
   el.addEventListener("pointerup",tlDragEnd);
   el.addEventListener("pointercancel",tlDragEnd);
   return el;
+}
+
+/* Right-aligned like the gap +, so it never lands under a drag grip. */
+function tlEdgeAdd(dk,fillStart,fillEnd,top,label){
+  const b=document.createElement("button");
+  b.className="btn sm";
+  b.textContent="+";
+  b.title=label;
+  b.style.cssText="position:absolute;right:0;top:"+Math.max(0,top)+"px;z-index:6;"+
+    "padding:3px 11px;font-size:15px;font-weight:800;line-height:1.15";
+  b.addEventListener("click",ev=>{ ev.stopPropagation(); openGapSheet(dk,fillStart,fillEnd,"edge"); });
+  b.addEventListener("pointerdown",ev=>ev.stopPropagation());
+  return b;
 }
 
 function tlDragStart(ev,dk,sid,edge,el){
@@ -1998,15 +2032,20 @@ function tlChipRow(pool,currentId,onPick){
 
 /* Filling a gap takes the whole gap. Splitting it afterwards is one tap, and
    guessing at a partial fill would be inventing data. */
-async function openGapSheet(dk,startTs,endTs){
+async function openGapSheet(dk,startTs,endTs,mode){
   tlEnsureSheet();
   const fmt=state.profile&&state.profile.hourFmt;
-  document.getElementById("blkTitle").textContent="Fill "+fmtDurShort(endTs-startTs);
+  const edge=mode==="edge";
+  const span=fmtDurShort(endTs-startTs);
+  document.getElementById("blkTitle").textContent=(edge?"Add ":"Fill ")+span;
   const body=document.getElementById("blkBody");
   body.innerHTML="";
   const when=document.createElement("div"); when.className="hint"; when.style.margin="0 0 16px";
-  when.textContent=fmtClock(startTs,fmt)+" – "+fmtClock(endTs,fmt)+
-    " is untracked. Pick a channel and it takes the whole gap.";
+  when.textContent=edge
+    ? "Adds "+span+" at "+fmtClock(startTs,fmt)+" – "+fmtClock(endTs,fmt)+
+      ". Drag its edge afterwards to make it longer or shorter."
+    : fmtClock(startTs,fmt)+" – "+fmtClock(endTs,fmt)+
+      " is untracked. Pick a channel and it takes the whole gap.";
   body.appendChild(when);
   const t=document.createElement("div"); t.className="sect-title"; t.style.margin="0 0 8px";
   t.textContent="Channel"; body.appendChild(t);
