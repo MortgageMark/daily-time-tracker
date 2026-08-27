@@ -28,6 +28,30 @@
     --accent:#4f8cff; --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
     --radius:18px; --shadow:0 8px 30px rgba(0,0,0,.35);
     --tile-min: 210px;
+    /* These four were hardcoded in ~25 places, which is what made the app
+       dark-only. Named here so a theme can move them. */
+    --field:#0a1424;              /* inputs, selects, textareas */
+    --glass:rgba(10,16,28,.7);    /* sticky headers and footers */
+    --glass2:rgba(10,16,28,.55);
+    --scrim:rgba(4,8,16,.7);      /* behind every modal */
+    --glow:#16233c;               /* the radial wash behind the app */
+    --bad-ink:#fca5a5;            /* destructive TEXT, not a fill */
+    --barbg:#0a101c;              /* the bottom bar sits below everything */
+  }
+  /* Channel colours are deliberately NOT themed: they are the user's data, and
+     every surface painting one already picks its text with contrastInk(). */
+  :root[data-theme="light"]{
+    --bg:#f2f5fb; --panel:#ffffff; --panel2:#f6f8fd; --line:#dae1ed;
+    --ink:#0f1a2c; --ink2:#46566f; --muted:#78879e;
+    --accent:#2a5bc4; --good:#15803d; --warn:#b45309; --bad:#dc2626;
+    --shadow:0 8px 26px rgba(15,26,44,.10);
+    --field:#ffffff;
+    --glass:rgba(255,255,255,.82);
+    --glass2:rgba(255,255,255,.7);
+    --scrim:rgba(18,28,48,.38);
+    --glow:#e4ecfb;
+    --bad-ink:#b91c1c;
+    --barbg:#ffffff;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{-webkit-text-size-adjust:100%; text-size-adjust:100%}
@@ -49,7 +73,7 @@
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     background-color:var(--bg);
-    background-image:radial-gradient(1200px 800px at 70% -10%,#16233c 0%,var(--bg) 55%);
+    background-image:radial-gradient(1200px 800px at 70% -10%,var(--glow) 0%,var(--bg) 55%);
     color:var(--ink); overflow:hidden; user-select:none; -webkit-user-select:none;
   }
   button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
@@ -63,7 +87,7 @@
      rather than empty space beneath it. */
   .app{display:flex; flex-direction:column; position:fixed; inset:0}
 
-  .topbar{display:flex; align-items:center; gap:16px; padding:max(14px, env(safe-area-inset-top)) 20px 14px 20px; border-bottom:1px solid var(--line); background:rgba(10,16,28,.55); backdrop-filter:blur(8px)}
+  .topbar{display:flex; align-items:center; gap:16px; padding:max(14px, env(safe-area-inset-top)) 20px 14px 20px; border-bottom:1px solid var(--line); background:var(--glass2); backdrop-filter:blur(8px)}
   .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.2px}
   .brand .dot{width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 14px var(--accent)}
   .topmeta{display:flex; align-items:center; gap:22px; margin-left:auto; flex-wrap:wrap}
@@ -109,13 +133,13 @@
      and taps would trigger its swipe gesture - so it is scaled back to ~62%
      and the top padding raised to meet it. The buttons end up optically
      centred in the bar instead of pinned to its top edge. */
-  .bottombar{display:flex; align-items:center; gap:10px; padding:14px 18px max(12px, calc(env(safe-area-inset-bottom) * 0.55)) 18px; border-top:1px solid var(--line); background:#0a101c; backdrop-filter:blur(8px)}
+  .bottombar{display:flex; align-items:center; gap:10px; padding:14px 18px max(12px, calc(env(safe-area-inset-bottom) * 0.55)) 18px; border-top:1px solid var(--line); background:var(--barbg); backdrop-filter:blur(8px)}
   .ctl{display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 14px; border-radius:14px; border:1px solid var(--line); background:var(--panel); font-size:12px; font-weight:700; min-width:76px; color:var(--ink2)}
   .ctl svg{width:22px;height:22px}
   .ctl:active{transform:scale(.96)}
   .ctl.primary{background:linear-gradient(180deg,#3b74e0,#2a5bc4); color:#fff; border-color:#2a5bc4}
 
-  .scrim{position:fixed; inset:0; background:rgba(4,8,16,.66); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; z-index:40; padding:20px}
+  .scrim{position:fixed; inset:0; background:var(--scrim); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; z-index:40; padding:20px}
   .scrim.open{display:flex}
   .sheet{width:100%; max-width:760px; max-height:88vh; overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:22px; box-shadow:var(--shadow)}
   .sheet.wide{max-width:1080px}
@@ -158,14 +182,14 @@
     .stage [ondrop]{font-size:12px !important}
   }
   .swatch{width:34px;height:34px;border-radius:9px; flex:none; border:2px solid rgba(255,255,255,.25)}
-  input,select{font-family:inherit; font-size:15px; color:var(--ink); background:#0a1424; border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none}
+  input,select{font-family:inherit; font-size:15px; color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none}
   input[type=color]{padding:3px; width:52px; height:40px}
   input:focus,select:focus{border-color:var(--accent)}
   .grow{flex:1; min-width:0}
   .btn{padding:10px 16px; border-radius:11px; border:1px solid var(--line); background:var(--panel2); font-weight:700; color:var(--ink)}
   .btn.pri{background:linear-gradient(180deg,#3b74e0,#2a5bc4); border-color:#2a5bc4; color:#fff}
   .btn.sm{padding:7px 11px; font-size:13px}
-  .btn.warn{color:#fca5a5; border-color:#5b2130}
+  .btn.warn{color:var(--bad-ink); border-color:#5b2130}
   .iconbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel2); font-size:16px; display:grid; place-items:center; color:var(--ink2)}
   .muted{color:var(--muted)} .ink2{color:var(--ink2)}
   .sect-title{font-size:12px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); margin:18px 0 10px}
@@ -199,11 +223,11 @@
   .insight b{color:#fff}
   .barrow{display:flex; align-items:center; gap:12px; margin-bottom:11px}
   .barrow .nm{width:130px; font-size:13px; font-weight:700; text-align:right; flex:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .barrow .track{flex:1; height:22px; background:#0a1424; border-radius:7px; overflow:hidden}
+  .barrow .track{flex:1; height:22px; background:var(--field); border-radius:7px; overflow:hidden}
   .barrow .fill{height:100%; border-radius:7px; min-width:2px}
   .barrow .val{width:92px; font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; flex:none}
   svg text{fill:var(--ink2); font-size:11px}
-  .toast{position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:#0a1424; border:1px solid var(--line); color:var(--ink); padding:11px 18px; border-radius:12px; box-shadow:var(--shadow); font-weight:600; font-size:14px; opacity:0; transition:opacity .2s, transform .2s; pointer-events:none; z-index:60}
+  .toast{position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:var(--field); border:1px solid var(--line); color:var(--ink); padding:11px 18px; border-radius:12px; box-shadow:var(--shadow); font-weight:600; font-size:14px; opacity:0; transition:opacity .2s, transform .2s; pointer-events:none; z-index:60}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px)}
   .tl-item{display:grid; grid-template-columns:14px 1fr auto; gap:12px; align-items:center; padding:11px 12px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); margin-bottom:9px}
   .tl-dot{width:14px;height:14px;border-radius:4px}
@@ -211,14 +235,14 @@
   .tl-dur{font-weight:800; font-variant-numeric:tabular-nums}
 
   /* login */
-  .login{position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; background:radial-gradient(1000px 700px at 50% -10%,#16233c 0%,var(--bg) 60%)}
+  .login{position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; background:radial-gradient(1000px 700px at 50% -10%,var(--glow) 0%,var(--bg) 60%)}
   .login .box{width:100%; max-width:400px; background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:30px; box-shadow:var(--shadow)}
   .login h1{margin:0 0 4px; font-size:23px; display:flex; align-items:center; gap:10px}
   .login h1 .dot{width:13px;height:13px;border-radius:50%;background:var(--accent);box-shadow:0 0 14px var(--accent)}
   .login p{color:var(--ink2); font-size:14px; margin:0 0 22px}
   .login label{display:block; font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:14px 0 6px}
   .login input{width:100%}
-  .login .err{color:#fca5a5; font-size:13px; margin-top:12px; min-height:18px}
+  .login .err{color:var(--bad-ink); font-size:13px; margin-top:12px; min-height:18px}
   .login .ok{color:#86efac; font-size:13px; margin-top:10px; line-height:1.45}
   .login .authlinks{display:flex; justify-content:space-between; gap:12px; margin-top:18px; font-size:13px; flex-wrap:wrap}
   .login .authlinks a{color:var(--accent); text-decoration:none; cursor:pointer}
@@ -265,7 +289,7 @@
     .bottombar .ctl svg{width:24px; height:24px}
   }
 
-  textarea{font-family:inherit;font-size:14px;color:var(--ink);background:#0a1424;border:1px solid var(--line);border-radius:10px;padding:12px;outline:none}
+  textarea{font-family:inherit;font-size:14px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:12px;outline:none}
   textarea:focus{border-color:var(--accent)}
   input[type="range"]{-webkit-appearance:slider-horizontal;appearance:slider-horizontal}
   input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer}
@@ -295,6 +319,18 @@
   .planner-controls{display:flex;gap:10px;margin-top:20px}
   .planner-controls button{flex:1}
 </style>
+<script>
+/* Runs before <body> exists so the theme is on <html> at first paint rather
+   than flashing dark and correcting. localStorage is device-local and
+   synchronous; a context that throws simply stays dark. */
+(function(){
+  var t="dark";
+  try{ t=localStorage.getItem("dtt-theme")||"dark"; }catch(e){}
+  document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");
+  var m=document.querySelector('meta[name="theme-color"]');
+  if(m) m.setAttribute("content",t==="light"?"#f2f5fb":"#0f172a");
+})();
+</script>
 </head>
 <body>
 
@@ -424,7 +460,7 @@
     </div>
 
     <div class="row"><div class="grow">Notes<div class="hint">Capture wins, challenges, or anything worth remembering</div></div></div>
-    <textarea id="dayNotes" placeholder="e.g. Finished project X, had great meeting with team, struggled with focus in afternoon" style="font-family:inherit;font-size:14px;color:var(--ink);background:#0a1424;border:1px solid var(--line);border-radius:10px;padding:12px;width:100%;min-height:100px;resize:vertical;outline:none"></textarea>
+    <textarea id="dayNotes" placeholder="e.g. Finished project X, had great meeting with team, struggled with focus in afternoon" style="font-family:inherit;font-size:14px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:12px;width:100%;min-height:100px;resize:vertical;outline:none"></textarea>
     <div style="display:flex;gap:10px;margin-top:16px"><button class="btn sm" id="notesSkip">Close</button><button class="btn pri" id="notesSave">Save</button></div>
   </div></div></div>
 
@@ -1464,7 +1500,7 @@ async function renderDayEditor(){
 
   /* ---------------- header ---------------- */
   const head=document.createElement("div");
-  head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap";
+  head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--glass);flex-wrap:wrap";
   const prev=document.createElement("button"); prev.className="btn sm"; prev.textContent="\u2039";
   const next=document.createElement("button"); next.className="btn sm"; next.textContent="\u203a";
   const dateInput=document.createElement("input");
@@ -1473,7 +1509,7 @@ async function renderDayEditor(){
      Bounded at +2 years so the picker stays sane. */
   const maxD=new Date(dayStartTs(tk)); maxD.setFullYear(maxD.getFullYear()+2);
   dateInput.max=dateKey(maxD.getTime());
-  dateInput.style.cssText="font-size:16px;background:#0a1424;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:7px 9px";
+  dateInput.style.cssText="font-size:16px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:7px 9px";
   const lbl=document.createElement("div");
   lbl.style.cssText="font-weight:700;font-size:13px;color:var(--ink2);white-space:nowrap";
   lbl.textContent=prettyDate(dk)+(isFuture?" \u00b7 upcoming":"");
@@ -1568,7 +1604,7 @@ async function renderDayEditor(){
     ta.placeholder="How did this day go?";
     ta.value=note.notes||"";
     ta.rows=3;
-    ta.style.cssText="width:100%;font-size:16px;background:#0a1424;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;resize:vertical";
+    ta.style.cssText="width:100%;font-size:16px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;resize:vertical";
     ta.addEventListener("change",async()=>{ await saveDayRatingAndNotes(dk,note.rating||0,ta.value); toast("Notes saved"); });
     body.appendChild(ta);
   }
@@ -1576,7 +1612,7 @@ async function renderDayEditor(){
 
   /* ---------------- footer ---------------- */
   const foot=document.createElement("div");
-  foot.style.cssText="padding:10px 12px max(10px, env(safe-area-inset-bottom)) 12px;border-top:1px solid var(--line);background:rgba(10,16,28,.7);display:flex;align-items:center;gap:10px;flex-wrap:wrap";
+  foot.style.cssText="padding:10px 12px max(10px, env(safe-area-inset-bottom)) 12px;border-top:1px solid var(--line);background:var(--glass);display:flex;align-items:center;gap:10px;flex-wrap:wrap";
   if(!isFuture){
     const add=document.createElement("button");
     add.className="btn pri sm"; add.textContent="+ Add session";
@@ -2125,7 +2161,7 @@ async function openBlockSheet(dk,sn){
   acts.appendChild(ex);
 
   const del=document.createElement("button");
-  del.className="btn sm"; del.textContent="Delete"; del.style.color="#fca5a5";
+  del.className="btn sm"; del.textContent="Delete"; del.style.color="var(--bad-ink)";
   del.addEventListener("click",async()=>{
     const ok=await uiConfirm("Remove this block from the day? Its time stops counting toward every total and score.",
       {title:"Delete block",okLabel:"Delete",danger:true});
@@ -2223,7 +2259,7 @@ async function renderPriorities(){
   root.innerHTML="";
 
   const head=document.createElement("div");
-  head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap";
+  head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--glass);flex-wrap:wrap";
   const h=document.createElement("h2"); h.style.cssText="margin:0;font-size:14px;font-weight:700"; h.textContent="Priorities";
   const sp=document.createElement("div"); sp.style.flex="1";
   const home=document.createElement("button"); home.className="btn sm"; home.textContent="Home";
@@ -2406,7 +2442,7 @@ function uiDialog(opts){
 
     const scrim=document.createElement("div");
     scrim.className="scrim";
-    scrim.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.7);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px";
+    scrim.style.cssText="position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px";
 
     const card=document.createElement("div");
     card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:400px;width:100%;box-shadow:var(--shadow)";
@@ -2427,7 +2463,7 @@ function uiDialog(opts){
       input=document.createElement("input");
       input.type="text";
       input.value=o.value||"";
-      input.style.cssText="width:100%;margin-top:14px;padding:11px;background:#0a1424;border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:14px;outline:none";
+      input.style.cssText="width:100%;margin-top:14px;padding:11px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:14px;outline:none";
       card.appendChild(input);
     }
 
@@ -2481,7 +2517,7 @@ function uiChoice(opts){
     const done=v=>{ if(settled)return; settled=true; cleanup(); resolve(v); };
     const scrim=document.createElement("div");
     scrim.className="scrim";
-    scrim.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.7);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px";
+    scrim.style.cssText="position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px";
     const card=document.createElement("div");
     card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:400px;width:100%;box-shadow:var(--shadow)";
     if(o.title){
@@ -2516,10 +2552,30 @@ function uiChoice(opts){
 function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1500);}
 
 /* ===== avatar menu ===== */
+/* Theme. Device-local rather than a profile field: which look someone wants
+   depends on the screen in front of them, not on who they are, and a profile
+   field would sync a phone's night mode onto a desktop. The boot script in
+   <head> reads the same key. */
+function currentTheme(){
+  try{ return localStorage.getItem("dtt-theme")==="light"?"light":"dark"; }catch(e){ return "dark"; }
+}
+function applyTheme(t){
+  const th=t==="light"?"light":"dark";
+  document.documentElement.setAttribute("data-theme",th);
+  try{ localStorage.setItem("dtt-theme",th); }catch(e){}
+  const m=document.querySelector('meta[name="theme-color"]');
+  if(m) m.setAttribute("content",th==="light"?"#f2f5fb":"#0f172a");
+}
+function toggleTheme(){
+  applyTheme(currentTheme()==="light"?"dark":"light");
+  renderAvatarMenu();
+  toast(currentTheme()==="light"?"Light mode":"Dark mode");
+}
+
 /* One row of the avatar menu. The icons are emoji, which arrive in their own
    colours; a grayscale filter keeps the menu monochrome without shipping an
    icon set. Profile rows are built separately and keep their colour. */
-function avatarMenuItem(icon,label,onClick,color){
+function avatarMenuItem(icon,label,onClick,color,keepOpen){
   const it=document.createElement("div");
   it.className="menu-item";
   it.style="padding:11px 14px;cursor:pointer;display:flex;align-items:center;gap:14px;color:"+(color||"var(--ink)");
@@ -2528,7 +2584,10 @@ function avatarMenuItem(icon,label,onClick,color){
   ic.textContent=icon;
   const tx=document.createElement("span"); tx.style="flex:1"; tx.textContent=label;
   it.appendChild(ic); it.appendChild(tx);
-  it.addEventListener("click",()=>{ document.getElementById("avatarMenu").style.display="none"; onClick(); });
+  it.addEventListener("click",()=>{
+    if(!keepOpen) document.getElementById("avatarMenu").style.display="none";
+    onClick();
+  });
   return it;
 }
 
@@ -2546,6 +2605,10 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
   m.appendChild(avatarMenuItem("🎯","Priorities",()=>openPriorities()));
   m.appendChild(avatarMenuItem("🎨","Channels",()=>openChannels()));
   m.appendChild(avatarMenuItem("⚙️","Settings",()=>openSettings()));
+  m.appendChild(avatarMenuItem(
+    currentTheme()==="light"?"🌙":"☀️",
+    currentTheme()==="light"?"Dark mode":"Light mode",
+    ()=>toggleTheme(),null,true));
 
   const sep2=document.createElement("div");sep2.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep2);
   if(window._acctEmail){
@@ -2782,7 +2845,7 @@ function initializeEventListeners(){
 /* ===== settings ===== */
 function openChannels(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;stage.innerHTML=`
   <div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">
-    <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--glass);flex-wrap:wrap">
       <h2 style="margin:0;font-size:18px;font-weight:700">🎨 Channels</h2>
       <button class="btn sm" id="closeChannelsBtn" style="margin-left:auto">Done</button>
     </div>
@@ -2802,7 +2865,7 @@ function openChannels(){const app=document.querySelector('.app');const stage=app
 
 function openSettings(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;stage.innerHTML=`
   <div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">
-    <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--glass);flex-wrap:wrap">
       <h2 style="margin:0;font-size:18px;font-weight:700">⚙️ Settings</h2>
       <button class="btn sm" id="closeSettingsBtn" style="margin-left:auto">Done</button>
     </div>
@@ -3004,7 +3067,7 @@ function renderChannelSettings(){
       al.innerHTML="";
       arch.forEach(c=>{
         const row=document.createElement("div"); row.className="row";
-        row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b> <span class="archived-tag">Archived</span></div><button class="btn sm">Restore</button><button class="btn sm" style="background:rgba(240,68,68,.2);border-color:#f87171;color:#f87171">Delete</button>`;
+        row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b> <span class="archived-tag">Archived</span></div><button class="btn sm">Restore</button><button class="btn sm" style="background:rgba(240,68,68,.2);border-color:#f87171;color:var(--bad-ink)">Delete</button>`;
         row.querySelector(".btn").addEventListener("click",()=>restoreChannel(c.id));
         row.querySelectorAll(".btn")[1].addEventListener("click",()=>deleteChannel(c.id));
         al.appendChild(row);
@@ -3128,7 +3191,7 @@ function updateChanPreview(){const col=document.getElementById("chanColor").valu
 
 /* ===== timeline ===== */
 async function openEditsModal(){try{const content=document.getElementById("editsContent");if(!content){console.error("editsContent not found");return;}content.innerHTML="";if(!state.profileId){console.error("No profile ID set");content.innerHTML='<div class="hint" style="padding:20px">Error: No profile selected.</div>';openScrim("editsScrim");return;}const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const today=todayKey();const filtered=all.filter(s=>s.date===today).sort((a,b)=>a.startTs-b.startTs);if(!filtered.length){content.innerHTML='<div class="hint" style="padding:20px">No sessions yet today.</div>';}else{filtered.forEach(s=>{const c=state.channels.find(x=>x.id===s.channelId)||{label:"(deleted)",color:"#64748b"};const dur=s.endTs?s.durMs:(now()-s.startTs);const open=!s.endTs;const row=document.createElement("div");row.style.display="flex";row.style.alignItems="center";row.style.gap="12px";row.style.padding="12px 14px";row.style.borderBottom="1px solid var(--line)";const leftDiv=document.createElement("div");leftDiv.style.display="flex";leftDiv.style.alignItems="center";leftDiv.style.gap="8px";leftDiv.style.flex="0 1 auto";const colorDot=document.createElement("div");colorDot.style.width="12px";colorDot.style.height="12px";colorDot.style.borderRadius="50%";colorDot.style.background=c.color;colorDot.style.flexShrink="0";leftDiv.appendChild(colorDot);const infoDiv=document.createElement("div");infoDiv.style.minWidth="0";const labelDiv=document.createElement("div");labelDiv.style.fontSize="12px";labelDiv.style.fontWeight="600";labelDiv.style.color="var(--ink)";labelDiv.innerHTML=`${escapeHtml(c.label)}${open?' <span style="color:var(--good);font-size:11px">● running</span>':''}`;infoDiv.appendChild(labelDiv);const timeDiv=document.createElement("div");timeDiv.style.fontSize="11px";timeDiv.style.color="var(--ink2)";timeDiv.textContent=`${fmtClock(s.startTs,state.profile.hourFmt)} — ${s.endTs?fmtClock(s.endTs,state.profile.hourFmt):"now"}`;infoDiv.appendChild(timeDiv);leftDiv.appendChild(infoDiv);row.appendChild(leftDiv);const durDiv=document.createElement("div");durDiv.style.fontSize="11px";durDiv.style.fontWeight="600";durDiv.style.color="var(--ink2)";durDiv.style.whiteSpace="nowrap";durDiv.textContent=fmtDur(dur);row.appendChild(durDiv);if(s.endTs){const adjBtn=document.createElement("button");adjBtn.className="btn sm";adjBtn.textContent="Adjust";adjBtn.addEventListener("click",()=>{closeScrim("editsScrim");openAdjustModal(s);});row.appendChild(adjBtn);}content.appendChild(row);});}openScrim("editsScrim");}catch(e){console.error("Error in openEditsModal:",e);const content=document.getElementById("editsContent");if(content)content.innerHTML='<div class="hint" style="padding:20px">Error loading sessions: '+escapeHtml(e.message)+'</div>';openScrim("editsScrim");}}
-async function openTimeline(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';const today=new Date();const dayName=today.toLocaleDateString('en-US',{weekday:'short'});const dateStr=today.toLocaleDateString('en-US',{month:'short',day:'numeric'});html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)">';html+='<div style="display:flex;align-items:center;gap:12px">';html+='<div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">'+dayName+' '+dateStr+'</div>';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Edits</h2>';html+='</div>';html+='<button class="btn sm" onclick="closeTimelineView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:0" id="tlContent"></div>';html+='</div>';stage.innerHTML=html;window.closeTimelineView=()=>{stage.innerHTML=origStage;renderGrid();};const all=(await idbAll("sessions","profile",IDBKeyRange.only(state.profileId))).filter(s=>s.date===todayKey()).sort((a,b)=>a.startTs-b.startTs);const tlContent=document.getElementById("tlContent");if(!all.length){tlContent.innerHTML='<div class="hint" style="padding:20px">No sessions yet today.</div>';}else{tlContent.innerHTML="";all.forEach(s=>{const c=state.channels.find(x=>x.id===s.channelId)||{label:"(deleted)",color:"#64748b"};const dur=s.endTs?s.durMs:(now()-s.startTs);const open=!s.endTs;const row=document.createElement("div");row.style.display="flex";row.style.alignItems="center";row.style.gap="12px";row.style.padding="12px 14px";row.style.borderBottom="1px solid var(--line)";const leftDiv=document.createElement("div");leftDiv.style.display="flex";leftDiv.style.alignItems="center";leftDiv.style.gap="8px";leftDiv.style.flex="0 1 auto";const colorDot=document.createElement("div");colorDot.style.width="12px";colorDot.style.height="12px";colorDot.style.borderRadius="50%";colorDot.style.background=c.color;colorDot.style.flexShrink="0";leftDiv.appendChild(colorDot);const infoDiv=document.createElement("div");infoDiv.style.minWidth="0";const labelDiv=document.createElement("div");labelDiv.style.fontSize="12px";labelDiv.style.fontWeight="600";labelDiv.style.color="var(--ink)";labelDiv.innerHTML=`${escapeHtml(c.label)}${open?' <span style="color:var(--good);font-size:11px">● running</span>':''}`;infoDiv.appendChild(labelDiv);const timeDiv=document.createElement("div");timeDiv.style.fontSize="11px";timeDiv.style.color="var(--ink2)";timeDiv.textContent=`${fmtClock(s.startTs,state.profile.hourFmt)} — ${s.endTs?fmtClock(s.endTs,state.profile.hourFmt):"now"}`;infoDiv.appendChild(timeDiv);leftDiv.appendChild(infoDiv);row.appendChild(leftDiv);const durDiv=document.createElement("div");durDiv.style.fontSize="11px";durDiv.style.fontWeight="600";durDiv.style.color="var(--ink2)";durDiv.style.whiteSpace="nowrap";durDiv.textContent=fmtDur(dur);row.appendChild(durDiv);if(s.endTs){const adjBtn=document.createElement("button");adjBtn.className="btn sm";adjBtn.textContent="Adjust";adjBtn.addEventListener("click",()=>openAdjustModal(s));row.appendChild(adjBtn);}tlContent.appendChild(row);});}}
+async function openTimeline(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';const today=new Date();const dayName=today.toLocaleDateString('en-US',{weekday:'short'});const dateStr=today.toLocaleDateString('en-US',{month:'short',day:'numeric'});html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)">';html+='<div style="display:flex;align-items:center;gap:12px">';html+='<div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">'+dayName+' '+dateStr+'</div>';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Edits</h2>';html+='</div>';html+='<button class="btn sm" onclick="closeTimelineView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:0" id="tlContent"></div>';html+='</div>';stage.innerHTML=html;window.closeTimelineView=()=>{stage.innerHTML=origStage;renderGrid();};const all=(await idbAll("sessions","profile",IDBKeyRange.only(state.profileId))).filter(s=>s.date===todayKey()).sort((a,b)=>a.startTs-b.startTs);const tlContent=document.getElementById("tlContent");if(!all.length){tlContent.innerHTML='<div class="hint" style="padding:20px">No sessions yet today.</div>';}else{tlContent.innerHTML="";all.forEach(s=>{const c=state.channels.find(x=>x.id===s.channelId)||{label:"(deleted)",color:"#64748b"};const dur=s.endTs?s.durMs:(now()-s.startTs);const open=!s.endTs;const row=document.createElement("div");row.style.display="flex";row.style.alignItems="center";row.style.gap="12px";row.style.padding="12px 14px";row.style.borderBottom="1px solid var(--line)";const leftDiv=document.createElement("div");leftDiv.style.display="flex";leftDiv.style.alignItems="center";leftDiv.style.gap="8px";leftDiv.style.flex="0 1 auto";const colorDot=document.createElement("div");colorDot.style.width="12px";colorDot.style.height="12px";colorDot.style.borderRadius="50%";colorDot.style.background=c.color;colorDot.style.flexShrink="0";leftDiv.appendChild(colorDot);const infoDiv=document.createElement("div");infoDiv.style.minWidth="0";const labelDiv=document.createElement("div");labelDiv.style.fontSize="12px";labelDiv.style.fontWeight="600";labelDiv.style.color="var(--ink)";labelDiv.innerHTML=`${escapeHtml(c.label)}${open?' <span style="color:var(--good);font-size:11px">● running</span>':''}`;infoDiv.appendChild(labelDiv);const timeDiv=document.createElement("div");timeDiv.style.fontSize="11px";timeDiv.style.color="var(--ink2)";timeDiv.textContent=`${fmtClock(s.startTs,state.profile.hourFmt)} — ${s.endTs?fmtClock(s.endTs,state.profile.hourFmt):"now"}`;infoDiv.appendChild(timeDiv);leftDiv.appendChild(infoDiv);row.appendChild(leftDiv);const durDiv=document.createElement("div");durDiv.style.fontSize="11px";durDiv.style.fontWeight="600";durDiv.style.color="var(--ink2)";durDiv.style.whiteSpace="nowrap";durDiv.textContent=fmtDur(dur);row.appendChild(durDiv);if(s.endTs){const adjBtn=document.createElement("button");adjBtn.className="btn sm";adjBtn.textContent="Adjust";adjBtn.addEventListener("click",()=>openAdjustModal(s));row.appendChild(adjBtn);}tlContent.appendChild(row);});}}
 /* Adherence cell: Timing on top, Budget beneath. Returns HTML so it drops
    into the existing <td>/<div> WITHOUT changing any table column count. */
 function fmtHM(ms){
@@ -3151,7 +3214,7 @@ async function openCombinedSummary(){
     const stage=app.querySelector('.stage');
     const origStage=stage.innerHTML;
     let html='<div style="display:flex;flex-direction:column;height:100%">';
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)">';
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)">';
     html+='<h2 style="margin:0;font-size:14px;font-weight:700">Summary</h2>';
     html+='</div>';
     html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:16px" id="summaryContent">Loading...</div>';
@@ -3612,7 +3675,7 @@ async function openCombinedSummary(){
     if(stage)stage.innerHTML='<div style="padding:20px"><div class="hint">Error loading summary: '+escapeHtml(e.message)+'</div></div>';
   }
 }
-async function openWeekView(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)">';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Week View</h2>';html+='<button class="btn sm" onclick="closeWeekView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:16px" id="weekContent"></div>';html+='</div>';stage.innerHTML=html;window.closeWeekView=()=>{stage.innerHTML=origStage;renderGrid();};const today=new Date();const weekStart=new Date(today);weekStart.setDate(today.getDate()-today.getDay()+(today.getDay()===0?-6:1));const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const weekData={};for(let i=0;i<7;i++){const d=new Date(weekStart);d.setDate(d.getDate()+i);const key=fmtDateKey(d);weekData[key]={date:d,total:0,channels:{}};}allSessions.forEach(s=>{if(weekData[s.date]){const dur=parseInt(s.endTs||s.startTs)-parseInt(s.startTs);weekData[s.date].total+=dur;const chId=s.channelId;if(!weekData[s.date].channels[chId]){weekData[s.date].channels[chId]=0;}weekData[s.date].channels[chId]+=dur;}});let content='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">';let weekTotal=0;Object.values(weekData).slice(0,5).forEach(day=>{const dName=day.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});const chRows=Object.entries(day.channels).map(([chId,dur])=>{const ch=state.channels.find(x=>x.id===chId)||{label:"(deleted)",color:"#64748b"};return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0"><div style="width:8px;height:8px;border-radius:50%;background:${ch.color}"></div><div style="flex:1;font-size:11px">${escapeHtml(ch.label)}</div><div style="font-size:11px;font-weight:600;color:var(--ink2);min-width:50px;text-align:right">${fmtDur(dur)}</div></div>`}).join('');weekTotal+=day.total;content+=`<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px"><div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--accent)">${dName}</div><div style="font-size:16px;font-weight:800;margin-bottom:8px">${fmtDur(day.total)}</div><div style="font-size:10px;color:var(--ink2)">${Object.keys(day.channels).length} channels</div><div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">${chRows||'<div style="color:var(--muted);font-size:11px">No sessions</div>'}</div></div>`;});content+='</div>';content+=`<div style="margin-top:20px;padding:12px;background:linear-gradient(180deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.3);border-radius:12px"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Total</div><div style="font-size:24px;font-weight:800;color:var(--good)">${fmtDur(weekTotal)}</div></div>`;document.getElementById("weekContent").innerHTML=content;}
+async function openWeekView(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)">';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Week View</h2>';html+='<button class="btn sm" onclick="closeWeekView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:16px" id="weekContent"></div>';html+='</div>';stage.innerHTML=html;window.closeWeekView=()=>{stage.innerHTML=origStage;renderGrid();};const today=new Date();const weekStart=new Date(today);weekStart.setDate(today.getDate()-today.getDay()+(today.getDay()===0?-6:1));const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const weekData={};for(let i=0;i<7;i++){const d=new Date(weekStart);d.setDate(d.getDate()+i);const key=fmtDateKey(d);weekData[key]={date:d,total:0,channels:{}};}allSessions.forEach(s=>{if(weekData[s.date]){const dur=parseInt(s.endTs||s.startTs)-parseInt(s.startTs);weekData[s.date].total+=dur;const chId=s.channelId;if(!weekData[s.date].channels[chId]){weekData[s.date].channels[chId]=0;}weekData[s.date].channels[chId]+=dur;}});let content='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">';let weekTotal=0;Object.values(weekData).slice(0,5).forEach(day=>{const dName=day.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});const chRows=Object.entries(day.channels).map(([chId,dur])=>{const ch=state.channels.find(x=>x.id===chId)||{label:"(deleted)",color:"#64748b"};return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0"><div style="width:8px;height:8px;border-radius:50%;background:${ch.color}"></div><div style="flex:1;font-size:11px">${escapeHtml(ch.label)}</div><div style="font-size:11px;font-weight:600;color:var(--ink2);min-width:50px;text-align:right">${fmtDur(dur)}</div></div>`}).join('');weekTotal+=day.total;content+=`<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px"><div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--accent)">${dName}</div><div style="font-size:16px;font-weight:800;margin-bottom:8px">${fmtDur(day.total)}</div><div style="font-size:10px;color:var(--ink2)">${Object.keys(day.channels).length} channels</div><div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">${chRows||'<div style="color:var(--muted);font-size:11px">No sessions</div>'}</div></div>`;});content+='</div>';content+=`<div style="margin-top:20px;padding:12px;background:linear-gradient(180deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.3);border-radius:12px"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Total</div><div style="font-size:24px;font-weight:800;color:var(--good)">${fmtDur(weekTotal)}</div></div>`;document.getElementById("weekContent").innerHTML=content;}
 
 
 
@@ -3897,7 +3960,7 @@ async function clearPlanSlot(slot){ await setPlanSlot(slot,null); }
 function openPlanSlotModal(slot){
   const modal=document.createElement("div");
   modal.className="scrim";
-  modal.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.66);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px";
+  modal.style.cssText="position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px";
   const card=document.createElement("div");
   card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:320px;width:100%;max-height:80vh;overflow-y:auto";
   const header=document.createElement("div");
@@ -3919,7 +3982,7 @@ function openPlanSlotModal(slot){
   });
   card.appendChild(options);
   const clearBtn=document.createElement("button");
-  clearBtn.style.cssText="width:100%;padding:10px;background:rgba(240,68,68,.15);border:1px solid rgba(240,68,68,.5);color:#f87171;border-radius:6px;font-weight:600;cursor:pointer";
+  clearBtn.style.cssText="width:100%;padding:10px;background:rgba(240,68,68,.15);border:1px solid rgba(240,68,68,.5);color:var(--bad-ink);border-radius:6px;font-weight:600;cursor:pointer";
   clearBtn.textContent="Clear slot";
   clearBtn.onclick=async()=>{ modal.remove(); await setPlanSlot(slot,null); };
   card.appendChild(clearBtn);
@@ -3946,7 +4009,7 @@ function renderPlanSelect(){
 function renderPlanSelect(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const curVal=planSelect.value;planSelect.innerHTML="";planState.plans.forEach((p,i)=>{const opt=document.createElement("option");opt.value=i;opt.textContent=p.name;planSelect.appendChild(opt);});planSelect.value=curVal;}async function setForTodayPlan(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const idx=parseInt(planSelect.value);if(idx<0||!planState.plans[idx])return;const plan=planState.plans[idx];planState.selectedPlanIdx=idx;const dayKey=todayKey();await saveLocal("selected_plan",{date:dayKey,profileId:state.profileId,planId:plan.id});toast("Plan '"+plan.name+"' set for today");}async function addPlan(){const newPlan={id:uid(),profileId:state.profileId,name:"New Template",schedule:{},order:planState.plans.length};await saveLocal("plans",newPlan);planState.plans.push(newPlan);planState.mode="templates";planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Template added - use Rename to name it");}async function deletePlan(idx){if(planState.plans.length<=1){toast("Cannot delete the last plan");return;}const plan=planState.plans[idx];await db.transaction(["plans"],"readwrite").objectStore("plans").delete(plan.id);planState.plans.splice(idx,1);if(planState.selectedPlanIdx>=planState.plans.length)planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Plan deleted");}
 function renderPlanSlots(){const times=document.getElementById("planSlots");const schedules=document.getElementById("planSchedule");let timesHtml='';let schedHtml='';for(let h=planState.startHour;h<planState.endHour;h++){for(let m=0;m<60;m+=planState.increment){const slot=h+':'+(m===0?'00':m);const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+planState.increment>=60?h+1:h)%12||12;const endMin=String((m+planState.increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;const scheduled=planState.schedule[slot];const ch=scheduled?state.channels.find(x=>x.id===scheduled):null;timesHtml+=`<div style="padding:8px 4px;text-align:center;font-size:11px;font-weight:600;color:var(--ink2);flex-shrink:0;border-bottom:1px solid var(--line)">${timeStr}</div>`;schedHtml+=`<div class="time-block-target" data-slot="${slot}" style="padding:8px;min-height:42px;background:${ch?ch.color+'15':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};border-radius:6px;display:flex;align-items:center;justify-content:center;text-align:center;color:${ch?ch.color:'var(--ink2)'};font-size:11px;font-weight:${ch?'700':'500'};cursor:move;flex-shrink:0;transition:all .15s;word-break:break-word">${ch?ch.label:''}</div>`;}}times.innerHTML=timesHtml;schedules.innerHTML=schedHtml;}
 function renderPlanChannels(){const ch=document.getElementById("planChannels");let html='';if(state.channels){state.channels.filter(c=>!c.archived).forEach(c=>{html+=`<div draggable="true" data-ch="${c.id}" style="padding:6px 4px;border:2px solid ${c.color};background:${c.color}15;color:${c.color};border-radius:5px;cursor:move;font-weight:700;font-size:11px;text-align:center;flex-shrink:0;transition:all .15s;word-break:break-word">${escapeHtml(c.label)}</div>`;});}ch.innerHTML=html;ch.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',el.dataset.ch);});el.addEventListener('dragend',e=>{el.style.opacity='1';});});}
-async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",openEditsModal);}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}/* ===== daily scoring =====
+async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",openEditsModal);}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}/* ===== daily scoring =====
    Two independent measures, because they answer different questions:
 
      Timing  - did you do the planned channel in the planned block.
@@ -4325,7 +4388,7 @@ function dayTypeSelectHtml(dateKey,current){
   const cur=current||"";
   const def=dayTypeDef(cur);
   return '<select onchange="window.setDayTypeFromSummary(\''+dateKey+'\',this.value)" '+
-    'style="margin-top:5px;font-size:16px;padding:3px 5px;border-radius:8px;background:#0a1424;color:'+(def?def.color:"var(--ink2)")+';border:1px solid '+(def?def.color:"var(--line)")+'">'+
+    'style="margin-top:5px;font-size:16px;padding:3px 5px;border-radius:8px;background:var(--field);color:'+(def?def.color:"var(--ink2)")+';border:1px solid '+(def?def.color:"var(--line)")+'">'+
     opts.map(o=>'<option value="'+o.v+'"'+(o.v===cur?" selected":"")+'>'+escapeHtml(o.label)+'</option>').join("")+
     '</select>';
 }
@@ -4517,7 +4580,7 @@ function showBootError(err){
   box.innerHTML='<div style="max-width:420px;width:100%;background:var(--panel);border:1px solid var(--warn);border-radius:14px;padding:22px">'+
     '<div style="font-size:17px;font-weight:800;color:var(--ink);margin-bottom:8px">This device could not load your data</div>'+
     '<div class="hint" style="margin-bottom:14px">Your time and channels are safe in the cloud. This is a problem with the copy stored on this device.</div>'+
-    '<div style="font-size:11px;font-family:ui-monospace,monospace;color:var(--ink2);background:#0a1424;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:16px;word-break:break-word">'+escapeHtml(msg)+'</div>'+
+    '<div style="font-size:11px;font-family:ui-monospace,monospace;color:var(--ink2);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:16px;word-break:break-word">'+escapeHtml(msg)+'</div>'+
     '<button class="btn pri" id="bootFixBtn" style="width:100%">Reset this device and reload</button>'+
     '<button class="btn sm" id="bootRetryBtn" style="width:100%;margin-top:8px">Just reload</button></div>';
   document.body.appendChild(box);

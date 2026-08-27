@@ -722,6 +722,34 @@ Round two of v12, after Mark used it:
   a different template picked, or the day edited away from its template.
   `syncApplyTodayBtn()` runs on render and on every dropdown change.
 
+### Light and dark
+
+The app was dark-only, and what made it dark-only was **~28 colours hardcoded
+outside `:root`** rather than any structural problem. Those are now named
+variables (`--field`, `--glass`, `--glass2`, `--scrim`, `--glow`, `--barbg`,
+`--bad-ink`) and `:root[data-theme="light"]` overrides the lot.
+
+- **Channel colours are deliberately not themed.** They are the user's data,
+  and every surface that paints one already picks its text with
+  `contrastInk()`, so tiles and timeline blocks work in both themes untouched.
+- **The choice is device-local** (`localStorage`, key `dtt-theme`), not a
+  profile field: which look someone wants depends on the screen in front of
+  them, and a profile field would sync a phone's night mode onto a desktop.
+- **A tiny script in `<head>` applies it before `<body>` exists**, so a reload
+  never flashes dark and then corrects. It reads the same key. Both it and
+  `currentTheme()` fall back to dark if `localStorage` throws.
+- The toggle lives in the avatar menu and **names the mode it will switch to**.
+  It is the one menu row that does not dismiss the menu, so the theme can be
+  flipped and flipped back while looking at it.
+- `apple-mobile-web-app-status-bar-style` is still `black` and **must stay
+  that way** in both themes - see Landmines. Only the `theme-color` meta moves.
+
+Two traps found while doing this, both worth remembering: a pale red
+(`#fca5a5`, `#f87171`) that reads fine on a dark panel is invisible on a white
+one - hence `--bad-ink`; and `.bottombar` carried its own `#0a101c`, which no
+search for the other literals would have found. When theming, sweep for
+`background:#...` across the whole file rather than trusting a list.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
