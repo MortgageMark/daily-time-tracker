@@ -1619,24 +1619,13 @@ async function renderDayEditor(){
   body.appendChild(dtBlock);
   root.appendChild(body);
 
-  /* ---------------- footer ---------------- */
-  const foot=document.createElement("div");
-  foot.style.cssText="padding:10px 12px max(10px, env(safe-area-inset-bottom)) 12px;border-top:1px solid var(--line);background:var(--glass);display:flex;align-items:center;gap:10px;flex-wrap:wrap";
-  const tot=document.createElement("div");
-  tot.style.cssText="flex:1;font-size:13px;color:var(--ink2);text-align:center";
-  if(isFuture){
-    tot.textContent=dayType?dayTypeLabel(dayType):"Working day";
-  } else if(dayType){
-    tot.textContent="Total "+fmtDurShort(total)+"  \u00b7  "+dayTypeLabel(dayType)+", not scored";
-  } else {
-    const scores=await refreshDayScores(dk);
-    let line="Total "+fmtDurShort(total);
-    if(scores&&scores.plannedSlotsElapsed) line+="  \u00b7  Timing "+scores.matchedSlots+"/"+scores.plannedSlotsElapsed;
-    if(scores&&typeof scores.budgetPct==="number") line+="  \u00b7  Budget "+Math.round(scores.budgetPct)+"%";
-    tot.textContent=line;
-  }
-  foot.appendChild(tot);
-  root.appendChild(foot);
+  /* No footer. Adding is done from the + on any gap or either end of the rail,
+     and the day total and adherence both live on the Summary. A fixed bar for
+     one line of read-only text is not worth the height on a phone.
+     refreshDayScores() is still called, because it PERSISTS the day’s scores
+     as well as returning them - dropping it would stop a browsed day being
+     rescored. */
+  if(!isFuture&&!dayType) await refreshDayScores(dk);
   if(keepScroll) body.scrollTop=keepScroll;
 }
 function tsToTimeInput(ts){ const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
