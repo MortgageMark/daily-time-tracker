@@ -653,6 +653,22 @@ end and duration. Gaps appear as dashed regions with the untracked time named.
   it was really all one thing" case. The preview during a drag and the commit
   on release run the same function, so what is shown is what is saved.
 - A **running block is never absorbed or pushed**; a drag stops short of it.
+- **Every gap carries a `+`** that fills it with one channel, taking the whole
+  gap — guessing at a partial fill would be inventing data. It is pinned to the
+  right of the gap because the two drag grips own the middle of a short seam.
+- **Dragging a block's body slides the whole block**, after a 280ms hold on
+  touch. The hold is not optional: without it every attempt to scroll the day
+  would pick up whatever block sat under the thumb. A body drag clamps at its
+  neighbours and **never absorbs one** — an edge drag is a deliberate reach for
+  a grip, but a body drag starts anywhere on the block, and losing a neighbour
+  to a clumsy thumb would be unrecoverable.
+- Because pointer events cannot cancel a scroll iOS has already begun, a
+  document-level `touchmove` listener refuses the scroll for as long as a drag
+  is live. That listener is the reason the hold works at all.
+- **Overlaps are refused in the "Exact times…" form too.** It used to warn and
+  then offer "Save anyway", explicitly permitting double-counted minutes. That
+  form was the last remaining way to create an overlap, and it is now closed —
+  so no path in the app can put two channels in the same minute.
 - Absorbed blocks are voided and zeroed, never deleted — deletes do not
   propagate to Supabase and the row would return on the next pull.
 

@@ -1601,7 +1601,9 @@ const TL_MAGNET_MIN=10;        /* ...and jumps a neighbour's edge within 10 */
 const TL_MIN_BLOCK_MIN=5;      /* thinner than this and the block is absorbed */
 const TL_HANDLE=20;            /* tap height of a drag handle */
 
-let tlRangeCur=null, tlSessions=[], tlFmt=null;
+let tlRangeCur=null, tlSessions=[], tlFmt=null, tlDk=null;
+/* A finger down on a block before it is known to be a tap or a drag. */
+let tlPress=null;
 
 function tlEndOf(s){ return s.endTs||now(); }
 
@@ -1620,6 +1622,8 @@ function tlRange(dk,sess){
   return {startHour:s,endHour:e,startTs:base+s*3600000,endTs:base+e*3600000};
 }
 function tlY(ts){ return ((ts-tlRangeCur.startTs)/60000)*TL_PX_PER_MIN; }
+/* Today's blocks stop at the present; a past day may use the whole rail. */
+function tlMaxTs(){ return tlDk===todayKey()?Math.min(tlRangeCur.endTs,now()):tlRangeCur.endTs; }
 
 /* Pure. Given the day's blocks and a proposed new time for one edge, work out
    what the day becomes. Overlaps are unreachable by construction: a block
@@ -1637,7 +1641,7 @@ function resolveEdgeDrag(list,id,edge,rawTs){
   const absorbed=[];
 
   if(edge==="end"){
-    ts=Math.max(me.startTs+minB,Math.min(ts,tlRangeCur.endTs));
+    ts=Math.max(me.startTs+minB,Math.min(ts,tlMaxTs()));
     const nxt=items[i+1];
     if(nxt&&Math.abs(ts-nxt.startTs)<=magnet) ts=nxt.startTs;   /* close the gap exactly */
     me.endTs=ts;
@@ -1662,7 +1666,31 @@ function resolveEdgeDrag(list,id,edge,rawTs){
       else { b.endTs=me.startTs; break; }
     }
   }
-  return {items:items.filter(x=>!x.gone),absorbed,edgeTs:edge==="end"?me.endTs:me.startTs};
+  const edgeTs=edge==="end"?me.endTs:me.startTs;
+  return {items:items.filter(x=>!x.gone),absorbed,edgeTs,badge:fmtClock(edgeTs,tlFmt)};
+}
+
+/* Moving a whole block slides it through the free space around it and stops
+   at a neighbour. It deliberately never absorbs one: an edge drag is a
+   deliberate reach for a grip, but a body drag starts anywhere on the block,
+   and losing a neighbour to a clumsy thumb would be unrecoverable. */
+function resolveBlockMove(list,id,rawStart){
+  const items=list.map(s=>({id:s.id,startTs:s.startTs,endTs:tlEndOf(s),locked:!s.endTs}))
+                  .sort((a,b)=>a.startTs-b.startTs);
+  const i=items.findIndex(x=>x.id===id);
+  if(i<0) return null;
+  const me=items[i], dur=me.endTs-me.startTs;
+  const snapU=TL_SNAP_MIN*60000, magnet=TL_MAGNET_MIN*60000;
+  const lo=items[i-1]?items[i-1].endTs:tlRangeCur.startTs;
+  const hi=(items[i+1]?items[i+1].startTs:tlMaxTs())-dur;
+  if(hi<lo) return null;                       /* wedged in with no room */
+  let st=Math.round(rawStart/snapU)*snapU;
+  if(Math.abs(st-lo)<=magnet) st=lo;           /* sit flush against either side */
+  if(Math.abs(st-hi)<=magnet) st=hi;
+  st=Math.max(lo,Math.min(st,hi));
+  me.startTs=st; me.endTs=st+dur;
+  return {items,absorbed:[],edgeTs:st,
+          badge:fmtClock(st,tlFmt)+" – "+fmtClock(st+dur,tlFmt)};
 }
 
 async function commitTimelineDrag(dk,plan){
@@ -1689,7 +1717,7 @@ async function commitTimelineDrag(dk,plan){
 }
 
 function buildTimeline(dk,sess,fmt){
-  tlRangeCur=tlRange(dk,sess); tlSessions=sess.slice(); tlFmt=fmt;
+  tlRangeCur=tlRange(dk,sess); tlSessions=sess.slice(); tlFmt=fmt; tlDk=dk;
   const wrap=document.createElement("div");
   wrap.id="tlWrap";
   wrap.style.cssText="position:relative;margin:4px 0 6px;height:"+
@@ -1731,23 +1759,39 @@ function buildTimeline(dk,sess,fmt){
         "  ·  "+fmtDurShort(en-sn.startTs);
       b.appendChild(tm);
     }
-    b.addEventListener("click",()=>{ if(!tlDrag) openBlockSheet(dk,sn); });
+    b.addEventListener("pointerdown",ev=>tlBodyDown(ev,dk,sn,b));
+    b.addEventListener("pointermove",tlBodyMove);
+    b.addEventListener("pointerup",tlBodyUp);
+    b.addEventListener("pointercancel",tlBodyCancel);
     wrap.appendChild(b);
 
     /* A gap is visible as a gap; it is also labelled, because eight untracked
        minutes and eighty look similar at this scale. */
     const nxt=ordered[i+1];
     if(nxt&&nxt.startTs-en>60000){
+      const gh=Math.max(2,tlY(nxt.startTs)-tlY(en));
       const g=document.createElement("div");
-      g.style.cssText="position:absolute;left:"+TL_RAIL+"px;right:0;top:"+tlY(en)+"px;height:"+
-        Math.max(2,tlY(nxt.startTs)-tlY(en))+"px;border-radius:8px;border:1px dashed var(--line);"+
+      g.style.cssText="position:absolute;left:"+TL_RAIL+"px;right:0;top:"+tlY(en)+"px;height:"+gh+
+        "px;border-radius:8px;border:1px dashed var(--line);"+
         "display:flex;align-items:center;justify-content:center;pointer-events:none";
-      if(tlY(nxt.startTs)-tlY(en)>=20){
+      if(gh>=20){
         const gl=document.createElement("div");
         gl.style.cssText="font-size:10px;font-weight:700;color:var(--muted)";
         gl.textContent=fmtDurShort(nxt.startTs-en)+" untracked";
         g.appendChild(gl);
       }
+      /* Pinned right rather than centred: the two drag grips own the middle of
+         a gap, and on a short one they would sit on top of this. */
+      const add=document.createElement("button");
+      add.className="btn sm";
+      add.textContent="+";
+      add.title="Fill this time with a channel";
+      add.style.cssText="position:absolute;right:8px;top:50%;transform:translateY(-50%);"+
+        "pointer-events:auto;z-index:6;padding:3px 11px;font-size:15px;font-weight:800;line-height:1.15";
+      const gs=en, ge=nxt.startTs;
+      add.addEventListener("click",ev=>{ ev.stopPropagation(); openGapSheet(dk,gs,ge); });
+      add.addEventListener("pointerdown",ev=>ev.stopPropagation());
+      g.appendChild(add);
       wrap.appendChild(g);
     }
 
@@ -1829,7 +1873,8 @@ function tlPaint(plan){
   if(badge){
     badge.style.display="block";
     badge.style.top=(y-30)+"px";
-    badge.textContent=fmtClock(plan.edgeTs,tlFmt)+(plan.absorbed.length?"  ·  absorbing "+plan.absorbed.length:"");
+    badge.textContent=(plan.badge||fmtClock(plan.edgeTs,tlFmt))+
+      (plan.absorbed.length?"  ·  absorbing "+plan.absorbed.length:"");
   }
 }
 
@@ -1841,6 +1886,78 @@ async function tlDragEnd(ev){
   if(d.plan) await commitTimelineDrag(d.dk,d.plan);
   await afterDayEdit(d.dk);
 }
+
+/* ---------------------------------------------------------------------
+   Pressing a block is ambiguous until it resolves: a tap opens the sheet, a
+   drag slides the block. A mouse commits on movement; a finger has to hold
+   first, because otherwise every attempt to scroll the day would pick up
+   whatever block happened to be under the thumb.
+   --------------------------------------------------------------------- */
+const TL_HOLD_MS=280, TL_SLOP=5;
+
+function tlBodyDown(ev,dk,sn,el){
+  if(tlDrag||!sn.endTs) return;              /* a running block is not movable */
+  try{ el.setPointerCapture(ev.pointerId); }catch(e){}
+  tlPress={dk,sn,el,pid:ev.pointerId,y0:ev.clientY,moved:false,
+           armed:ev.pointerType==="mouse",timer:null};
+  if(ev.pointerType!=="mouse"){
+    tlPress.timer=setTimeout(()=>{
+      if(tlPress&&!tlPress.moved){ tlPress.armed=true; tlArmMove(); }
+    },TL_HOLD_MS);
+  }
+}
+
+function tlArmMove(){
+  const p=tlPress; if(!p||tlDrag) return;
+  tlDrag={kind:"move",dk:p.dk,sid:p.sn.id,el:p.el,pid:p.pid,y0:p.y0,s0:p.sn.startTs,plan:null};
+  p.el.style.zIndex="7";
+  p.el.style.filter="brightness(1.25)";
+  document.querySelectorAll("#tlWrap .tlHandle").forEach(h=>h.style.visibility="hidden");
+}
+
+function tlBodyMove(ev){
+  const p=tlPress; if(!p||ev.pointerId!==p.pid) return;
+  const dy=ev.clientY-p.y0;
+  if(!p.moved&&Math.abs(dy)>TL_SLOP){
+    p.moved=true;
+    if(p.timer){ clearTimeout(p.timer); p.timer=null; }
+  }
+  if(!tlDrag||tlDrag.kind!=="move"){
+    if(p.armed&&p.moved) tlArmMove(); else return;
+  }
+  ev.preventDefault();
+  const plan=resolveBlockMove(tlSessions,tlDrag.sid,tlDrag.s0+(dy/TL_PX_PER_MIN)*60000);
+  if(plan){ tlDrag.plan=plan; tlPaint(plan); }
+}
+
+async function tlBodyUp(ev){
+  const p=tlPress; if(!p||ev.pointerId!==p.pid) return;
+  if(p.timer) clearTimeout(p.timer);
+  try{ p.el.releasePointerCapture(p.pid); }catch(e){}
+  tlPress=null;
+  const badge=document.getElementById("tlBadge"); if(badge) badge.style.display="none";
+  p.el.style.zIndex=""; p.el.style.filter="";
+  if(tlDrag&&tlDrag.kind==="move"){
+    const d=tlDrag; tlDrag=null;
+    if(d.plan) await commitTimelineDrag(d.dk,d.plan);
+    await afterDayEdit(d.dk);
+    return;
+  }
+  if(!p.moved) openBlockSheet(p.dk,p.sn);     /* it was a tap after all */
+}
+
+function tlBodyCancel(ev){
+  const p=tlPress; if(!p||(ev&&ev.pointerId!==p.pid)) return;
+  if(p.timer) clearTimeout(p.timer);
+  p.el.style.zIndex=""; p.el.style.filter="";
+  tlPress=null; tlDrag=null;
+  const badge=document.getElementById("tlBadge"); if(badge) badge.style.display="none";
+  renderDayEditor();
+}
+
+/* Pointer events cannot cancel a scroll that iOS has already started, so the
+   scroll is refused at the touch level for as long as a drag is live. */
+document.addEventListener("touchmove",e=>{ if(tlDrag) e.preventDefault(); },{passive:false});
 
 /* ---------------------------------------------------------------------
    Block sheet - everything that is not a drag. Opening a sheet rather than
@@ -1861,6 +1978,49 @@ function tlEnsureSheet(){
   return sc;
 }
 
+function tlChipRow(pool,currentId,onPick){
+  const chips=document.createElement("div");
+  chips.style.cssText="display:flex;gap:6px;flex-wrap:wrap";
+  pool.forEach(c=>{
+    const btn=document.createElement("button");
+    btn.className="btn sm";
+    btn.style.cssText="display:inline-flex;align-items:center;gap:6px";
+    btn.textContent=c.label;
+    const d=document.createElement("span");
+    d.style.cssText="width:9px;height:9px;border-radius:50%;flex:none;background:"+c.color;
+    btn.prepend(d);
+    if(currentId&&c.id===currentId){ btn.style.borderColor="var(--accent)"; btn.style.fontWeight="800"; }
+    btn.addEventListener("click",()=>onPick(c));
+    chips.appendChild(btn);
+  });
+  return chips;
+}
+
+/* Filling a gap takes the whole gap. Splitting it afterwards is one tap, and
+   guessing at a partial fill would be inventing data. */
+async function openGapSheet(dk,startTs,endTs){
+  tlEnsureSheet();
+  const fmt=state.profile&&state.profile.hourFmt;
+  document.getElementById("blkTitle").textContent="Fill "+fmtDurShort(endTs-startTs);
+  const body=document.getElementById("blkBody");
+  body.innerHTML="";
+  const when=document.createElement("div"); when.className="hint"; when.style.margin="0 0 16px";
+  when.textContent=fmtClock(startTs,fmt)+" – "+fmtClock(endTs,fmt)+
+    " is untracked. Pick a channel and it takes the whole gap.";
+  body.appendChild(when);
+  const t=document.createElement("div"); t.className="sect-title"; t.style.margin="0 0 8px";
+  t.textContent="Channel"; body.appendChild(t);
+  const pool=await rankedChannelsForPicker(await sessionsForDay(dk));
+  body.appendChild(tlChipRow(pool,null,async c=>{
+    await saveLocal("sessions",{id:uid(),profileId:state.profileId,channelId:c.id,
+      startTs:startTs,endTs:endTs,durMs:endTs-startTs,date:dateKey(startTs),voided:false});
+    closeScrim("blockScrim");
+    await afterDayEdit(dk);
+    toast(fmtDurShort(endTs-startTs)+" added to "+c.label);
+  }));
+  openScrim("blockScrim");
+}
+
 async function openBlockSheet(dk,sn){
   tlEnsureSheet();
   const fresh=(await sessionsForDay(dk)).find(x=>x.id===sn.id)||sn;
@@ -1877,27 +2037,13 @@ async function openBlockSheet(dk,sn){
 
   const t=document.createElement("div"); t.className="sect-title"; t.style.margin="0 0 8px";
   t.textContent="Change channel"; body.appendChild(t);
-  const chips=document.createElement("div");
-  chips.style.cssText="display:flex;gap:6px;flex-wrap:wrap";
   const pool=await rankedChannelsForPicker(await sessionsForDay(dk));
-  pool.forEach(c=>{
-    const btn=document.createElement("button");
-    btn.className="btn sm";
-    btn.style.cssText="display:inline-flex;align-items:center;gap:6px";
-    btn.textContent=c.label;
-    const d=document.createElement("span");
-    d.style.cssText="width:9px;height:9px;border-radius:50%;flex:none;background:"+c.color;
-    btn.prepend(d);
-    if(c.id===fresh.channelId){ btn.style.borderColor="var(--accent)"; btn.style.fontWeight="800"; }
-    btn.addEventListener("click",async()=>{
-      await reassignSession(fresh.id,c.id);
-      closeScrim("blockScrim");
-      await afterDayEdit(dk);
-      toast("Moved to "+c.label);
-    });
-    chips.appendChild(btn);
-  });
-  body.appendChild(chips);
+  body.appendChild(tlChipRow(pool,fresh.channelId,async c=>{
+    await reassignSession(fresh.id,c.id);
+    closeScrim("blockScrim");
+    await afterDayEdit(dk);
+    toast("Moved to "+c.label);
+  }));
 
   const acts=document.createElement("div");
   acts.style.cssText="display:flex;gap:6px;flex-wrap:wrap;margin-top:18px";
@@ -2369,19 +2515,25 @@ function initializeEventListeners(){
     if(t.endTs<=t.startTs){ toast("End must be after start"); return; }
     if(t.endTs>now()){ toast("That end time is in the future"); return; }
 
-    /* Overlaps would double-count the same minutes in every total, so they are
-       worth a question. They are still allowed - two things genuinely can be
-       worked at once, and it is the user's data. */
+    /* Overlaps are refused outright. Two channels cannot be running in the
+       same minute, and allowing it double-counts that minute in every total
+       and every score. The timeline makes this unreachable by construction;
+       this form is the only other way in, so it is closed here too. */
     const others=(await sessionsForDay(dk)).filter(x=>x.id!==editingSessId);
     const clash=others.find(x=>{ const xe=x.endTs||now(); return t.startTs<xe && x.startTs<t.endTs; });
     if(clash){
       const ch=state.channels.find(c=>c.id===clash.channelId);
-      const fmt=state.profile&&state.profile.hourFmt;
-      const ok=await uiConfirm("This overlaps "+(ch?ch.label:"another session")+" ("+
-        fmtClock(clash.startTs,fmt)+" \u2013 "+(clash.endTs?fmtClock(clash.endTs,fmt):"running")+
-        "). Both will be counted, so that time will be double counted in your totals.",
-        {title:"Overlapping session",okLabel:"Save anyway"});
-      if(!ok) return;
+      const cf=state.profile&&state.profile.hourFmt;
+      const span=fmtClock(clash.startTs,cf)+" to "+(clash.endTs?fmtClock(clash.endTs,cf):"running");
+      await uiChoice({
+        title:"Times overlap",
+        message:"That would run at the same time as "+(ch?ch.label:"another block")+
+          " ("+span+")." + String.fromCharCode(10,10) +
+          "Two channels cannot both be running in the same minute. Shorten that one "+
+          "first, or drag the edge on the timeline - it moves both at once.",
+        choices:[{label:"OK",value:"ok"}]
+      });
+      return;
     }
 
     if(editingSessId){
