@@ -1164,8 +1164,8 @@ function showSubcategoryModal(parentId,subs){
   subs.forEach(sub=>{
     const b=document.createElement("button");
     b.style.cssText="border:2px solid transparent;border-radius:14px;padding:16px 13px;min-height:78px;"+
-      "cursor:pointer;font-weight:800;font-size:15px;line-height:1.25;text-align:left;display:flex;"+
-      "align-items:flex-end;box-shadow:var(--shadow);color:"+ink+
+      "cursor:pointer;font-weight:800;font-size:15px;line-height:1.25;text-align:center;display:flex;"+
+      "align-items:center;justify-content:center;box-shadow:var(--shadow);color:"+ink+
       ";background:linear-gradient(160deg,"+color+","+shade(color,.22)+")";
     b.textContent=sub.label;
     b.addEventListener("click",async()=>{closeScrim("subScrim");await startSessionOnChannel(sub.id,now());});
@@ -2281,6 +2281,22 @@ async function renderPriorities(){
   const body=document.createElement("div");
   body.style.cssText="flex:1;overflow-y:auto;padding:14px 12px max(14px, env(safe-area-inset-bottom))";
 
+  /* This whole page is opt-in, and the tags it reports on are edited
+     somewhere else entirely. Saying both up front stops it reading as a
+     thing you are failing to fill in. */
+  const intro=document.createElement("div");
+  intro.style.cssText="margin:0 0 16px;padding:12px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)";
+  const introTxt=document.createElement("div");
+  introTxt.className="hint"; introTxt.style.margin="0";
+  introTxt.textContent="Completely optional. Your time is tracked whether or not you use this. It is here for when you want to know not just where the time went, but what kind of time it was — tag channels as Must/Will/Want, DRIP, or urgent/important, and this page reports against those tags. Anything untagged is shown separately rather than quietly dropped.";
+  intro.appendChild(introTxt);
+  const introGo=document.createElement("button");
+  introGo.className="btn sm"; introGo.style.marginTop="11px";
+  introGo.textContent="Edit tags in Channels";
+  introGo.addEventListener("click",()=>openChannels());
+  intro.appendChild(introGo);
+  body.appendChild(intro);
+
   if(!data.total){
     const e=document.createElement("div"); e.className="hint"; e.style.padding="18px 4px";
     e.textContent="No tracked time in this range yet.";
@@ -2602,8 +2618,8 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
       it.addEventListener("click",()=>{loadProfile(p.id);document.getElementById("avatarMenu").style.display="none";renderAvatarMenu();});m.appendChild(it);}}
   const sep=document.createElement("div");sep.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep);
   m.appendChild(avatarMenuItem("📅","Edit a day",()=>openDayEditor(todayKey())));
-  m.appendChild(avatarMenuItem("🎯","Priorities",()=>openPriorities()));
   m.appendChild(avatarMenuItem("🎨","Channels",()=>openChannels()));
+  m.appendChild(avatarMenuItem("🎯","Priorities",()=>openPriorities()));
   m.appendChild(avatarMenuItem("⚙️","Settings",()=>openSettings()));
   m.appendChild(avatarMenuItem(
     currentTheme()==="light"?"🌙":"☀️",
@@ -2846,7 +2862,7 @@ function initializeEventListeners(){
 function openChannels(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;stage.innerHTML=`
   <div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">
     <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--glass);flex-wrap:wrap">
-      <h2 style="margin:0;font-size:18px;font-weight:700">🎨 Channels</h2>
+      <h2 style="margin:0;font-size:18px;font-weight:700">Channels</h2>
       <button class="btn sm" id="closeChannelsBtn" style="margin-left:auto">Done</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:20px 24px;background:var(--bg)">
@@ -2866,7 +2882,7 @@ function openChannels(){const app=document.querySelector('.app');const stage=app
 function openSettings(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;stage.innerHTML=`
   <div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">
     <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--glass);flex-wrap:wrap">
-      <h2 style="margin:0;font-size:18px;font-weight:700">⚙️ Settings</h2>
+      <h2 style="margin:0;font-size:18px;font-weight:700">Settings</h2>
       <button class="btn sm" id="closeSettingsBtn" style="margin-left:auto">Done</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:20px 24px;background:var(--bg)">
@@ -3301,6 +3317,11 @@ async function openCombinedSummary(){
       const dRating=dayNote.rating||0;
       const dNotes=dayNote.notes||"";
       const dName=day.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+      /* Saturday and Sunday are tagged so they do not read as ordinary
+         working days that happened to go badly. */
+      const wkDay=day.date.getDay();
+      const wkndTag=(wkDay===0||wkDay===6)
+        ? '<span style="margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--muted);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px">Weekend</span>' : '';
       const chRows=Object.entries(day.channels).map(([chId,dur])=>{
         const ch=state.channels.find(x=>x.id===chId)||{label:"(deleted)",color:"#64748b"};
         return`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:10px"><div style="width:6px;height:6px;border-radius:50%;background:${ch.color}"></div><div style="flex:1;min-width:0;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ch.label)}</div><div style="font-weight:600;color:var(--ink2);min-width:40px;text-align:right">${fmtDur(dur)}</div></div>`
@@ -3316,14 +3337,14 @@ async function openCombinedSummary(){
       const adhStr=adhCellHtml(dayNote.matchScore,dayNote.budgetScore?dayNote.budgetScore.pct:undefined);
       
       weekTotal+=day.total;
-      content+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)">${dName}</div><div style="margin-bottom:6px">${dTypeSelCard}</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">${fmtDur(day.total)}</div><div style="font-size:11px;color:var(--ink2);margin-bottom:6px">${adhStr}</div><div style="margin:8px 0">${starHtml}</div>${notesDisplay}<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:9px">${chRows||'<div style="color:var(--muted)">No sessions</div>'}</div></div>`;
+      content+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)">${dName}${wkndTag}</div><div style="margin-bottom:6px">${dTypeSelCard}</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">${fmtDur(day.total)}</div><div style="font-size:11px;color:var(--ink2);margin-bottom:6px">${adhStr}</div><div style="margin:8px 0">${starHtml}</div>${notesDisplay}<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:9px">${chRows||'<div style="color:var(--muted)">No sessions</div>'}</div></div>`;
     }
     content+='</div>';
     content+=`<div style="margin-top:14px;padding:12px;background:linear-gradient(180deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.3);border-radius:12px"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Total</div><div style="font-size:22px;font-weight:800;color:var(--good)">${fmtDur(weekTotal)}</div></div>`;
     
     // NEW SECTION: Day by Day Breakdown Table
     content+='<div style="margin-top:24px;padding-top:20px;border-top:2px solid var(--line)"><div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Day by Day Breakdown</div>';
-    content+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody>';
+    content+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day type</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody>';
     for(const day of Object.values(weekData).slice(0,7)){
       const dKey=fmtDateKey(day.date);
       const dayNote=await idbGet("day_notes",dKey)||{};
@@ -3336,13 +3357,13 @@ async function openCombinedSummary(){
       const rowBg=isWeekend?'rgba(100,116,139,.15)':'transparent';
       
       const starHtml=starCellHtml(dKey,dRating,"editWeekStar");
-      const dTypeSel=dayTypeSelectHtml(dKey,await getDayType(dKey));
+      const dTypeSel=dayTypeSelectHtml(dKey,await getDayType(dKey),true);
       
       const adhData=await idbGet("day_notes",dKey);
       const adhStr=adhCellHtml(adhData&&adhData.matchScore,adhData&&adhData.budgetScore?adhData.budgetScore.pct:undefined);
       
       weekTotal+=day.total;
-      content+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink)">${dName}${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editWeekNotes('${dKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
+      content+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink);white-space:nowrap">${dName}</td><td style="padding:12px">${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editWeekNotes('${dKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
     }
     content+='</tbody></table></div></div>';
     
@@ -3379,7 +3400,7 @@ async function openCombinedSummary(){
     
     // FULL HISTORY LOG SECTION - Very Bottom
     content+='<div style="margin-top:32px;padding-top:24px;border-top:2px solid var(--line)"><div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:14px">Complete History Log</div>';
-    content+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Date</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody id="historyTableBody"></tbody></table></div></div>';
+    content+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Date</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day type</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody id="historyTableBody"></tbody></table></div></div>';
 
     document.getElementById("summaryContent").innerHTML=content;
     
@@ -3411,9 +3432,9 @@ async function openCombinedSummary(){
         const dName=dayDate.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
         
         const starHtml=starCellHtml(dateKey,dRating,"editHistoryStar");
-        const dTypeSel=dayTypeSelectHtml(dateKey,await getDayType(dateKey));
+        const dTypeSel=dayTypeSelectHtml(dateKey,await getDayType(dateKey),true);
         
-        historyHtml+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink)">${dName}${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editHistoryNotes('${dateKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
+        historyHtml+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink);white-space:nowrap">${dName}</td><td style="padding:12px">${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editHistoryNotes('${dateKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
       }
       
       const historyBody=document.getElementById("historyTableBody");
@@ -4119,7 +4140,7 @@ async function refreshDayScores(dk){
 }
 async function refreshTodayScores(){ return refreshDayScores(todayKey()); }
 
-async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;flex-wrap:wrap;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;min-height:36px;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
+async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden;flex-wrap:nowrap;min-width:0;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;height:36px;overflow:hidden;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
   
   (async ()=>{
     const S=computeDayScores(plan,today,todaySessions);
@@ -4383,12 +4404,12 @@ function starCellHtml(dateKey,rating,fnName,size){
    existing date cell rather than as a new column: the Summary tables are read
    on a phone, and a fifth column would push them into horizontal scrolling.
    It also avoids the header/body column-count trap documented in Landmines. */
-function dayTypeSelectHtml(dateKey,current){
+function dayTypeSelectHtml(dateKey,current,inline){
   const opts=[{v:"",label:"Working"}].concat(DAY_TYPES.map(d=>({v:d.v,label:d.label})));
   const cur=current||"";
   const def=dayTypeDef(cur);
   return '<select onchange="window.setDayTypeFromSummary(\''+dateKey+'\',this.value)" '+
-    'style="margin-top:5px;font-size:16px;padding:3px 5px;border-radius:8px;background:var(--field);color:'+(def?def.color:"var(--ink2)")+';border:1px solid '+(def?def.color:"var(--line)")+'">'+
+    'style="'+(inline?'width:100%;':'margin-top:5px;')+'font-size:16px;padding:3px 5px;border-radius:8px;background:var(--field);color:'+(def?def.color:"var(--ink2)")+';border:1px solid '+(def?def.color:"var(--line)")+'">'+
     opts.map(o=>'<option value="'+o.v+'"'+(o.v===cur?" selected":"")+'>'+escapeHtml(o.label)+'</option>').join("")+
     '</select>';
 }

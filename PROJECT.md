@@ -750,6 +750,31 @@ one - hence `--bad-ink`; and `.bottombar` carried its own `#0a101c`, which no
 search for the other literals would have found. When theming, sweep for
 `background:#...` across the whole file rather than trusting a list.
 
+### Polish round, 2026-08-27
+
+- **The Tracker's four columns are four separate stacks**, not a table, so one
+  row growing in one column silently pushed that column out of step with the
+  other three - which is what "the spacing gets off" was. Rows are now a fixed
+  `height:36px` with `overflow:hidden`, and the channel chips ellipsis instead
+  of wrapping. Verified: 20 rows per column, every row 36px, identical first
+  and last offsets across all four. **If you ever add content to one of those
+  cells, keep the fixed height.**
+- Subcategory tiles centre their label on both axes.
+- Channels now sits above Priorities in the avatar menu, and both the Channels
+  and Settings page headers lost their glyph - the header already says what
+  the page is.
+- **The Priorities page opens with an explicit "completely optional"** note and
+  a button through to Channels, where the tags are actually edited. It read
+  like something you were failing to fill in.
+- **Summary Week Overview tags Saturday and Sunday "Weekend."** This is a
+  *label only* - it does not change scoring. Weekends usually score nothing
+  anyway, because `todaysEffectivePlan()` finds no template matching that
+  weekday. If weekends should be excluded from adherence the way leave is,
+  that is a separate change to `refreshDayScores()`.
+- **Both Summary tables gained a "Day type" column.** The select used to be
+  jammed under the date in the Day cell. Header and body counts were moved
+  together - see Landmines; this is exactly the trap that warning is about.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
