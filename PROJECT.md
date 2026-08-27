@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v16
-- **Last deployed:** v16, 2026-08-27
+- **Current release:** v17
+- **Last deployed:** v17, 2026-08-27
 - **Status:** stable, in daily use
 
 > **Verify before believing any release claim in this file.** It has been
@@ -912,6 +912,21 @@ three of them.
 Also: the Day Editor shows the weekday beside the date, because a native date
 input renders `08/27/2026` and cannot be told to include it; and the zoom
 buttons are captioned "Zoom" so `1x 2x 4x` is not a riddle.
+
+### Today button, v17
+
+On both the Day Editor and the Tracker, Today is pinned to the right edge and
+**blue when tapping it would change something, grey and disabled when you are
+already on today**. The colour carries the whole message; nothing else had to
+say it.
+
+Pinning it needed a wrapper rather than a spacer: the left cluster (arrows,
+date, weekday, zoom) is its own flex container with `flex:1;flex-wrap:wrap`, so
+it wraps *inside itself* and Today stays on the right at every width. A flex
+spacer in the shared row carried Today onto the second line on a phone.
+
+On the Tracker, Today and Edit Sessions are grouped together on the right, so
+the left side is just the date controls and the plan name.
 
 ---
 
