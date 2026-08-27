@@ -882,15 +882,16 @@ Reordered around what people actually come here to do, which is fix times.
   container, so both rows stay put.
 - The pretty-date label ("Wed, Aug 26") is gone; the date input beside it
   already says which day you are on.
-- **The footer is gone entirely.** Adding is done from the `+` on any gap or
-  either end of the rail, so "+ Add session" was a fourth route to the same
-  thing; the day total and adherence both live on the Summary, and a fixed bar
-  for one line of read-only text is not worth the height on a phone.
-  `openSessionEditor(dk,null)` is now unreachable - the modal is still used for
-  editing, so its "Add session" title branch is simply never chosen.
-  **`refreshDayScores(dk)` is still called on render.** It persists the day’s
-  scores as well as returning them, so dropping it with the footer would have
-  quietly stopped a browsed day being rescored.
+- **The fixed footer is gone; the totals moved into the page.** "+ Add session"
+  was a fourth route to something the `+` on any gap or either end of the rail
+  already does, and a permanently pinned bar was not worth the height on a
+  phone. The day total, Timing and Budget line now sits at the end of the
+  scrolling content instead. `openSessionEditor(dk,null)` is unreachable as a
+  result - the modal is still used for editing, so its "Add session" title
+  branch is simply never chosen.
+  **`refreshDayScores(dk)` does more than feed that line: it persists the
+  day’s scores.** Removing it along with the display would quietly stop a
+  browsed day being rescored.
 
 ---
 
