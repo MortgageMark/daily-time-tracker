@@ -5,20 +5,17 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v12 (in `feature/day-editor-timeline`, not yet merged)
-- **Last deployed:** **v9**, build `202608262001-dcb070b`
+- **Current release:** v13
+- **Last deployed:** v13, 2026-08-27
 - **Status:** stable, in daily use
 
-> **v10, v11 and v12 are committed but NOT deployed.** The live site is
-> still v9, so the v11 stale-device sync protection is not protecting
-> anything yet. `master` was pushed on 2026-08-27 (`d2d590b`), but **the
-> Netlify build failed at Initializing** — before the build command runs,
-> and with `netlify.toml` byte-identical to the last good deploy, so it is
-> not a code problem. Suspect a retired build image, revoked GitHub access,
-> or exhausted build minutes; the detail is inside the Initializing row of
-> the failed deploy. **Unresolved as of 2026-08-27.** Verify with
-> `curl https://dailytimetracker.com/version.json` before believing any
-> release claim in this file.
+> **Verify before believing any release claim in this file.** It has been
+> wrong twice. `curl https://dailytimetracker.com/version.json` settles it.
+> v10-v12 sat undeployed for a day because a push was never made, and then
+> because Netlify failed at *Initializing* - before the build command runs,
+> with `netlify.toml` byte-identical to the last good deploy. A Retry
+> cleared it. If it recurs, the detail is inside the Initializing row;
+> suspect a retired build image or repo access rather than the code.
 
 ---
 
