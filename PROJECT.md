@@ -628,40 +628,46 @@ newer data: the push is gated by a comparison against the server's
 `updated_at`, sign-out no longer force-pushes, and Settings gains "Refresh from
 cloud" as the safe reset that sign-out could never be.
 
-**v12** — reworks the Day Editor around **relabelling** rather than re-entry.
-The old editor assumed the problem was missing time; the actual common problem
-is a day the timer tracked correctly against the wrong channels.
+**v12** — rebuilds the Day Editor as a **timeline**, after a first attempt as a
+card list with nudge buttons was correct but unpleasant to use. The lesson is
+worth keeping: the list was technically complete and still failed, because a
+list cannot show a gap and a day is a shape.
 
-- **The channel picker is inline.** Tapping a block expands it in place with
-  colour-coded chips, so the most frequent correction costs two taps instead of
-  a modal round trip. Chips are ranked by `rankedChannelsForPicker()` — the
-  channels already on that day first, then the last fortnight by time spent —
-  capped at ten with "More…" revealing all of them.
-- **Adjacent blocks share one boundary control.** Editing an end time and a
-  start time as separate fields is what let a correction leave a gap or an
-  overlap behind. `moveBoundary()` moves both records together, so neither is
-  reachable. Nudges are ±5 and ±15 minutes; the guards keep the new time
-  strictly inside the day, so neither record's `date` can change.
-- **Split and merge.** `splitSession()` cuts at the midpoint and the caller
-  opens the picker on the new half, since relabelling it is the point.
-  `mergeSessions()` appears on the seam only when both sides share a channel.
-  Merge voids and zeroes the absorbed row rather than deleting it — deletes do
-  not propagate to Supabase and the row would return on the next pull.
-- Gaps and overlaps between blocks are **reported, not silently closed**.
-  Deciding what happened in an untracked half hour is a judgement, not an
-  adjustment.
+The day is drawn to scale against an hour rail (`tlRange()` covers the planned
+working hours widened to whatever actually happened, so a 6am start is not
+clipped). Each block is its channel's colour, labelled with its exact start,
+end and duration. Gaps appear as dashed regions with the untracked time named.
 
-The old per-session modal survives as "Exact times…" — it is still the way to
-type a precise time, and `openSessionEditor()` is unchanged.
+- **Tap a block** to change its channel, from a sheet rather than an inline
+  expansion — expanding inline would move everything below it and break the
+  geometry the timeline exists to show.
+- **Drag the grip on an edge** to move when a block started or stopped. Every
+  drag lands on a 5-minute grid and jumps to a neighbour's edge within 10
+  minutes, so closing an 8-minute gap needs no precision. Mark asked for this
+  explicitly: do not make him be exact.
+- **`resolveEdgeDrag()` is pure and is the whole model.** It takes the day and
+  one proposed edge time and returns what the day becomes. Overlaps are
+  unreachable *by construction* rather than validated after the fact: a block
+  dragged into its neighbour pushes that neighbour back, and one dragged clean
+  past a neighbour's far edge absorbs it — the "I left the timer running and
+  it was really all one thing" case. The preview during a drag and the commit
+  on release run the same function, so what is shown is what is saved.
+- A **running block is never absorbed or pushed**; a drag stops short of it.
+- Absorbed blocks are voided and zeroed, never deleted — deletes do not
+  propagate to Supabase and the row would return on the next pull.
 
-Verified on a seeded fixture at 375px: reassign, ±nudge both directions, split,
-merge, the too-short guard, and total time conserved across boundary moves
-(7h 45m in, 7h 45m out). **The seam fits on one line with ~19px to spare at
-375px** — it wrapped at first, and the four nudge buttons plus a time label
-plus Merge is genuinely tight, so re-measure it if anything there grows.
+Verified on a seeded fixture at 375px by dispatching real pointer events at the
+handles: magnet (a 38m gap snapped shut exactly), push (a neighbour shrank
+rather than overlapping), absorb (the swallowed row voided with `durMs` 0), the
+start-edge drag, and **no overlapping pair anywhere in the day afterwards**.
+
+This replaced `buildSessionCard` / `buildSessionPanel` / `buildBoundaryRow` and
+`moveBoundary` / `mergeSessions`, all removed. Merging is now just dragging one
+block over another. `openSessionEditor()` survives untouched as "Exact times…",
+still the way to type a precise time.
 
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
-*Updated 2026-08-27: v12 Day Editor rework, and the deploy-status correction
-at the top.*
+*Updated 2026-08-27: v12 Day Editor timeline, and the deploy-status
+correction at the top.*
