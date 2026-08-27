@@ -858,6 +858,22 @@ too or they would throw on null).
 Bringing the feature back needs a switcher here **and a rename**, which never
 existed - that missing rename is half the reason it was hidden.
 
+### Day Editor layout, v14
+
+Reordered around what people actually come here to do, which is fix times.
+
+- The header is one row: `‹ [date] › Today`, with the pretty date beside it.
+  **Home was removed** - the bottom bar already goes to the dashboard, so it was
+  a second way to do the same thing occupying a whole row on a phone. Today
+  keeps its greyed-out state on today itself.
+- **Day type moved to the foot of the page**, behind a rule. It used to lead,
+  which put the rarest action first. It still leads on a *future* date, where
+  marking leave in advance is the only thing you can do.
+- The paragraph explaining the timeline is gone, and the section is labelled
+  **Zoom** rather than Sessions, because the control beside it is the zoom and
+  pressing one teaches it faster than prose. The label falls back to "Sessions"
+  on an empty day, where there is nothing to zoom.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
