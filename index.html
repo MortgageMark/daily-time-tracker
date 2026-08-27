@@ -1131,12 +1131,19 @@ async function reconcileOpenSession(open){
 }
 async function switchTo(channelId){
   const t=now();
-  if(running&&running.channelId===channelId){ offerPause(); return; }
-  const runningCh=running?state.channels.find(c=>c.id===running.channelId):null;
-  if(running&&runningCh?.parentChannelId===channelId){ offerPause(); return; }
   const ch=state.channels.find(c=>c.id===channelId);
   if(!ch) return;
   const subs=state.channels.filter(c=>c.parentChannelId===channelId&&!c.archived);
+  const runningCh=running?state.channels.find(c=>c.id===running.channelId):null;
+  const alreadyOn=!!running&&(running.channelId===channelId||runningCh&&runningCh.parentChannelId===channelId);
+  if(alreadyOn){
+    /* A parent with subcategories still opens its picker: tapping it again is
+       usually a move to a different subcategory, not a request to stop. The
+       pause offer rides alongside it - the toast sits above the scrim. */
+    offerPause();
+    if(subs.length>0) showSubcategoryModal(channelId,subs);
+    return;
+  }
   if(subs.length>0){ showSubcategoryModal(channelId,subs); return; }
   startSessionOnChannel(channelId,t);
 }
@@ -2467,7 +2474,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=17;
+const APP_RELEASE=18;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -2655,6 +2662,7 @@ function toastAction(msg,label,onClick,ms){
 }
 async function offerPause(){
   toastAction("Already running","Pause",async()=>{
+    closeScrim("subScrim");            /* it may be open behind the toast */
     if(!running) return;
     const st=await stopRunning(now());
     undoStack.push({type:"pause",prev:st});
@@ -2722,6 +2730,7 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
     currentTheme()==="light"?"🌙":"☀️",
     currentTheme()==="light"?"Dark mode":"Light mode",
     ()=>toggleTheme(),null,true));
+  m.appendChild(avatarMenuItem("💾","Export backup",()=>exportDataBackup()));
   m.appendChild(avatarMenuItem("⚙️","Settings",()=>openSettings()));
 
   const sep2=document.createElement("div");sep2.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep2);
@@ -2988,7 +2997,6 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
         <div class="row"><div class="grow">End time</div><select id="plannerEnd"><option value="16">4 PM</option><option value="17">5 PM</option><option value="18" selected>6 PM</option><option value="19">7 PM</option><option value="20">8 PM</option></select></div>
         <div class="row"><div class="grow">Increment</div><select id="plannerIncr"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="60">60 min</option></select></div>
         <div class="sect-title">Data Management</div>
-        <div class="row"><div class="grow"><b>Export Data Backup</b><div class="hint">Download your complete data before any destructive operations.</div></div><button class="btn sm" id="exportBackupBtn">Export</button></div>
         <div class="row"><div class="grow"><b>Restore Deleted Days</b><div class="hint" id="deletedDaysCount"></div></div><button class="btn sm" id="restoreDeletedBtn" style="display:none">Restore</button></div>
         <div class="row"><div class="grow"><b>Delete Date Range</b><div class="hint">Remove all data from a specific date range.</div></div><button class="btn sm warn" id="deleteDateRangeBtn">Delete Range</button></div>
         <div class="row"><div class="grow"><b>Complete Reset</b><div class="hint">⚠️ Permanently delete ALL data. This cannot be undone.</div></div><button class="btn sm warn" id="completeResetBtn" style="background:#dc2626">Complete Reset</button></div>
@@ -2998,8 +3006,6 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
     </div>
   </div>
 `;window.closeSettings=()=>{stage.innerHTML=origStage;renderGrid();};document.getElementById("hourFmt").value=state.profile.hourFmt||"12";document.getElementById("btnSize").value=state.profile.btnSize||"normal";document.getElementById("plannerStart").value=planState.startHour;document.getElementById("plannerEnd").value=planState.endHour;document.getElementById("plannerIncr").value=planState.increment;document.getElementById("closeSettingsBtn").addEventListener("click",()=>{window.closeSettings();});
-  const exportBackupBtn=document.getElementById("exportBackupBtn");
-  if(exportBackupBtn)exportBackupBtn.addEventListener("click",exportDataBackup);
   const restoreDeletedBtn=document.getElementById("restoreDeletedBtn");
   if(restoreDeletedBtn)restoreDeletedBtn.addEventListener("click",restoreDeletedDays);
   const deleteDateRangeBtn=document.getElementById("deleteDateRangeBtn");
@@ -3882,7 +3888,7 @@ function syncApplyTodayBtn(){
   btn.disabled=applied;
   btn.style.opacity=applied?".55":"";
   btn.style.cursor=applied?"default":"pointer";
-  btn.textContent=applied?"Applied":"Apply to today";
+  btn.textContent=applied?"Applied":"Apply";
 }
 
 
@@ -4001,13 +4007,11 @@ async function renderPlanPageUI(){
       : ``;
     const canPush=(today&&today.edited&&linked);
     html+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px">
-      <div style="font-size:13px;font-weight:700;color:var(--ink)">${linked?"From template: "+escapeHtml(linked.name):"No template applied"}${badge}</div>
-      <div class="hint" style="margin-top:4px">Changes here affect today only. The template stays as it is.</div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         <select id="applyTplSelect" style="flex:1;min-width:130px;padding:9px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:13px">
           ${planState.plans.map(p=>`<option value="${p.id}"${linked&&linked.id===p.id?" selected":""}>${escapeHtml(p.name)}</option>`).join("")}
         </select>
-        <button id="applyTodayBtn" class="btn sm pri" onclick="applyTemplateToToday(document.getElementById('applyTplSelect').value)">Apply to today</button>
+        <button id="applyTodayBtn" class="btn sm pri" onclick="applyTemplateToToday(document.getElementById('applyTplSelect').value)">Apply</button>
         ${canPush?`<button class="btn sm" onclick="saveTodayToTemplate()">Save to template</button>`:``}
         ${canPush?`<button class="btn sm warn" onclick="resetTodayToTemplate()">Discard edits</button>`:``}
       </div>
