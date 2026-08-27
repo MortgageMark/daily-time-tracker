@@ -1564,8 +1564,23 @@ async function renderDayEditor(){
     f.textContent="This day has not happened yet, so there is no time to edit. You can mark it off in advance now.";
     body.appendChild(f);
   } else {
-    const sTitle=document.createElement("div"); sTitle.className="sect-title"; sTitle.textContent="Sessions";
-    body.appendChild(sTitle);
+    const sBar=document.createElement("div");
+    sBar.style.cssText="display:flex;align-items:center;gap:8px;margin:18px 0 10px";
+    const sTitle=document.createElement("div"); sTitle.className="sect-title";
+    sTitle.style.margin="0"; sTitle.style.flex="1"; sTitle.textContent="Sessions";
+    sBar.appendChild(sTitle);
+    if(sess.length){
+      TL_ZOOMS.forEach(z=>{
+        const zb=document.createElement("button");
+        zb.className="btn sm"+(tlZoom===z?" pri":"");
+        zb.style.cssText="padding:5px 9px;min-width:38px;font-size:12px";
+        zb.textContent=z+"×";
+        zb.title=z===1?"Whole day":"Stretch the day "+z+" times taller";
+        zb.addEventListener("click",()=>zoomTimeline(z));
+        sBar.appendChild(zb);
+      });
+    }
+    body.appendChild(sBar);
     if(!sess.length){
       const empty=document.createElement("div"); empty.className="hint"; empty.style.padding="4px 4px 8px";
       empty.textContent="No time recorded on this day yet.";
@@ -1573,7 +1588,7 @@ async function renderDayEditor(){
     }
     if(sess.length){
       const hint=document.createElement("div"); hint.className="hint"; hint.style.margin="-4px 0 10px";
-      hint.textContent="Tap a block to change its channel. Drag the grip on its edge to move when it started or stopped.";
+      hint.textContent="Tap a block to change its channel. Drag the grip on its edge to move when it started or stopped, or the middle of a block to slide the whole thing. Zoom in if an hour is too busy to grab.";
       body.appendChild(hint);
     }
     body.appendChild(buildTimeline(dk,sess,fmt));
@@ -1645,7 +1660,18 @@ function tsToTimeInput(ts){ const d=new Date(ts); return pad(d.getHours())+":"+p
    are dragged by their edges, and the drag itself enforces the invariant
    that two channels can never be running at the same moment.
    ===================================================================== */
-const TL_PX_PER_MIN=1.15;      /* ~69px an hour - a finger can land 5m */
+const TL_BASE_PX_PER_MIN=1.15; /* ~69px an hour at 1x */
+const TL_ZOOMS=[1,2,4];
+/* Derived, not independent: every position on the timeline goes through
+   tlY(), so changing this one number rescales the whole day. The drag math
+   works in deltas and needs no changes. */
+let tlZoom=1, TL_PX_PER_MIN=TL_BASE_PX_PER_MIN;
+function setTlZoom(z){
+  tlZoom=TL_ZOOMS.indexOf(z)>=0?z:1;
+  TL_PX_PER_MIN=TL_BASE_PX_PER_MIN*tlZoom;
+  try{ localStorage.setItem('dtt-tl-zoom',String(tlZoom)); }catch(e){}
+}
+(function(){ try{ const z=parseFloat(localStorage.getItem('dtt-tl-zoom')); if(z) setTlZoom(z); }catch(e){} })();
 const TL_RAIL=52;              /* width of the hour rail */
 const TL_SNAP_MIN=5;           /* every drag lands on a 5-minute grid */
 const TL_MAGNET_MIN=10;        /* ...and jumps a neighbour's edge within 10 */
@@ -1769,6 +1795,27 @@ async function commitTimelineDrag(dk,plan){
   }
 }
 
+/* Zooming around the top of the scroll area would throw the reader hours
+   away from what they were looking at, so the moment currently in the
+   middle of the screen is measured first and put back afterwards. */
+async function zoomTimeline(z){
+  const body=document.getElementById("dayEditorBody");
+  const wrap=document.getElementById("tlWrap");
+  let anchorTs=null;
+  if(body&&wrap&&tlRangeCur){
+    const wrapTop=wrap.getBoundingClientRect().top-body.getBoundingClientRect().top+body.scrollTop;
+    const centre=body.scrollTop+body.clientHeight/2-wrapTop-TL_PAD;
+    anchorTs=tlRangeCur.startTs+(centre/TL_PX_PER_MIN)*60000;
+  }
+  setTlZoom(z);
+  await renderDayEditor();
+  const b=document.getElementById("dayEditorBody"), w=document.getElementById("tlWrap");
+  if(!b||!w||anchorTs===null) return;
+  const wrapTop=w.getBoundingClientRect().top-b.getBoundingClientRect().top+b.scrollTop;
+  const y=((anchorTs-tlRangeCur.startTs)/60000)*TL_PX_PER_MIN;
+  b.scrollTop=Math.max(0,wrapTop+TL_PAD+y-b.clientHeight/2);
+}
+
 function buildTimeline(dk,sess,fmt){
   tlRangeCur=tlRange(dk,sess); tlSessions=sess.slice(); tlFmt=fmt; tlDk=dk;
   const wrap=document.createElement("div");
@@ -1793,18 +1840,21 @@ function buildTimeline(dk,sess,fmt){
   ordered.forEach((sn,i)=>{
     const ch=state.channels.find(c=>c.id===sn.channelId)||{label:"(deleted channel)",color:"#64748b"};
     const en=tlEndOf(sn), top=tlY(sn.startTs);
-    const h=Math.max(18,tlY(en)-top);
+    const h=Math.max(2,tlY(en)-top);
     const b=document.createElement("div");
     b.dataset.sid=sn.id;
     b.style.cssText="position:absolute;left:"+TL_RAIL+"px;right:0;top:"+top+"px;height:"+h+
-      "px;border-radius:10px;border:1px solid "+ch.color+";background:"+ch.color+
-      "2e;box-shadow:inset 4px 0 0 "+ch.color+";overflow:hidden;cursor:pointer;padding:4px 10px 4px 14px";
+      "px;border-radius:"+(h<14?"5px":"10px")+";border:1px solid "+ch.color+";background:"+ch.color+
+      "2e;box-shadow:inset 4px 0 0 "+ch.color+";overflow:hidden;cursor:pointer;padding:"+
+      (h>=24?"4px 10px 4px 14px":"0 0 0 14px");
     const nm=document.createElement("div");
     nm.style.cssText="font-weight:800;font-size:13px;line-height:1.25;overflow:hidden;"+
       "text-overflow:ellipsis;white-space:nowrap;color:var(--ink)";
     nm.textContent=ch.label;
-    b.appendChild(nm);
-    if(h>=38){
+    /* Below this the text would be clipped to a meaningless sliver; the colour
+       bar still says which channel it is, and zooming in reveals the rest. */
+    if(h>=24) b.appendChild(nm);
+    if(h>=42){
       const tm=document.createElement("div");
       tm.dataset.times="1";
       tm.style.cssText="font-size:11px;color:var(--ink2);margin-top:1px;white-space:nowrap";
@@ -1945,7 +1995,7 @@ function tlPaint(plan){
   plan.items.forEach(it=>{
     const el=wrap.querySelector('[data-sid="'+it.id+'"]');
     if(!el||el.classList.contains("tlHandle")) return;
-    const top=tlY(it.startTs), h=Math.max(18,tlY(it.endTs)-top);
+    const top=tlY(it.startTs), h=Math.max(2,tlY(it.endTs)-top);
     el.style.top=top+"px"; el.style.height=h+"px"; el.style.opacity="1";
     const tm=el.querySelector("[data-times]");
     if(tm) tm.textContent=fmtClock(it.startTs,tlFmt)+" – "+fmtClock(it.endTs,tlFmt)+

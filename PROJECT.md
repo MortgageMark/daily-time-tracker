@@ -775,6 +775,39 @@ search for the other literals would have found. When theming, sweep for
   jammed under the date in the Day cell. Header and body counts were moved
   together - see Landmines; this is exactly the trap that warning is about.
 
+### Timeline zoom, and why blocks are drawn at their true height
+
+A busy hour used to be unusable, and worse than it looked. `buildTimeline()`
+floored every block at 18px so short ones stayed visible, which meant a
+six-minute block claimed nearly three times its real span. Measured on ten
+six-minute blocks in one hour: **nine of the ten pairs visually overlapped, and
+all ten drag handles sat within 20px of each other**, stacked. Height had
+stopped meaning duration, and the thing under your finger was not the thing you
+were aiming at.
+
+The fix is honest geometry plus a zoom, not a bigger minimum:
+
+- Blocks render at their true height (floor of 2px, so a sliver is still
+  visible). The label appears at >=24px and the times at >=42px; below that the
+  colour bar alone says which channel it is.
+- `TL_PX_PER_MIN` is now derived from `tlZoom` (1x / 2x / 4x, persisted in
+  localStorage). Everything already positions through `tlY()`, and the drag
+  maths works in deltas, so nothing else changed. At 4x a six-minute block is
+  27.6px and handle collisions drop to **zero**.
+- `zoomTimeline()` measures which moment is at the centre of the viewport,
+  rescales, then puts that moment back. Without it, zooming throws the reader
+  hours away from what they were looking at.
+
+**A fisheye was deliberately rejected** - auto-expanding dense hours, or
+tap-an-hour-to-expand. Both break linearity, and linearity is the entire reason
+the timeline beats the old list: height means duration, at a glance. A view
+where a 20-minute block can look larger than an hour is a worse confusion than
+scrolling.
+
+Pinch-to-zoom was left out for now. The buttons are testable here; a two-finger
+gesture would interact with the existing pointer capture and the document-level
+`touchmove` guard, and none of that can be verified without a real device.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
