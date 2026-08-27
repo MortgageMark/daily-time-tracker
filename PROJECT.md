@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v13
-- **Last deployed:** v13, 2026-08-27
+- **Current release:** v14
+- **Last deployed:** v14, 2026-08-27
 - **Status:** stable, in daily use
 
 > **Verify before believing any release claim in this file.** It has been
@@ -835,6 +835,28 @@ Two details specific to the Summary:
   re-entry - every edit - recaptured the summary as the thing to return to, and
   Home would "close" the summary back into the summary. It is now captured only
   on first entry.
+
+### Profiles are hidden, not removed
+
+The multi-profile UI is gone as of v14: no switcher in the avatar menu, and the
+"New profile" sheet - which nothing ever opened, so it was already unreachable -
+is deleted along with its create handler. The `Settings` and `Dashboard` headers
+no longer append the profile name.
+
+**The model is untouched and must stay that way.** Every store carries
+`profileId` and a `profile` index, `runSync()` scopes by it, and every
+`idbAll(store,"profile",...)` depends on it. Removing it would be a migration
+across IndexedDB and Supabase both, for no gain. `seedIfEmpty()` still creates
+exactly one profile and `loadProfile()` still runs at boot; there is simply no
+route to a second one.
+
+Verified with two profiles deliberately present in the database: the menu shows
+no switcher and no profile names, and Settings and Dashboard both open cleanly
+(their name spans were removed, so the assignments that filled them had to go
+too or they would throw on null).
+
+Bringing the feature back needs a switcher here **and a rename**, which never
+existed - that missing rename is half the reason it was hidden.
 
 ---
 
