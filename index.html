@@ -1336,6 +1336,15 @@ function attrColor(key,v){
    and persisting that day's scores after every change.
    ===================================================================== */
 let dayEditorDate=null, editingSessId=null;
+/* Which session card is open, and whether its picker is showing every channel
+   rather than the ranked short list. Both are view state only. */
+let expandedSessId=null, chipsExpanded=null;
+
+/* Nudges for the shared boundary between two blocks. Small enough to correct a
+   late channel switch, large enough that a 45-minute miss is not forty taps. */
+const BOUNDARY_STEPS=[-15,-5,5,15];
+/* A nudge may never consume either side of the boundary entirely. */
+const MIN_SESSION_MS=60000;
 
 function dayStartTs(dk){ const p=String(dk).split("-").map(Number); return new Date(p[0],p[1]-1,p[2],0,0,0,0).getTime(); }
 function shiftDateKey(dk,days){ const d=new Date(dayStartTs(dk)); d.setDate(d.getDate()+days); return dateKey(d.getTime()); }
@@ -1350,14 +1359,112 @@ async function sessionsForDay(dk){
   return liveSessions(all).filter(s=>s.date===dk).sort((a,b)=>a.startTs-b.startTs);
 }
 
+function channelPath(c){
+  if(!c) return "(deleted channel)";
+  const p=c.parentChannelId?state.channels.find(x=>x.id===c.parentChannelId):null;
+  return p?p.label+" › "+c.label:c.label;
+}
+function activeChannels(){ return state.channels.filter(c=>!c.archived); }
+
+/* Ranks the picker chips by what is most likely wanted: the channels already
+   on this day first - a mislabelled block is nearly always one of the day's
+   own channels - then whatever has had the most time in the last fortnight. */
+async function rankedChannelsForPicker(dayList){
+  const pick=[], seen=new Set();
+  const add=id=>{
+    if(!id||seen.has(id)) return;
+    const c=state.channels.find(x=>x.id===id&&!x.archived);
+    if(!c) return;
+    seen.add(id); pick.push(c);
+  };
+  (dayList||[]).forEach(s=>add(s.channelId));
+  const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
+  const since=now()-14*86400000, tally={};
+  liveSessions(all).forEach(s=>{ if(s.startTs>=since) tally[s.channelId]=(tally[s.channelId]||0)+(s.durMs||0); });
+  Object.keys(tally).sort((a,b)=>tally[b]-tally[a]).forEach(add);
+  activeChannels().slice().sort((a,b)=>a.order-b.order).forEach(c=>add(c.id));
+  return pick;
+}
+
+async function reassignSession(id,channelId){
+  const rec=await idbGet("sessions",id);
+  if(!rec) return false;
+  if(rec.channelId!==channelId){
+    rec.channelId=channelId;
+    await saveLocal("sessions",rec);
+    /* Relabelling the block the timer is sitting on has to move the timer too,
+       or the tracker keeps counting into the channel just corrected. */
+    if(running&&running.sessionId===rec.id) running.channelId=channelId;
+  }
+  return true;
+}
+
+/* One control, two records. Editing an end time and a start time separately is
+   exactly what let a correction leave a gap or an overlap behind; moving the
+   shared split point cannot. The guards keep the new time strictly inside the
+   day, so neither record's `date` can change. */
+async function moveBoundary(aId,bId,deltaMs){
+  const a=await idbGet("sessions",aId), b=await idbGet("sessions",bId);
+  if(!a||!b||!a.endTs) return "gone";
+  const t=a.endTs+deltaMs;
+  if(t-a.startTs<MIN_SESSION_MS) return "min";
+  if(b.endTs&&b.endTs-t<MIN_SESSION_MS) return "min";
+  if(t>now()) return "future";
+  a.endTs=t; a.durMs=t-a.startTs;
+  b.startTs=t; if(b.endTs) b.durMs=b.endTs-t;
+  await saveLocal("sessions",a); await saveLocal("sessions",b);
+  if(running&&running.sessionId===b.id) running.startTs=t;
+  return "ok";
+}
+
+/* Voided and zeroed rather than deleted, for the same reason the delete button
+   is: a real delete does not propagate to Supabase and the row would return on
+   the next pull. */
+async function mergeSessions(aId,bId){
+  const a=await idbGet("sessions",aId), b=await idbGet("sessions",bId);
+  if(!a||!b) return false;
+  a.endTs=b.endTs; a.durMs=a.endTs?a.endTs-a.startTs:0;
+  b.voided=true; b.endTs=b.startTs; b.durMs=0;
+  await saveLocal("sessions",a); await saveLocal("sessions",b);
+  /* Merging into a running tail leaves the head running in its place. */
+  if(running&&running.sessionId===b.id) running={sessionId:a.id,channelId:a.channelId,startTs:a.startTs};
+  return true;
+}
+
+/* Splits at the midpoint. The caller then opens the picker on the new half,
+   because the reason to split is almost always that it was something else -
+   and the boundary nudges move the cut afterwards. */
+async function splitSession(id){
+  const rec=await idbGet("sessions",id);
+  if(!rec||!rec.endTs) return null;
+  const mid=rec.startTs+Math.round((rec.endTs-rec.startTs)/2);
+  if(mid-rec.startTs<MIN_SESSION_MS||rec.endTs-mid<MIN_SESSION_MS) return null;
+  const tail={id:uid(),profileId:rec.profileId,channelId:rec.channelId,startTs:mid,endTs:rec.endTs,
+              durMs:rec.endTs-mid,date:rec.date,voided:false};
+  rec.endTs=mid; rec.durMs=mid-rec.startTs;
+  await saveLocal("sessions",rec); await saveLocal("sessions",tail);
+  return tail.id;
+}
+
+async function afterDayEdit(dk){
+  await refreshDayScores(dk);
+  await updateTodayTotals();
+  await renderDayEditor();
+}
+function dayEditorGoto(dk){
+  dayEditorDate=dk; expandedSessId=null; chipsExpanded=null;
+  renderDayEditor();
+}
+
 async function openDayEditor(dk){
   dayEditorDate=dk||todayKey();
+  expandedSessId=null; chipsExpanded=null;
   const stage=document.querySelector(".app .stage");
   stage.innerHTML='<div id="dayEditorRoot" style="display:flex;flex-direction:column;height:100%;overflow:hidden"></div>';
   await renderDayEditor();
 }
 function closeDayEditor(){
-  dayEditorDate=null;
+  dayEditorDate=null; expandedSessId=null; chipsExpanded=null;
   const stage=document.querySelector(".app .stage");
   stage.innerHTML='<div class="grid" id="grid"></div>';
   renderAll();
@@ -1396,10 +1503,10 @@ async function renderDayEditor(){
   const todayBtn=document.createElement("button"); todayBtn.className="btn sm"; todayBtn.textContent="Today";
   todayBtn.disabled=isToday; if(isToday) todayBtn.style.opacity=".4";
   const homeBtn=document.createElement("button"); homeBtn.className="btn sm"; homeBtn.textContent="Home";
-  prev.addEventListener("click",()=>{ dayEditorDate=shiftDateKey(dk,-1); renderDayEditor(); });
-  next.addEventListener("click",()=>{ dayEditorDate=shiftDateKey(dk,1); renderDayEditor(); });
-  dateInput.addEventListener("change",()=>{ if(dateInput.value){ dayEditorDate=dateInput.value; renderDayEditor(); } });
-  todayBtn.addEventListener("click",()=>{ dayEditorDate=tk; renderDayEditor(); });
+  prev.addEventListener("click",()=>dayEditorGoto(shiftDateKey(dk,-1)));
+  next.addEventListener("click",()=>dayEditorGoto(shiftDateKey(dk,1)));
+  dateInput.addEventListener("change",()=>{ if(dateInput.value) dayEditorGoto(dateInput.value); });
+  todayBtn.addEventListener("click",()=>dayEditorGoto(tk));
   homeBtn.addEventListener("click",closeDayEditor);
   [prev,dateInput,next,lbl,spacer,todayBtn,homeBtn].forEach(n=>head.appendChild(n));
   root.appendChild(head);
@@ -1450,24 +1557,15 @@ async function renderDayEditor(){
       empty.textContent="No time recorded on this day yet.";
       body.appendChild(empty);
     }
-    sess.forEach(sn=>{
-      const ch=state.channels.find(c=>c.id===sn.channelId)||{label:"(deleted channel)",color:"#64748b"};
-      const row=document.createElement("div");
-      row.style.cssText="display:flex;align-items:center;gap:10px;padding:11px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--panel2)";
-      const dot=document.createElement("span");
-      dot.style.cssText="width:12px;height:12px;border-radius:50%;flex:none;background:"+ch.color;
-      const info=document.createElement("div"); info.style.cssText="flex:1;min-width:0";
-      const nm=document.createElement("div");
-      nm.style.cssText="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
-      nm.textContent=ch.label;
-      const tm=document.createElement("div"); tm.className="hint"; tm.style.margin="2px 0 0";
-      tm.textContent=fmtClock(sn.startTs,fmt)+" \u2013 "+(sn.endTs?fmtClock(sn.endTs,fmt):"running")+"  \u00b7  "+fmtDurShort(sn.endTs?sn.durMs:(now()-sn.startTs));
-      info.appendChild(nm); info.appendChild(tm);
-      const edit=document.createElement("button");
-      edit.className="btn sm"; edit.textContent="Edit";
-      edit.addEventListener("click",()=>openSessionEditor(dk,sn));
-      row.appendChild(dot); row.appendChild(info); row.appendChild(edit);
-      body.appendChild(row);
+    if(sess.length){
+      const hint=document.createElement("div"); hint.className="hint"; hint.style.margin="-4px 0 10px";
+      hint.textContent="Tap a block to change its channel. The time between two blocks moves both at once.";
+      body.appendChild(hint);
+    }
+    const pool=await rankedChannelsForPicker(sess);
+    sess.forEach((sn,i)=>{
+      body.appendChild(buildSessionCard(dk,sn,fmt,pool));
+      if(sess[i+1]) body.appendChild(buildBoundaryRow(dk,sn,sess[i+1],fmt));
     });
 
     /* rating + notes: retrospective, so today and past only - never the future */
@@ -1527,6 +1625,191 @@ async function renderDayEditor(){
   root.appendChild(foot);
 }
 function tsToTimeInput(ts){ const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
+
+/* One block in the day. The whole header strip is the tap target, because
+   changing the channel is the common correction and it should not cost a
+   dialog - the picker opens in place instead. */
+function buildSessionCard(dk,sn,fmt,pool){
+  const ch=state.channels.find(c=>c.id===sn.channelId)||{label:"(deleted channel)",color:"#64748b"};
+  const open=expandedSessId===sn.id;
+  const isRun=!sn.endTs;
+  const card=document.createElement("div");
+  card.style.cssText="border:1px solid "+(open?"var(--accent)":"var(--line)")+
+    ";border-radius:12px;margin-bottom:6px;background:var(--panel2);overflow:hidden";
+
+  const head=document.createElement("div");
+  head.style.cssText="display:flex;align-items:center;gap:10px;padding:11px 10px;cursor:pointer";
+  head.setAttribute("role","button");
+  head.setAttribute("aria-expanded",open?"true":"false");
+  const dot=document.createElement("span");
+  dot.style.cssText="width:12px;height:12px;border-radius:50%;flex:none;background:"+ch.color;
+  const info=document.createElement("div"); info.style.cssText="flex:1;min-width:0";
+  const nm=document.createElement("div");
+  nm.style.cssText="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+  nm.textContent=ch.label;
+  const tm=document.createElement("div"); tm.className="hint"; tm.style.margin="2px 0 0";
+  tm.textContent=fmtClock(sn.startTs,fmt)+" – "+(isRun?"running":fmtClock(sn.endTs,fmt))+
+    "  ·  "+fmtDurShort(isRun?(now()-sn.startTs):sn.durMs);
+  info.appendChild(nm); info.appendChild(tm);
+  const car=document.createElement("span");
+  car.style.cssText="flex:none;color:var(--muted);font-size:18px;line-height:1;padding:0 2px";
+  car.textContent=open?"⌄":"›";
+  head.appendChild(dot); head.appendChild(info); head.appendChild(car);
+  head.addEventListener("click",()=>{
+    expandedSessId=open?null:sn.id;
+    if(!open) chipsExpanded=null;
+    renderDayEditor();
+  });
+  card.appendChild(head);
+
+  if(open) card.appendChild(buildSessionPanel(dk,sn,pool));
+  return card;
+}
+
+function buildSessionPanel(dk,sn,pool){
+  const wrap=document.createElement("div");
+  wrap.style.cssText="padding:0 10px 12px;border-top:1px solid var(--line)";
+
+  const t=document.createElement("div"); t.className="sect-title"; t.style.margin="10px 0 8px";
+  t.textContent="Change channel";
+  wrap.appendChild(t);
+
+  const chips=document.createElement("div");
+  chips.style.cssText="display:flex;gap:6px;flex-wrap:wrap";
+  const all=activeChannels();
+  const showAll=chipsExpanded===sn.id;
+  const shortList=pool.slice(0,10);
+  const list=showAll?all.slice().sort((a,b)=>a.order-b.order):shortList;
+  list.forEach(c=>{
+    const b=document.createElement("button");
+    b.className="btn sm";
+    b.style.cssText="display:inline-flex;align-items:center;gap:6px";
+    b.textContent=showAll?channelPath(c):c.label;
+    const d=document.createElement("span");
+    d.style.cssText="width:9px;height:9px;border-radius:50%;flex:none;background:"+c.color;
+    b.prepend(d);
+    if(c.id===sn.channelId){ b.style.borderColor="var(--accent)"; b.style.fontWeight="800"; }
+    b.addEventListener("click",async()=>{
+      await reassignSession(sn.id,c.id);
+      expandedSessId=null; chipsExpanded=null;
+      await afterDayEdit(dk);
+      toast("Moved to "+c.label);
+    });
+    chips.appendChild(b);
+  });
+  if(!showAll&&all.length>shortList.length){
+    const more=document.createElement("button");
+    more.className="btn sm"; more.textContent="More…";
+    more.addEventListener("click",()=>{ chipsExpanded=sn.id; renderDayEditor(); });
+    chips.appendChild(more);
+  }
+  wrap.appendChild(chips);
+
+  const acts=document.createElement("div");
+  acts.style.cssText="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px";
+
+  const sp=document.createElement("button");
+  sp.className="btn sm"; sp.textContent="Split in two";
+  if(!sn.endTs||sn.durMs<2*MIN_SESSION_MS){ sp.disabled=true; sp.style.opacity=".4"; }
+  sp.addEventListener("click",async()=>{
+    const nid=await splitSession(sn.id);
+    if(!nid){ toast("Too short to split"); return; }
+    /* Land on the new half with its picker open - relabelling it is the point. */
+    expandedSessId=nid; chipsExpanded=null;
+    await afterDayEdit(dk);
+  });
+  acts.appendChild(sp);
+
+  const ex=document.createElement("button");
+  ex.className="btn sm"; ex.textContent="Exact times…";
+  ex.addEventListener("click",()=>openSessionEditor(dk,sn));
+  acts.appendChild(ex);
+
+  const del=document.createElement("button");
+  del.className="btn sm"; del.textContent="Delete"; del.style.color="#fca5a5";
+  del.addEventListener("click",async()=>{
+    const ok=await uiConfirm("Remove this session from the day? Its time stops counting toward every total and score.",
+      {title:"Delete session",okLabel:"Delete",danger:true});
+    if(!ok) return;
+    const rec=await idbGet("sessions",sn.id);
+    if(rec){
+      rec.voided=true; rec.endTs=rec.startTs; rec.durMs=0;
+      await saveLocal("sessions",rec);
+      if(running&&running.sessionId===rec.id) running=null;
+    }
+    expandedSessId=null;
+    await afterDayEdit(dk);
+    toast("Session removed");
+  });
+  acts.appendChild(del);
+
+  wrap.appendChild(acts);
+  return wrap;
+}
+
+/* The seam between two blocks. A boundary only exists where they actually
+   touch; a gap or an overlap is reported instead, because closing one is a
+   judgement about what happened rather than an adjustment. */
+function buildBoundaryRow(dk,a,b,fmt){
+  const wrap=document.createElement("div");
+  /* Flush to the body, not inset like the cards: the seam should align with
+     the card edge and it needs every pixel to stay on one line at 320px. */
+  wrap.style.cssText="display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:2px 0 8px";
+  if(!a.endTs) return wrap;                       /* a is still running */
+
+  const delta=b.startTs-a.endTs;
+  if(Math.abs(delta)>1000){
+    const n=document.createElement("div");
+    n.style.cssText="display:flex;align-items:center;gap:8px;width:100%";
+    const txt=document.createElement("span");
+    txt.style.cssText="flex:none;font-size:12px;font-weight:700;color:var(--ink2)";
+    txt.textContent=delta>0?fmtDurShort(delta)+" untracked":"overlaps by "+fmtDurShort(-delta);
+    if(delta<0) txt.style.color="#fbbf24";
+    const rule=document.createElement("span");
+    rule.style.cssText="flex:1;height:0;border-top:1px dashed var(--line)";
+    n.appendChild(rule); n.appendChild(txt); n.appendChild(rule.cloneNode());
+    wrap.appendChild(n);
+    return wrap;
+  }
+
+  const at=document.createElement("div");
+  at.style.cssText="font-size:12px;color:var(--muted);font-weight:800;min-width:54px;letter-spacing:.2px";
+  at.textContent=fmtClock(a.endTs,fmt);
+  wrap.appendChild(at);
+
+  /* Deliberately lighter than a session card: this is a seam between two
+     blocks, and it must not read as a third block. */
+  BOUNDARY_STEPS.forEach(mins=>{
+    const btn=document.createElement("button");
+    btn.className="btn sm";
+    btn.style.cssText="padding:7px 6px;min-width:40px;font-size:13px;text-align:center";
+    btn.textContent=(mins>0?"+":"−")+Math.abs(mins);
+    btn.title=mins>0?"Move the switch "+mins+" minutes later"
+                    :"Move the switch "+Math.abs(mins)+" minutes earlier";
+    btn.addEventListener("click",async()=>{
+      const r=await moveBoundary(a.id,b.id,mins*60000);
+      if(r==="min"){ toast("That would leave nothing on one side"); return; }
+      if(r==="future"){ toast("That would run past now"); return; }
+      if(r==="gone"){ toast("That session no longer exists"); }
+      await afterDayEdit(dk);
+    });
+    wrap.appendChild(btn);
+  });
+
+  if(a.channelId===b.channelId){
+    const mg=document.createElement("button");
+    mg.className="btn sm"; mg.textContent="Merge";
+    mg.style.cssText="padding:7px 8px;font-size:13px";
+    mg.addEventListener("click",async()=>{
+      await mergeSessions(a.id,b.id);
+      expandedSessId=null;
+      await afterDayEdit(dk);
+      toast("Merged");
+    });
+    wrap.appendChild(mg);
+  }
+  return wrap;
+}
 
 /* =====================================================================
    PRIORITIES REPORT
@@ -1734,7 +2017,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=11;
+const APP_RELEASE=12;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
