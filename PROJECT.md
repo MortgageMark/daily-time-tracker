@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v17
-- **Last deployed:** v17, 2026-08-27
+- **Current release:** v18
+- **Last deployed:** v18, 2026-08-27
 - **Status:** stable, in daily use
 
 > **Verify before believing any release claim in this file.** It has been
@@ -927,6 +927,22 @@ spacer in the shared row carried Today onto the second line on a phone.
 
 On the Tracker, Today and Edit Sessions are grouped together on the right, so
 the left side is just the date controls and the plan name.
+
+### v18
+
+- **Tapping a running parent channel opens its subcategory picker again.** It
+  used to answer with the pause offer and nothing else, which made switching
+  between two subcategories of the running parent impossible without stopping
+  first. Both now happen: the picker opens and the pause toast rides above it.
+  That works because `.toast` is z-index 60 and `.scrim` is 40, and the action
+  toast is the one with `pointer-events:auto`. Pausing from it also closes the
+  picker.
+- **"Apply to today" is just "Apply"**, and the "From template: X / Changes
+  here affect today only" preamble above it is gone. The grey/blue behaviour is
+  unchanged: grey and disabled when today already matches the chosen template,
+  blue the moment applying would change something.
+- **Export Data Backup moved out of Settings** into the avatar menu, between
+  Light mode and Settings. Settings keeps the other Data Management rows.
 
 ---
 
