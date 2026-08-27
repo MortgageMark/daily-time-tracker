@@ -1467,6 +1467,7 @@ function dayEditorGoto(dk){
 
 async function openDayEditor(dk){
   dayEditorDate=dk||todayKey();
+  setTlZoom(1);
   tlDrag=null;
   const stage=document.querySelector(".app .stage");
   stage.innerHTML='<div id="dayEditorRoot" style="display:flex;flex-direction:column;height:100%;overflow:hidden"></div>';
@@ -1669,9 +1670,10 @@ let tlZoom=1, TL_PX_PER_MIN=TL_BASE_PX_PER_MIN;
 function setTlZoom(z){
   tlZoom=TL_ZOOMS.indexOf(z)>=0?z:1;
   TL_PX_PER_MIN=TL_BASE_PX_PER_MIN*tlZoom;
-  try{ localStorage.setItem('dtt-tl-zoom',String(tlZoom)); }catch(e){}
 }
-(function(){ try{ const z=parseFloat(localStorage.getItem('dtt-tl-zoom')); if(z) setTlZoom(z); }catch(e){} })();
+/* Zoom is a tool for one crowded hour, not a preference: the editor always
+   opens showing the whole day at 1x. It does persist while you stay in the
+   editor, including across day navigation. */
 const TL_RAIL=52;              /* width of the hour rail */
 const TL_SNAP_MIN=5;           /* every drag lands on a 5-minute grid */
 const TL_MAGNET_MIN=10;        /* ...and jumps a neighbour's edge within 10 */
@@ -1722,7 +1724,11 @@ function resolveEdgeDrag(list,id,edge,rawTs){
   if(edge==="end"){
     ts=Math.max(me.startTs+minB,Math.min(ts,tlMaxTs()));
     const nxt=items[i+1];
-    if(nxt&&Math.abs(ts-nxt.startTs)<=magnet) ts=nxt.startTs;   /* close the gap exactly */
+    /* Only magnet toward an edge there is still a gap to close. Snapping to an
+       edge already touched would pin the pair together and eat every nudge
+       smaller than the magnet radius. */
+    const flush=nxt&&Math.abs(me.endTs-nxt.startTs)<1000;
+    if(nxt&&!flush&&Math.abs(ts-nxt.startTs)<=magnet) ts=nxt.startTs;
     me.endTs=ts;
     for(let j=i+1;j<items.length;j++){
       const b=items[j];
@@ -1735,7 +1741,8 @@ function resolveEdgeDrag(list,id,edge,rawTs){
   } else {
     ts=Math.min(me.endTs-minB,Math.max(ts,tlRangeCur.startTs));
     const prv=items[i-1];
-    if(prv&&Math.abs(ts-prv.endTs)<=magnet) ts=prv.endTs;
+    const flush=prv&&Math.abs(me.startTs-prv.endTs)<1000;
+    if(prv&&!flush&&Math.abs(ts-prv.endTs)<=magnet) ts=prv.endTs;
     me.startTs=ts;
     for(let j=i-1;j>=0;j--){
       const b=items[j];
@@ -1764,8 +1771,9 @@ function resolveBlockMove(list,id,rawStart){
   const hi=(items[i+1]?items[i+1].startTs:tlMaxTs())-dur;
   if(hi<lo) return null;                       /* wedged in with no room */
   let st=Math.round(rawStart/snapU)*snapU;
-  if(Math.abs(st-lo)<=magnet) st=lo;           /* sit flush against either side */
-  if(Math.abs(st-hi)<=magnet) st=hi;
+  const atLo=Math.abs(me.startTs-lo)<1000, atHi=Math.abs(me.startTs-hi)<1000;
+  if(!atLo&&Math.abs(st-lo)<=magnet) st=lo;    /* sit flush against either side */
+  if(!atHi&&Math.abs(st-hi)<=magnet) st=hi;
   st=Math.max(lo,Math.min(st,hi));
   me.startTs=st; me.endTs=st+dur;
   return {items,absorbed:[],edgeTs:st,

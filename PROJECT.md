@@ -808,6 +808,20 @@ Pinch-to-zoom was left out for now. The buttons are testable here; a two-finger
 gesture would interact with the existing pointer capture and the document-level
 `touchmove` guard, and none of that can be verified without a real device.
 
+**The magnet must never apply to an edge that is already flush.** This shipped
+broken and is easy to reintroduce. The 10-minute magnet exists so that dragging
+*toward* a neighbour closes the gap exactly. Applied unconditionally it does the
+reverse: on a boundary the two blocks already share, every drag within 10
+minutes snaps straight back, in both directions, so a contiguous day cannot be
+nudged at all. It looked like "dragging down is broken" because the one edge
+that still moved freely was the first block's start, which has no neighbour to
+stick to. `resolveEdgeDrag()` and `resolveBlockMove()` now check whether the
+edge was already touching before applying the magnet.
+
+Zoom always opens at 1x. It is a tool for one crowded hour, not a preference,
+so it is deliberately not persisted - though it does survive day navigation
+while the editor stays open.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
