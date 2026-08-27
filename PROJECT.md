@@ -5,14 +5,18 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v12 (in `feature/day-editor-relabel`, not yet merged)
+- **Current release:** v12 (in `feature/day-editor-timeline`, not yet merged)
 - **Last deployed:** **v9**, build `202608262001-dcb070b`
 - **Status:** stable, in daily use
 
-> **v10, v11 and v12 are committed but NOT deployed.** `master` was four
-> commits ahead of `origin/master` as of 2026-08-27 and the push never
-> happened, so the live site is still v9 — meaning the v11 stale-device sync
-> protection is not actually protecting anything yet. Verify with
+> **v10, v11 and v12 are committed but NOT deployed.** The live site is
+> still v9, so the v11 stale-device sync protection is not protecting
+> anything yet. `master` was pushed on 2026-08-27 (`d2d590b`), but **the
+> Netlify build failed at Initializing** — before the build command runs,
+> and with `netlify.toml` byte-identical to the last good deploy, so it is
+> not a code problem. Suspect a retired build image, revoked GitHub access,
+> or exhausted build minutes; the detail is inside the Initializing row of
+> the failed deploy. **Unresolved as of 2026-08-27.** Verify with
 > `curl https://dailytimetracker.com/version.json` before believing any
 > release claim in this file.
 
@@ -36,11 +40,11 @@ build command only stamps a version; it does not compile anything.
 index.html                      the entire app
 manifest.json                   PWA manifest
 netlify.toml                    build command, cache headers, SPA rewrite
-supabase-plans-migration.sql    already run; kept for reference / new envs
+supabase-plans-migration.sql    RUN. Creates plans + dayplans.
 supabase-channel-attributes-migration.sql
                                 RUN 2026-08-26. Channel attribute columns.
 supabase-dayplans-daytype-migration.sql
-                                NOT YET RUN - adds dayplans.day_type.
+                                RUN 2026-08-27. Adds dayplans.day_type.
 apple-touch-icon.png            180px, iOS home screen
 icon-192.png / icon-512.png     manifest icons (512 doubles as maskable)
 favicon-32.png                  browser tab
@@ -281,8 +285,10 @@ treats a record with no `planId` and no blocks as not yet materialised - so
 `ensureDayPlan()` still fills in the real plan when the day arrives and carries
 the flag across.
 
-`supabase-dayplans-daytype-migration.sql` **has not been run yet.** Until it
-does, the flag works on-device but does not sync.
+`supabase-dayplans-daytype-migration.sql` **was run on 2026-08-27**, so the
+flag syncs. It failed the first time with `relation "public.dayplans" does not
+exist` because it was run against the wrong Supabase project - check the ref in
+the address bar first; that error means nothing was changed.
 
 ### Which fields may be edited for a future date
 
