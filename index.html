@@ -1115,23 +1115,33 @@ async function startSessionOnChannel(channelId,t){
 }
 function showSubcategoryModal(parentId,subs){
   const ch=state.channels.find(c=>c.id===parentId);
+  const color=(ch&&ch.color)||"#3b74e0";
+  const ink=contrastInk(color);
   document.getElementById("subTitle").textContent=ch?ch.label:"Select";
   const list=document.getElementById("subList");
   list.innerHTML="";
-  for(const s of subs){
-    const it=document.createElement("button");
-    it.className="btn pri";
-    it.style.width="100%";
-    it.style.marginBottom="8px";
-    it.textContent=s.label;
-    it.addEventListener("click",async()=>{closeScrim("subScrim");await startSessionOnChannel(s.id,now());});
-    list.appendChild(it);
-  }
-  const sep=document.createElement("div");sep.style.margin="12px 0;border-top:1px solid var(--line)";list.appendChild(sep);
+
+  /* Tiles in the parent's colour, so this sheet reads like the dashboard it
+     was opened from instead of a stack of identical blue bars. */
+  const grid=document.createElement("div");
+  grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px";
+  subs.forEach(sub=>{
+    const b=document.createElement("button");
+    b.style.cssText="border:2px solid transparent;border-radius:14px;padding:16px 13px;min-height:78px;"+
+      "cursor:pointer;font-weight:800;font-size:15px;line-height:1.25;text-align:left;display:flex;"+
+      "align-items:flex-end;box-shadow:var(--shadow);color:"+ink+
+      ";background:linear-gradient(160deg,"+color+","+shade(color,.22)+")";
+    b.textContent=sub.label;
+    b.addEventListener("click",async()=>{closeScrim("subScrim");await startSessionOnChannel(sub.id,now());});
+    grid.appendChild(b);
+  });
+  list.appendChild(grid);
+
+  /* Outlined rather than filled: it is the same channel, not a sibling. */
   const gen=document.createElement("button");
-  gen.className="btn";
-  gen.style.width="100%";
-  gen.textContent="Generic ("+ch.label+")";
+  gen.style.cssText="width:100%;margin-top:12px;border-radius:14px;padding:14px 12px;cursor:pointer;"+
+    "font-weight:800;font-size:14px;background:transparent;border:2px dashed "+color+";color:"+color;
+  gen.textContent="Generic ("+(ch?ch.label:"")+")";
   gen.addEventListener("click",async()=>{closeScrim("subScrim");await startSessionOnChannel(parentId,now());});
   list.appendChild(gen);
   openScrim("subScrim");
@@ -1437,6 +1447,10 @@ function closeDayEditor(){
 async function renderDayEditor(){
   const root=document.getElementById("dayEditorRoot");
   if(!root||!dayEditorDate) return;
+  /* Every edit rebuilds this whole view, which would otherwise dump the
+     reader back at 8am after they added something at 6pm. */
+  const prevBody=document.getElementById("dayEditorBody");
+  const keepScroll=prevBody?prevBody.scrollTop:0;
   const dk=dayEditorDate, tk=todayKey();
   const isToday=dk===tk;
   const isFuture=dk>tk;                     /* YYYY-MM-DD compares correctly as text */
@@ -1477,6 +1491,7 @@ async function renderDayEditor(){
 
   /* ---------------- body ---------------- */
   const body=document.createElement("div");
+  body.id="dayEditorBody";
   body.style.cssText="flex:1;overflow-y:auto;padding:12px";
 
   /* day type */
@@ -1583,6 +1598,7 @@ async function renderDayEditor(){
   }
   foot.appendChild(tot);
   root.appendChild(foot);
+  if(keepScroll) body.scrollTop=keepScroll;
 }
 function tsToTimeInput(ts){ const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
 
@@ -1601,6 +1617,7 @@ const TL_MAGNET_MIN=10;        /* ...and jumps a neighbour's edge within 10 */
 const TL_MIN_BLOCK_MIN=5;      /* thinner than this and the block is absorbed */
 const TL_HANDLE=20;            /* tap height of a drag handle */
 const TL_EDGE_ADD_MS=3600000;  /* most a + adds beyond the first or last block */
+const TL_PAD=34;               /* rail headroom, so an edge + is never clipped */
 
 let tlRangeCur=null, tlSessions=[], tlFmt=null, tlDk=null;
 /* A finger down on a block before it is known to be a tap or a drag. */
@@ -1622,7 +1639,7 @@ function tlRange(dk,sess){
   const base=dayStartTs(dk);
   return {startHour:s,endHour:e,startTs:base+s*3600000,endTs:base+e*3600000};
 }
-function tlY(ts){ return ((ts-tlRangeCur.startTs)/60000)*TL_PX_PER_MIN; }
+function tlY(ts){ return TL_PAD+((ts-tlRangeCur.startTs)/60000)*TL_PX_PER_MIN; }
 /* Today's blocks stop at the present; a past day may use the whole rail. */
 function tlMaxTs(){ return tlDk===todayKey()?Math.min(tlRangeCur.endTs,now()):tlRangeCur.endTs; }
 
@@ -1722,7 +1739,7 @@ function buildTimeline(dk,sess,fmt){
   const wrap=document.createElement("div");
   wrap.id="tlWrap";
   wrap.style.cssText="position:relative;margin:4px 0 6px;height:"+
-    Math.round((tlRangeCur.endTs-tlRangeCur.startTs)/60000*TL_PX_PER_MIN+8)+"px;"+
+    Math.round((tlRangeCur.endTs-tlRangeCur.startTs)/60000*TL_PX_PER_MIN+2*TL_PAD)+"px;"+
     "user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent";
 
   for(let h=tlRangeCur.startHour;h<=tlRangeCur.endHour;h++){
@@ -1809,18 +1826,20 @@ function buildTimeline(dk,sess,fmt){
      but no dashed region: an empty afternoon is not "untracked", it is empty.
      The + adds at most an hour, because unlike a real gap this span has data
      on one side only and its far edge is the plan's boundary, not a fact. */
+  const dayLo=dayStartTs(dk), dayHi=dayLo+86400000;
+  const nowCap=dk===todayKey()?now():dayHi;
   if(ordered.length){
     const first=ordered[0], last=ordered[ordered.length-1];
-    if(first.startTs-tlRangeCur.startTs>=60000){
-      const st=Math.max(tlRangeCur.startTs,first.startTs-TL_EDGE_ADD_MS);
-      wrap.appendChild(tlEdgeAdd(dk,st,first.startTs,tlY(first.startTs)-30,"Add time before "+fmtClock(first.startTs,fmt)));
+    if(first.startTs>dayLo){
+      const st=Math.max(dayLo,first.startTs-TL_EDGE_ADD_MS);
+      wrap.appendChild(tlEdgeAdd(dk,st,first.startTs,tlY(first.startTs)-32,"Add time before "+fmtClock(first.startTs,fmt)));
     }
-    const le=tlEndOf(last), cap=tlMaxTs();
-    if(cap-le>=60000){
-      wrap.appendChild(tlEdgeAdd(dk,le,Math.min(cap,le+TL_EDGE_ADD_MS),tlY(le)+6,"Add time after "+fmtClock(le,fmt)));
+    const le=tlEndOf(last);
+    if(le<nowCap){
+      wrap.appendChild(tlEdgeAdd(dk,le,Math.min(nowCap,le+TL_EDGE_ADD_MS),tlY(le)+6,"Add time after "+fmtClock(le,fmt)));
     }
   } else {
-    const st=tlRangeCur.startTs, en=Math.min(tlMaxTs(),st+TL_EDGE_ADD_MS);
+    const st=Math.max(dayLo,tlRangeCur.startTs), en=Math.min(nowCap,st+TL_EDGE_ADD_MS);
     if(en>st) wrap.appendChild(tlEdgeAdd(dk,st,en,tlY(st)+6,"Add time"));
   }
 
@@ -2497,6 +2516,23 @@ function uiChoice(opts){
 function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1500);}
 
 /* ===== avatar menu ===== */
+/* One row of the avatar menu. The icons are emoji, which arrive in their own
+   colours; a grayscale filter keeps the menu monochrome without shipping an
+   icon set. Profile rows are built separately and keep their colour. */
+function avatarMenuItem(icon,label,onClick,color){
+  const it=document.createElement("div");
+  it.className="menu-item";
+  it.style="padding:11px 14px;cursor:pointer;display:flex;align-items:center;gap:14px;color:"+(color||"var(--ink)");
+  const ic=document.createElement("span");
+  ic.style="filter:grayscale(1);opacity:.8;font-size:15px;line-height:1;width:18px;text-align:center;flex:none";
+  ic.textContent=icon;
+  const tx=document.createElement("span"); tx.style="flex:1"; tx.textContent=label;
+  it.appendChild(ic); it.appendChild(tx);
+  it.addEventListener("click",()=>{ document.getElementById("avatarMenu").style.display="none"; onClick(); });
+  return it;
+}
+
+
 function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.innerHTML="";
   const profInitial=state.profile?state.profile.name[0].toUpperCase():"?";
   document.getElementById("avatarBtn").textContent=profInitial;
@@ -2506,11 +2542,10 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
       it.innerHTML=`<span style="width:24px;height:24px;border-radius:50%;background:${strColor(p.name)};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white">${p.name[0].toUpperCase()}</span><span class="grow">${escapeHtml(p.name)}</span>${p.id===state.profileId?"✓":""}`;
       it.addEventListener("click",()=>{loadProfile(p.id);document.getElementById("avatarMenu").style.display="none";renderAvatarMenu();});m.appendChild(it);}}
   const sep=document.createElement("div");sep.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep);
-  const pastDayItem=document.createElement("div");pastDayItem.className="menu-item";pastDayItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";pastDayItem.textContent="📅 Edit a day";pastDayItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openDayEditor(todayKey());});m.appendChild(pastDayItem);
-  const prioItem=document.createElement("div");prioItem.className="menu-item";prioItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";prioItem.textContent="🎯 Priorities";prioItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openPriorities();});m.appendChild(prioItem);
-  const channelsItem=document.createElement("div");channelsItem.className="menu-item";channelsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";channelsItem.textContent="🎨 Channels";channelsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openChannels();});m.appendChild(channelsItem);
-  
-  const settingsItem=document.createElement("div");settingsItem.className="menu-item";settingsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";settingsItem.textContent="⚙️ Settings";settingsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openSettings();});m.appendChild(settingsItem);
+  m.appendChild(avatarMenuItem("📅","Edit a day",()=>openDayEditor(todayKey())));
+  m.appendChild(avatarMenuItem("🎯","Priorities",()=>openPriorities()));
+  m.appendChild(avatarMenuItem("🎨","Channels",()=>openChannels()));
+  m.appendChild(avatarMenuItem("⚙️","Settings",()=>openSettings()));
 
   const sep2=document.createElement("div");sep2.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep2);
   if(window._acctEmail){
@@ -2519,9 +2554,7 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
     who.textContent=window._acctEmail;
     m.appendChild(who);
   }
-  const signOutItem=document.createElement("div");signOutItem.className="menu-item";signOutItem.style="padding:10px 12px;cursor:pointer;color:var(--warn)";signOutItem.textContent="🚪 Sign out";
-  signOutItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";doSignOut();});
-  m.appendChild(signOutItem);
+  m.appendChild(avatarMenuItem("🚪","Sign out",()=>doSignOut(),"var(--warn)"));
 
   const ver=document.createElement("div");
   ver.style="padding:9px 12px 11px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px";
@@ -3642,6 +3675,23 @@ async function ensureDayPlan(date){
   await saveLocal("dayplans",dp);
   return dp;
 }
+/* Grey once today already matches the chosen template exactly. It goes blue
+   again the moment re-applying would actually change something: a different
+   template picked in the dropdown, or the day edited away from the one it
+   came from. */
+function syncApplyTodayBtn(){
+  const btn=document.getElementById("applyTodayBtn"), sel=document.getElementById("applyTplSelect");
+  if(!btn||!sel) return;
+  const dp=planState.today;
+  const applied=!!dp&&dp.planId===sel.value&&!dp.edited;
+  btn.classList.toggle("pri",!applied);
+  btn.disabled=applied;
+  btn.style.opacity=applied?".55":"";
+  btn.style.cursor=applied?"default":"pointer";
+  btn.textContent=applied?"Applied":"Apply to today";
+}
+
+
 async function applyTemplateToToday(planId){
   const src=(planState.plans||[]).find(p=>p.id===planId);
   if(!src) return;
@@ -3763,7 +3813,7 @@ async function renderPlanPageUI(){
         <select id="applyTplSelect" style="flex:1;min-width:130px;padding:9px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:13px">
           ${planState.plans.map(p=>`<option value="${p.id}"${linked&&linked.id===p.id?" selected":""}>${escapeHtml(p.name)}</option>`).join("")}
         </select>
-        <button class="btn sm pri" onclick="applyTemplateToToday(document.getElementById('applyTplSelect').value)">Apply to today</button>
+        <button id="applyTodayBtn" class="btn sm pri" onclick="applyTemplateToToday(document.getElementById('applyTplSelect').value)">Apply to today</button>
         ${canPush?`<button class="btn sm" onclick="saveTodayToTemplate()">Save to template</button>`:``}
         ${canPush?`<button class="btn sm warn" onclick="resetTodayToTemplate()">Discard edits</button>`:``}
       </div>
@@ -3818,6 +3868,11 @@ async function renderPlanPageUI(){
   html+=`</div></div></div>`;
 
   stage.innerHTML=html;
+
+  const applySel=document.getElementById("applyTplSelect");
+  if(applySel) applySel.addEventListener("change",syncApplyTodayBtn);
+  syncApplyTodayBtn();
+
 
   const planSelect=document.getElementById("planSelect");
   if(planSelect){

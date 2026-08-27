@@ -690,6 +690,32 @@ This replaced `buildSessionCard` / `buildSessionPanel` / `buildBoundaryRow` and
 block over another. `openSessionEditor()` survives untouched as "Exact times…",
 still the way to type a precise time.
 
+Round two of v12, after Mark used it:
+
+- **A re-render no longer scrolls the day back to the top.** Every edit rebuilds
+  the whole Day Editor, which threw the reader back to 8am after they added
+  something at 6pm. `renderDayEditor()` now carries `#dayEditorBody`'s
+  `scrollTop` across the rebuild.
+- **The edge `+` is always offered**, even when the day already reaches the ends
+  of the rail. The rail is the *planned* day, not the limit of the day: adding
+  before 8am or after 6pm simply widens it on the next render, because
+  `tlRange()` already covers whatever exists. Bounds are the real midnights
+  (and the present, on today), not the plan. `TL_PAD` gives the rail 34px of
+  headroom top and bottom so a flush-to-the-edge `+` is not clipped.
+- **Avatar menu**: rows are `avatarMenuItem()`, with a 14px gap between icon and
+  label and `filter:grayscale(1)` on the glyph. The emoji stay emoji - a
+  grayscale filter was far cheaper than adopting an icon set. The sync dot is
+  deliberately still coloured: it is a status, not an icon.
+- **The subcategory sheet uses the parent's colour**, as gradient tiles in a
+  grid rather than a stack of identical blue bars, so it reads like the
+  dashboard it was opened from. Subcategories may carry their own colour; it is
+  ignored here on purpose. "Generic" is outlined instead of filled, because it
+  is the same channel rather than a sibling.
+- **"Apply to today" greys to "Applied"** once today already matches the chosen
+  template, and returns to blue the moment re-applying would change something -
+  a different template picked, or the day edited away from its template.
+  `syncApplyTodayBtn()` runs on render and on every dropdown change.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
