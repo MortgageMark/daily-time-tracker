@@ -3278,13 +3278,27 @@ function adhCellHtml(match,budgetPct){
   if(typeof budgetPct==="number") h+='<div style="font-size:11px;font-weight:700;color:'+adhTone(budgetPct)+'">'+budgetPct+'%<span style="font-size:10px;font-weight:600;color:var(--ink2);margin-left:4px">budget</span></div>';
   return h;
 }
+/* Every edit on the Summary rebuilds the entire page, so the reader's place
+   has to be carried across by hand. The history log arrives later, in a
+   setTimeout, so the restore runs twice: once for the main content and
+   again once the log has given the container its full height. */
+let summaryOrigStage=null, summaryScroll=0;
+function restoreSummaryScroll(){
+  const sc=document.getElementById("summaryContent");
+  if(sc&&summaryScroll) sc.scrollTop=summaryScroll;
+}
 async function openCombinedSummary(){
+  const prevContent=document.getElementById("summaryContent");
+  summaryScroll=prevContent?prevContent.scrollTop:0;
   await refreshTodayScores();
   try{
     console.log("openCombinedSummary: Starting, db=",db,"profileId=",state.profileId);
     const app=document.querySelector('.app');
     const stage=app.querySelector('.stage');
-    const origStage=stage.innerHTML;
+    /* Re-entering would otherwise capture the summary itself, and Home
+       would then 'close' the summary back into the summary. */
+    const origStage=(prevContent&&summaryOrigStage!==null)?summaryOrigStage:stage.innerHTML;
+    summaryOrigStage=origStage;
     let html='<div style="display:flex;flex-direction:column;height:100%">';
     html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)">';
     html+='<h2 style="margin:0;font-size:14px;font-weight:700">Summary</h2>';
@@ -3459,6 +3473,7 @@ async function openCombinedSummary(){
     content+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Date</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day type</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody id="historyTableBody"></tbody></table></div></div>';
 
     document.getElementById("summaryContent").innerHTML=content;
+    restoreSummaryScroll();
     
     // Build and populate history log
     setTimeout(async()=>{
@@ -3497,6 +3512,9 @@ async function openCombinedSummary(){
       if(historyBody){
         historyBody.innerHTML=historyHtml;
       }
+      /* The container only reaches its full height now, so a scrollTop that
+         was clamped a moment ago can finally be honoured. */
+      restoreSummaryScroll();
     },0);
     
     window.editHistoryStar=async(dateKey,rating)=>{

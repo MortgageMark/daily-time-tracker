@@ -822,6 +822,23 @@ Zoom always opens at 1x. It is a tool for one crowded hour, not a preference,
 so it is deliberately not persisted - though it does survive day navigation
 while the editor stays open.
 
+**Any view that rebuilds itself on every edit must carry the scroll across.**
+This has now been fixed twice - the Day Editor, then the Summary - and the next
+full-page view will have the same problem. `openCombinedSummary()` re-renders
+the entire page for a rating, a note or a day-type change, so a change made in
+the Complete History Log threw the reader back to the top.
+
+Two details specific to the Summary:
+
+- **Restore runs twice.** The history log is populated in a `setTimeout`, so
+  immediately after the main content lands the container is still short and a
+  large `scrollTop` gets clamped. `restoreSummaryScroll()` is called again once
+  the log has rendered.
+- **`origStage` had to be guarded.** It was captured unconditionally, so every
+  re-entry - every edit - recaptured the summary as the thing to return to, and
+  Home would "close" the summary back into the summary. It is now captured only
+  on first entry.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
