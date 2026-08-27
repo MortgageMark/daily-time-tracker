@@ -5,9 +5,16 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v11
-- **Last deployed:** v11, 2026-08-26
+- **Current release:** v12 (in `feature/day-editor-relabel`, not yet merged)
+- **Last deployed:** **v9**, build `202608262001-dcb070b`
 - **Status:** stable, in daily use
+
+> **v10, v11 and v12 are committed but NOT deployed.** `master` was four
+> commits ahead of `origin/master` as of 2026-08-27 and the push never
+> happened, so the live site is still v9 — meaning the v11 stale-device sync
+> protection is not actually protecting anything yet. Verify with
+> `curl https://dailytimetracker.com/version.json` before believing any
+> release claim in this file.
 
 ---
 
@@ -621,6 +628,40 @@ newer data: the push is gated by a comparison against the server's
 `updated_at`, sign-out no longer force-pushes, and Settings gains "Refresh from
 cloud" as the safe reset that sign-out could never be.
 
+**v12** — reworks the Day Editor around **relabelling** rather than re-entry.
+The old editor assumed the problem was missing time; the actual common problem
+is a day the timer tracked correctly against the wrong channels.
+
+- **The channel picker is inline.** Tapping a block expands it in place with
+  colour-coded chips, so the most frequent correction costs two taps instead of
+  a modal round trip. Chips are ranked by `rankedChannelsForPicker()` — the
+  channels already on that day first, then the last fortnight by time spent —
+  capped at ten with "More…" revealing all of them.
+- **Adjacent blocks share one boundary control.** Editing an end time and a
+  start time as separate fields is what let a correction leave a gap or an
+  overlap behind. `moveBoundary()` moves both records together, so neither is
+  reachable. Nudges are ±5 and ±15 minutes; the guards keep the new time
+  strictly inside the day, so neither record's `date` can change.
+- **Split and merge.** `splitSession()` cuts at the midpoint and the caller
+  opens the picker on the new half, since relabelling it is the point.
+  `mergeSessions()` appears on the seam only when both sides share a channel.
+  Merge voids and zeroes the absorbed row rather than deleting it — deletes do
+  not propagate to Supabase and the row would return on the next pull.
+- Gaps and overlaps between blocks are **reported, not silently closed**.
+  Deciding what happened in an untracked half hour is a judgement, not an
+  adjustment.
+
+The old per-session modal survives as "Exact times…" — it is still the way to
+type a precise time, and `openSessionEditor()` is unchanged.
+
+Verified on a seeded fixture at 375px: reassign, ±nudge both directions, split,
+merge, the too-short guard, and total time conserved across boundary moves
+(7h 45m in, 7h 45m out). **The seam fits on one line with ~19px to spare at
+375px** — it wrapped at first, and the four nudge buttons plus a time label
+plus Merge is genuinely tight, so re-measure it if anything there grows.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
+*Updated 2026-08-27: v12 Day Editor rework, and the deploy-status correction
+at the top.*
