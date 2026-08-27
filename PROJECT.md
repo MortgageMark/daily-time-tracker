@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v14
-- **Last deployed:** v14, 2026-08-27
+- **Current release:** v15
+- **Last deployed:** v15, 2026-08-27
 - **Status:** stable, in daily use
 
 > **Verify before believing any release claim in this file.** It has been
@@ -873,6 +873,20 @@ Reordered around what people actually come here to do, which is fix times.
   **Zoom** rather than Sessions, because the control beside it is the zoom and
   pressing one teaches it faster than prose. The label falls back to "Sessions"
   on an empty day, where there is nothing to zoom.
+
+### Day Editor chrome, v15
+
+- **Zoom lives in the header now.** The body scrolls; the control you reach for
+  when an hour is crowded must not scroll away with it. On a narrow phone the
+  header wraps to two rows, which is fine — the header is outside the scroll
+  container, so both rows stay put.
+- The pretty-date label ("Wed, Aug 26") is gone; the date input beside it
+  already says which day you are on.
+- **The footer lost "+ Add session".** Every gap carries a `+`, and both ends of
+  the rail carry one, so the button was a fourth way to do the same thing.
+  `openSessionEditor(dk,null)` is now unreachable - the modal is still used for
+  editing, so its "Add session" title branch is simply never chosen. The footer
+  keeps the day total and adherence line, centred.
 
 ---
 

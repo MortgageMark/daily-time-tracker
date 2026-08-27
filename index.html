@@ -1508,9 +1508,6 @@ async function renderDayEditor(){
   const maxD=new Date(dayStartTs(tk)); maxD.setFullYear(maxD.getFullYear()+2);
   dateInput.max=dateKey(maxD.getTime());
   dateInput.style.cssText="font-size:16px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:7px 9px";
-  const lbl=document.createElement("div");
-  lbl.style.cssText="font-weight:700;font-size:13px;color:var(--ink2);white-space:nowrap";
-  lbl.textContent=prettyDate(dk)+(isFuture?" \u00b7 upcoming":"");
   const spacer=document.createElement("div"); spacer.style.flex="1";
   const todayBtn=document.createElement("button"); todayBtn.className="btn sm"; todayBtn.textContent="Today";
   todayBtn.disabled=isToday; if(isToday) todayBtn.style.opacity=".4";
@@ -1520,7 +1517,23 @@ async function renderDayEditor(){
   todayBtn.addEventListener("click",()=>dayEditorGoto(tk));
   /* Today sits with the date it competes with, and there is no Home: the
      bottom bar already goes to the dashboard. */
-  [prev,dateInput,next,todayBtn,lbl,spacer].forEach(n=>head.appendChild(n));
+  [prev,dateInput,next,todayBtn,spacer].forEach(n=>head.appendChild(n));
+  /* Zoom sits in the header rather than the body: the body scrolls, and the
+     control you reach for when an hour is crowded has to stay put. */
+  if(!isFuture&&sess.length){
+    const zwrap=document.createElement("div");
+    zwrap.style.cssText="display:flex;gap:5px;flex:none";
+    TL_ZOOMS.forEach(z=>{
+      const zb=document.createElement("button");
+      zb.className="btn sm"+(tlZoom===z?" pri":"");
+      zb.style.cssText="padding:5px 8px;min-width:36px;font-size:12px";
+      zb.textContent=z+"×";
+      zb.title=z===1?"Whole day":"Stretch the day "+z+" times taller";
+      zb.addEventListener("click",()=>zoomTimeline(z));
+      zwrap.appendChild(zb);
+    });
+    head.appendChild(zwrap);
+  }
   root.appendChild(head);
 
   /* ---------------- body ---------------- */
@@ -1565,26 +1578,6 @@ async function renderDayEditor(){
     f.textContent="This day has not happened yet, so there is no time to edit. You can mark it off in advance now.";
     body.appendChild(f);
   } else {
-    const sBar=document.createElement("div");
-    sBar.style.cssText="display:flex;align-items:center;gap:8px;margin:18px 0 10px";
-    const sTitle=document.createElement("div"); sTitle.className="sect-title";
-    sTitle.style.margin="0"; sTitle.style.flex="1";
-    /* Named for the control beside it: pressing one shows what it does far
-       faster than a paragraph about the timeline would. */
-    sTitle.textContent=sess.length?"Zoom":"Sessions";
-    sBar.appendChild(sTitle);
-    if(sess.length){
-      TL_ZOOMS.forEach(z=>{
-        const zb=document.createElement("button");
-        zb.className="btn sm"+(tlZoom===z?" pri":"");
-        zb.style.cssText="padding:5px 9px;min-width:38px;font-size:12px";
-        zb.textContent=z+"×";
-        zb.title=z===1?"Whole day":"Stretch the day "+z+" times taller";
-        zb.addEventListener("click",()=>zoomTimeline(z));
-        sBar.appendChild(zb);
-      });
-    }
-    body.appendChild(sBar);
     if(!sess.length){
       const empty=document.createElement("div"); empty.className="hint"; empty.style.padding="4px 4px 8px";
       empty.textContent="No time recorded on this day yet.";
@@ -1629,14 +1622,8 @@ async function renderDayEditor(){
   /* ---------------- footer ---------------- */
   const foot=document.createElement("div");
   foot.style.cssText="padding:10px 12px max(10px, env(safe-area-inset-bottom)) 12px;border-top:1px solid var(--line);background:var(--glass);display:flex;align-items:center;gap:10px;flex-wrap:wrap";
-  if(!isFuture){
-    const add=document.createElement("button");
-    add.className="btn pri sm"; add.textContent="+ Add session";
-    add.addEventListener("click",()=>openSessionEditor(dk,null));
-    foot.appendChild(add);
-  }
   const tot=document.createElement("div");
-  tot.style.cssText="margin-left:auto;font-size:13px;color:var(--ink2);text-align:right";
+  tot.style.cssText="flex:1;font-size:13px;color:var(--ink2);text-align:center";
   if(isFuture){
     tot.textContent=dayType?dayTypeLabel(dayType):"Working day";
   } else if(dayType){
@@ -2462,7 +2449,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=14;
+const APP_RELEASE=15;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
