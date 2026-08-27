@@ -5,16 +5,17 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v12 (in `feature/day-editor-relabel`, not yet merged)
-- **Last deployed:** **v9**, build `202608262001-dcb070b`
+- **Current release:** v13
+- **Last deployed:** v13, 2026-08-27
 - **Status:** stable, in daily use
 
-> **v10, v11 and v12 are committed but NOT deployed.** `master` was four
-> commits ahead of `origin/master` as of 2026-08-27 and the push never
-> happened, so the live site is still v9 — meaning the v11 stale-device sync
-> protection is not actually protecting anything yet. Verify with
-> `curl https://dailytimetracker.com/version.json` before believing any
-> release claim in this file.
+> **Verify before believing any release claim in this file.** It has been
+> wrong twice. `curl https://dailytimetracker.com/version.json` settles it.
+> v10-v12 sat undeployed for a day because a push was never made, and then
+> because Netlify failed at *Initializing* - before the build command runs,
+> with `netlify.toml` byte-identical to the last good deploy. A Retry
+> cleared it. If it recurs, the detail is inside the Initializing row;
+> suspect a retired build image or repo access rather than the code.
 
 ---
 
@@ -36,11 +37,11 @@ build command only stamps a version; it does not compile anything.
 index.html                      the entire app
 manifest.json                   PWA manifest
 netlify.toml                    build command, cache headers, SPA rewrite
-supabase-plans-migration.sql    already run; kept for reference / new envs
+supabase-plans-migration.sql    RUN. Creates plans + dayplans.
 supabase-channel-attributes-migration.sql
                                 RUN 2026-08-26. Channel attribute columns.
 supabase-dayplans-daytype-migration.sql
-                                NOT YET RUN - adds dayplans.day_type.
+                                RUN 2026-08-27. Adds dayplans.day_type.
 apple-touch-icon.png            180px, iOS home screen
 icon-192.png / icon-512.png     manifest icons (512 doubles as maskable)
 favicon-32.png                  browser tab
@@ -281,8 +282,10 @@ treats a record with no `planId` and no blocks as not yet materialised - so
 `ensureDayPlan()` still fills in the real plan when the day arrives and carries
 the flag across.
 
-`supabase-dayplans-daytype-migration.sql` **has not been run yet.** Until it
-does, the flag works on-device but does not sync.
+`supabase-dayplans-daytype-migration.sql` **was run on 2026-08-27**, so the
+flag syncs. It failed the first time with `relation "public.dayplans" does not
+exist` because it was run against the wrong Supabase project - check the ref in
+the address bar first; that error means nothing was changed.
 
 ### Which fields may be edited for a future date
 
@@ -628,40 +631,213 @@ newer data: the push is gated by a comparison against the server's
 `updated_at`, sign-out no longer force-pushes, and Settings gains "Refresh from
 cloud" as the safe reset that sign-out could never be.
 
-**v12** — reworks the Day Editor around **relabelling** rather than re-entry.
-The old editor assumed the problem was missing time; the actual common problem
-is a day the timer tracked correctly against the wrong channels.
+**v12** — rebuilds the Day Editor as a **timeline**, after a first attempt as a
+card list with nudge buttons was correct but unpleasant to use. The lesson is
+worth keeping: the list was technically complete and still failed, because a
+list cannot show a gap and a day is a shape.
 
-- **The channel picker is inline.** Tapping a block expands it in place with
-  colour-coded chips, so the most frequent correction costs two taps instead of
-  a modal round trip. Chips are ranked by `rankedChannelsForPicker()` — the
-  channels already on that day first, then the last fortnight by time spent —
-  capped at ten with "More…" revealing all of them.
-- **Adjacent blocks share one boundary control.** Editing an end time and a
-  start time as separate fields is what let a correction leave a gap or an
-  overlap behind. `moveBoundary()` moves both records together, so neither is
-  reachable. Nudges are ±5 and ±15 minutes; the guards keep the new time
-  strictly inside the day, so neither record's `date` can change.
-- **Split and merge.** `splitSession()` cuts at the midpoint and the caller
-  opens the picker on the new half, since relabelling it is the point.
-  `mergeSessions()` appears on the seam only when both sides share a channel.
-  Merge voids and zeroes the absorbed row rather than deleting it — deletes do
-  not propagate to Supabase and the row would return on the next pull.
-- Gaps and overlaps between blocks are **reported, not silently closed**.
-  Deciding what happened in an untracked half hour is a judgement, not an
-  adjustment.
+The day is drawn to scale against an hour rail (`tlRange()` covers the planned
+working hours widened to whatever actually happened, so a 6am start is not
+clipped). Each block is its channel's colour, labelled with its exact start,
+end and duration. Gaps appear as dashed regions with the untracked time named.
 
-The old per-session modal survives as "Exact times…" — it is still the way to
-type a precise time, and `openSessionEditor()` is unchanged.
+- **Tap a block** to change its channel, from a sheet rather than an inline
+  expansion — expanding inline would move everything below it and break the
+  geometry the timeline exists to show.
+- **Drag the grip on an edge** to move when a block started or stopped. Every
+  drag lands on a 5-minute grid and jumps to a neighbour's edge within 10
+  minutes, so closing an 8-minute gap needs no precision. Mark asked for this
+  explicitly: do not make him be exact.
+- **`resolveEdgeDrag()` is pure and is the whole model.** It takes the day and
+  one proposed edge time and returns what the day becomes. Overlaps are
+  unreachable *by construction* rather than validated after the fact: a block
+  dragged into its neighbour pushes that neighbour back, and one dragged clean
+  past a neighbour's far edge absorbs it — the "I left the timer running and
+  it was really all one thing" case. The preview during a drag and the commit
+  on release run the same function, so what is shown is what is saved.
+- A **running block is never absorbed or pushed**; a drag stops short of it.
+- **Every gap carries a `+`** that fills it with one channel, taking the whole
+  gap — guessing at a partial fill would be inventing data. It is pinned to the
+  right of the gap because the two drag grips own the middle of a short seam.
+- **The rail before the first block and after the last one also gets a `+`**,
+  so a day can be extended at either end. That space is deliberately *not*
+  drawn as a dashed "untracked" region: an empty afternoon is not untracked
+  time, it is simply the end of the day. These two add **at most an hour**
+  (`TL_EDGE_ADD_MS`), unlike a real gap which fills exactly — a gap has data on
+  both sides so its length is a fact, whereas the rail's far edge is only the
+  plan's boundary. Adding again after that is one more tap, since a fresh `+`
+  appears past whatever was just added.
+- **Dragging a block's body slides the whole block**, after a 280ms hold on
+  touch. The hold is not optional: without it every attempt to scroll the day
+  would pick up whatever block sat under the thumb. A body drag clamps at its
+  neighbours and **never absorbs one** — an edge drag is a deliberate reach for
+  a grip, but a body drag starts anywhere on the block, and losing a neighbour
+  to a clumsy thumb would be unrecoverable.
+- Because pointer events cannot cancel a scroll iOS has already begun, a
+  document-level `touchmove` listener refuses the scroll for as long as a drag
+  is live. That listener is the reason the hold works at all.
+- **Overlaps are refused in the "Exact times…" form too.** It used to warn and
+  then offer "Save anyway", explicitly permitting double-counted minutes. That
+  form was the last remaining way to create an overlap, and it is now closed —
+  so no path in the app can put two channels in the same minute.
+- Absorbed blocks are voided and zeroed, never deleted — deletes do not
+  propagate to Supabase and the row would return on the next pull.
 
-Verified on a seeded fixture at 375px: reassign, ±nudge both directions, split,
-merge, the too-short guard, and total time conserved across boundary moves
-(7h 45m in, 7h 45m out). **The seam fits on one line with ~19px to spare at
-375px** — it wrapped at first, and the four nudge buttons plus a time label
-plus Merge is genuinely tight, so re-measure it if anything there grows.
+Verified on a seeded fixture at 375px by dispatching real pointer events at the
+handles: magnet (a 38m gap snapped shut exactly), push (a neighbour shrank
+rather than overlapping), absorb (the swallowed row voided with `durMs` 0), the
+start-edge drag, and **no overlapping pair anywhere in the day afterwards**.
+
+This replaced `buildSessionCard` / `buildSessionPanel` / `buildBoundaryRow` and
+`moveBoundary` / `mergeSessions`, all removed. Merging is now just dragging one
+block over another. `openSessionEditor()` survives untouched as "Exact times…",
+still the way to type a precise time.
+
+Round two of v12, after Mark used it:
+
+- **A re-render no longer scrolls the day back to the top.** Every edit rebuilds
+  the whole Day Editor, which threw the reader back to 8am after they added
+  something at 6pm. `renderDayEditor()` now carries `#dayEditorBody`'s
+  `scrollTop` across the rebuild.
+- **The edge `+` is always offered**, even when the day already reaches the ends
+  of the rail. The rail is the *planned* day, not the limit of the day: adding
+  before 8am or after 6pm simply widens it on the next render, because
+  `tlRange()` already covers whatever exists. Bounds are the real midnights
+  (and the present, on today), not the plan. `TL_PAD` gives the rail 34px of
+  headroom top and bottom so a flush-to-the-edge `+` is not clipped.
+- **Avatar menu**: rows are `avatarMenuItem()`, with a 14px gap between icon and
+  label and `filter:grayscale(1)` on the glyph. The emoji stay emoji - a
+  grayscale filter was far cheaper than adopting an icon set. The sync dot is
+  deliberately still coloured: it is a status, not an icon.
+- **The subcategory sheet uses the parent's colour**, as gradient tiles in a
+  grid rather than a stack of identical blue bars, so it reads like the
+  dashboard it was opened from. Subcategories may carry their own colour; it is
+  ignored here on purpose. "Generic" is outlined instead of filled, because it
+  is the same channel rather than a sibling.
+- **"Apply to today" greys to "Applied"** once today already matches the chosen
+  template, and returns to blue the moment re-applying would change something -
+  a different template picked, or the day edited away from its template.
+  `syncApplyTodayBtn()` runs on render and on every dropdown change.
+
+### Light and dark
+
+The app was dark-only, and what made it dark-only was **~28 colours hardcoded
+outside `:root`** rather than any structural problem. Those are now named
+variables (`--field`, `--glass`, `--glass2`, `--scrim`, `--glow`, `--barbg`,
+`--bad-ink`) and `:root[data-theme="light"]` overrides the lot.
+
+- **Channel colours are deliberately not themed.** They are the user's data,
+  and every surface that paints one already picks its text with
+  `contrastInk()`, so tiles and timeline blocks work in both themes untouched.
+- **The choice is device-local** (`localStorage`, key `dtt-theme`), not a
+  profile field: which look someone wants depends on the screen in front of
+  them, and a profile field would sync a phone's night mode onto a desktop.
+- **A tiny script in `<head>` applies it before `<body>` exists**, so a reload
+  never flashes dark and then corrects. It reads the same key. Both it and
+  `currentTheme()` fall back to dark if `localStorage` throws.
+- The toggle lives in the avatar menu and **names the mode it will switch to**.
+  It is the one menu row that does not dismiss the menu, so the theme can be
+  flipped and flipped back while looking at it.
+- `apple-mobile-web-app-status-bar-style` is still `black` and **must stay
+  that way** in both themes - see Landmines. Only the `theme-color` meta moves.
+
+Two traps found while doing this, both worth remembering: a pale red
+(`#fca5a5`, `#f87171`) that reads fine on a dark panel is invisible on a white
+one - hence `--bad-ink`; and `.bottombar` carried its own `#0a101c`, which no
+search for the other literals would have found. When theming, sweep for
+`background:#...` across the whole file rather than trusting a list.
+
+### Polish round, 2026-08-27
+
+- **The Tracker's four columns are four separate stacks**, not a table, so one
+  row growing in one column silently pushed that column out of step with the
+  other three - which is what "the spacing gets off" was. Rows are now a fixed
+  `height:36px` with `overflow:hidden`, and the channel chips ellipsis instead
+  of wrapping. Verified: 20 rows per column, every row 36px, identical first
+  and last offsets across all four. **If you ever add content to one of those
+  cells, keep the fixed height.**
+- Subcategory tiles centre their label on both axes.
+- Channels now sits above Priorities in the avatar menu, and both the Channels
+  and Settings page headers lost their glyph - the header already says what
+  the page is.
+- **The Priorities page opens with an explicit "completely optional"** note and
+  a button through to Channels, where the tags are actually edited. It read
+  like something you were failing to fill in.
+- **Summary Week Overview tags Saturday and Sunday "Weekend."** This is a
+  *label only* - it does not change scoring. Weekends usually score nothing
+  anyway, because `todaysEffectivePlan()` finds no template matching that
+  weekday. If weekends should be excluded from adherence the way leave is,
+  that is a separate change to `refreshDayScores()`.
+- **Both Summary tables gained a "Day type" column.** The select used to be
+  jammed under the date in the Day cell. Header and body counts were moved
+  together - see Landmines; this is exactly the trap that warning is about.
+
+### Timeline zoom, and why blocks are drawn at their true height
+
+A busy hour used to be unusable, and worse than it looked. `buildTimeline()`
+floored every block at 18px so short ones stayed visible, which meant a
+six-minute block claimed nearly three times its real span. Measured on ten
+six-minute blocks in one hour: **nine of the ten pairs visually overlapped, and
+all ten drag handles sat within 20px of each other**, stacked. Height had
+stopped meaning duration, and the thing under your finger was not the thing you
+were aiming at.
+
+The fix is honest geometry plus a zoom, not a bigger minimum:
+
+- Blocks render at their true height (floor of 2px, so a sliver is still
+  visible). The label appears at >=24px and the times at >=42px; below that the
+  colour bar alone says which channel it is.
+- `TL_PX_PER_MIN` is now derived from `tlZoom` (1x / 2x / 4x, persisted in
+  localStorage). Everything already positions through `tlY()`, and the drag
+  maths works in deltas, so nothing else changed. At 4x a six-minute block is
+  27.6px and handle collisions drop to **zero**.
+- `zoomTimeline()` measures which moment is at the centre of the viewport,
+  rescales, then puts that moment back. Without it, zooming throws the reader
+  hours away from what they were looking at.
+
+**A fisheye was deliberately rejected** - auto-expanding dense hours, or
+tap-an-hour-to-expand. Both break linearity, and linearity is the entire reason
+the timeline beats the old list: height means duration, at a glance. A view
+where a 20-minute block can look larger than an hour is a worse confusion than
+scrolling.
+
+Pinch-to-zoom was left out for now. The buttons are testable here; a two-finger
+gesture would interact with the existing pointer capture and the document-level
+`touchmove` guard, and none of that can be verified without a real device.
+
+**The magnet must never apply to an edge that is already flush.** This shipped
+broken and is easy to reintroduce. The 10-minute magnet exists so that dragging
+*toward* a neighbour closes the gap exactly. Applied unconditionally it does the
+reverse: on a boundary the two blocks already share, every drag within 10
+minutes snaps straight back, in both directions, so a contiguous day cannot be
+nudged at all. It looked like "dragging down is broken" because the one edge
+that still moved freely was the first block's start, which has no neighbour to
+stick to. `resolveEdgeDrag()` and `resolveBlockMove()` now check whether the
+edge was already touching before applying the magnet.
+
+Zoom always opens at 1x. It is a tool for one crowded hour, not a preference,
+so it is deliberately not persisted - though it does survive day navigation
+while the editor stays open.
+
+**Any view that rebuilds itself on every edit must carry the scroll across.**
+This has now been fixed twice - the Day Editor, then the Summary - and the next
+full-page view will have the same problem. `openCombinedSummary()` re-renders
+the entire page for a rating, a note or a day-type change, so a change made in
+the Complete History Log threw the reader back to the top.
+
+Two details specific to the Summary:
+
+- **Restore runs twice.** The history log is populated in a `setTimeout`, so
+  immediately after the main content lands the container is still short and a
+  large `scrollTop` gets clamped. `restoreSummaryScroll()` is called again once
+  the log has rendered.
+- **`origStage` had to be guarded.** It was captured unconditionally, so every
+  re-entry - every edit - recaptured the summary as the thing to return to, and
+  Home would "close" the summary back into the summary. It is now captured only
+  on first entry.
 
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
-*Updated 2026-08-27: v12 Day Editor rework, and the deploy-status correction
-at the top.*
+*Updated 2026-08-27: v12 Day Editor timeline, and the deploy-status
+correction at the top.*

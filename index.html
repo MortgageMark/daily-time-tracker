@@ -28,6 +28,30 @@
     --accent:#4f8cff; --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
     --radius:18px; --shadow:0 8px 30px rgba(0,0,0,.35);
     --tile-min: 210px;
+    /* These four were hardcoded in ~25 places, which is what made the app
+       dark-only. Named here so a theme can move them. */
+    --field:#0a1424;              /* inputs, selects, textareas */
+    --glass:rgba(10,16,28,.7);    /* sticky headers and footers */
+    --glass2:rgba(10,16,28,.55);
+    --scrim:rgba(4,8,16,.7);      /* behind every modal */
+    --glow:#16233c;               /* the radial wash behind the app */
+    --bad-ink:#fca5a5;            /* destructive TEXT, not a fill */
+    --barbg:#0a101c;              /* the bottom bar sits below everything */
+  }
+  /* Channel colours are deliberately NOT themed: they are the user's data, and
+     every surface painting one already picks its text with contrastInk(). */
+  :root[data-theme="light"]{
+    --bg:#f2f5fb; --panel:#ffffff; --panel2:#f6f8fd; --line:#dae1ed;
+    --ink:#0f1a2c; --ink2:#46566f; --muted:#78879e;
+    --accent:#2a5bc4; --good:#15803d; --warn:#b45309; --bad:#dc2626;
+    --shadow:0 8px 26px rgba(15,26,44,.10);
+    --field:#ffffff;
+    --glass:rgba(255,255,255,.82);
+    --glass2:rgba(255,255,255,.7);
+    --scrim:rgba(18,28,48,.38);
+    --glow:#e4ecfb;
+    --bad-ink:#b91c1c;
+    --barbg:#ffffff;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{-webkit-text-size-adjust:100%; text-size-adjust:100%}
@@ -49,7 +73,7 @@
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     background-color:var(--bg);
-    background-image:radial-gradient(1200px 800px at 70% -10%,#16233c 0%,var(--bg) 55%);
+    background-image:radial-gradient(1200px 800px at 70% -10%,var(--glow) 0%,var(--bg) 55%);
     color:var(--ink); overflow:hidden; user-select:none; -webkit-user-select:none;
   }
   button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
@@ -63,7 +87,7 @@
      rather than empty space beneath it. */
   .app{display:flex; flex-direction:column; position:fixed; inset:0}
 
-  .topbar{display:flex; align-items:center; gap:16px; padding:max(14px, env(safe-area-inset-top)) 20px 14px 20px; border-bottom:1px solid var(--line); background:rgba(10,16,28,.55); backdrop-filter:blur(8px)}
+  .topbar{display:flex; align-items:center; gap:16px; padding:max(14px, env(safe-area-inset-top)) 20px 14px 20px; border-bottom:1px solid var(--line); background:var(--glass2); backdrop-filter:blur(8px)}
   .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.2px}
   .brand .dot{width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 14px var(--accent)}
   .topmeta{display:flex; align-items:center; gap:22px; margin-left:auto; flex-wrap:wrap}
@@ -109,13 +133,13 @@
      and taps would trigger its swipe gesture - so it is scaled back to ~62%
      and the top padding raised to meet it. The buttons end up optically
      centred in the bar instead of pinned to its top edge. */
-  .bottombar{display:flex; align-items:center; gap:10px; padding:14px 18px max(12px, calc(env(safe-area-inset-bottom) * 0.55)) 18px; border-top:1px solid var(--line); background:#0a101c; backdrop-filter:blur(8px)}
+  .bottombar{display:flex; align-items:center; gap:10px; padding:14px 18px max(12px, calc(env(safe-area-inset-bottom) * 0.55)) 18px; border-top:1px solid var(--line); background:var(--barbg); backdrop-filter:blur(8px)}
   .ctl{display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 14px; border-radius:14px; border:1px solid var(--line); background:var(--panel); font-size:12px; font-weight:700; min-width:76px; color:var(--ink2)}
   .ctl svg{width:22px;height:22px}
   .ctl:active{transform:scale(.96)}
   .ctl.primary{background:linear-gradient(180deg,#3b74e0,#2a5bc4); color:#fff; border-color:#2a5bc4}
 
-  .scrim{position:fixed; inset:0; background:rgba(4,8,16,.66); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; z-index:40; padding:20px}
+  .scrim{position:fixed; inset:0; background:var(--scrim); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; z-index:40; padding:20px}
   .scrim.open{display:flex}
   .sheet{width:100%; max-width:760px; max-height:88vh; overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:22px; box-shadow:var(--shadow)}
   .sheet.wide{max-width:1080px}
@@ -158,14 +182,14 @@
     .stage [ondrop]{font-size:12px !important}
   }
   .swatch{width:34px;height:34px;border-radius:9px; flex:none; border:2px solid rgba(255,255,255,.25)}
-  input,select{font-family:inherit; font-size:15px; color:var(--ink); background:#0a1424; border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none}
+  input,select{font-family:inherit; font-size:15px; color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none}
   input[type=color]{padding:3px; width:52px; height:40px}
   input:focus,select:focus{border-color:var(--accent)}
   .grow{flex:1; min-width:0}
   .btn{padding:10px 16px; border-radius:11px; border:1px solid var(--line); background:var(--panel2); font-weight:700; color:var(--ink)}
   .btn.pri{background:linear-gradient(180deg,#3b74e0,#2a5bc4); border-color:#2a5bc4; color:#fff}
   .btn.sm{padding:7px 11px; font-size:13px}
-  .btn.warn{color:#fca5a5; border-color:#5b2130}
+  .btn.warn{color:var(--bad-ink); border-color:#5b2130}
   .iconbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel2); font-size:16px; display:grid; place-items:center; color:var(--ink2)}
   .muted{color:var(--muted)} .ink2{color:var(--ink2)}
   .sect-title{font-size:12px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); margin:18px 0 10px}
@@ -199,26 +223,27 @@
   .insight b{color:#fff}
   .barrow{display:flex; align-items:center; gap:12px; margin-bottom:11px}
   .barrow .nm{width:130px; font-size:13px; font-weight:700; text-align:right; flex:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .barrow .track{flex:1; height:22px; background:#0a1424; border-radius:7px; overflow:hidden}
+  .barrow .track{flex:1; height:22px; background:var(--field); border-radius:7px; overflow:hidden}
   .barrow .fill{height:100%; border-radius:7px; min-width:2px}
   .barrow .val{width:92px; font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; flex:none}
   svg text{fill:var(--ink2); font-size:11px}
-  .toast{position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:#0a1424; border:1px solid var(--line); color:var(--ink); padding:11px 18px; border-radius:12px; box-shadow:var(--shadow); font-weight:600; font-size:14px; opacity:0; transition:opacity .2s, transform .2s; pointer-events:none; z-index:60}
+  .toast{position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:var(--field); border:1px solid var(--line); color:var(--ink); padding:11px 18px; border-radius:12px; box-shadow:var(--shadow); font-weight:600; font-size:14px; opacity:0; transition:opacity .2s, transform .2s; pointer-events:none; z-index:60}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px)}
+  .toast.act{pointer-events:auto; display:flex; align-items:center; gap:14px; padding:10px 12px 10px 18px}
   .tl-item{display:grid; grid-template-columns:14px 1fr auto; gap:12px; align-items:center; padding:11px 12px; border:1px solid var(--line); border-radius:12px; background:var(--panel2); margin-bottom:9px}
   .tl-dot{width:14px;height:14px;border-radius:4px}
   .tl-mid .ch{font-weight:800} .tl-mid .tm{font-size:12px; color:var(--ink2)}
   .tl-dur{font-weight:800; font-variant-numeric:tabular-nums}
 
   /* login */
-  .login{position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; background:radial-gradient(1000px 700px at 50% -10%,#16233c 0%,var(--bg) 60%)}
+  .login{position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; background:radial-gradient(1000px 700px at 50% -10%,var(--glow) 0%,var(--bg) 60%)}
   .login .box{width:100%; max-width:400px; background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:30px; box-shadow:var(--shadow)}
   .login h1{margin:0 0 4px; font-size:23px; display:flex; align-items:center; gap:10px}
   .login h1 .dot{width:13px;height:13px;border-radius:50%;background:var(--accent);box-shadow:0 0 14px var(--accent)}
   .login p{color:var(--ink2); font-size:14px; margin:0 0 22px}
   .login label{display:block; font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:14px 0 6px}
   .login input{width:100%}
-  .login .err{color:#fca5a5; font-size:13px; margin-top:12px; min-height:18px}
+  .login .err{color:var(--bad-ink); font-size:13px; margin-top:12px; min-height:18px}
   .login .ok{color:#86efac; font-size:13px; margin-top:10px; line-height:1.45}
   .login .authlinks{display:flex; justify-content:space-between; gap:12px; margin-top:18px; font-size:13px; flex-wrap:wrap}
   .login .authlinks a{color:var(--accent); text-decoration:none; cursor:pointer}
@@ -265,7 +290,7 @@
     .bottombar .ctl svg{width:24px; height:24px}
   }
 
-  textarea{font-family:inherit;font-size:14px;color:var(--ink);background:#0a1424;border:1px solid var(--line);border-radius:10px;padding:12px;outline:none}
+  textarea{font-family:inherit;font-size:14px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:12px;outline:none}
   textarea:focus{border-color:var(--accent)}
   input[type="range"]{-webkit-appearance:slider-horizontal;appearance:slider-horizontal}
   input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer}
@@ -295,6 +320,18 @@
   .planner-controls{display:flex;gap:10px;margin-top:20px}
   .planner-controls button{flex:1}
 </style>
+<script>
+/* Runs before <body> exists so the theme is on <html> at first paint rather
+   than flashing dark and correcting. localStorage is device-local and
+   synchronous; a context that throws simply stays dark. */
+(function(){
+  var t="dark";
+  try{ t=localStorage.getItem("dtt-theme")||"dark"; }catch(e){}
+  document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");
+  var m=document.querySelector('meta[name="theme-color"]');
+  if(m) m.setAttribute("content",t==="light"?"#f2f5fb":"#0f172a");
+})();
+</script>
 </head>
 <body>
 
@@ -424,7 +461,7 @@
     </div>
 
     <div class="row"><div class="grow">Notes<div class="hint">Capture wins, challenges, or anything worth remembering</div></div></div>
-    <textarea id="dayNotes" placeholder="e.g. Finished project X, had great meeting with team, struggled with focus in afternoon" style="font-family:inherit;font-size:14px;color:var(--ink);background:#0a1424;border:1px solid var(--line);border-radius:10px;padding:12px;width:100%;min-height:100px;resize:vertical;outline:none"></textarea>
+    <textarea id="dayNotes" placeholder="e.g. Finished project X, had great meeting with team, struggled with focus in afternoon" style="font-family:inherit;font-size:14px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:12px;width:100%;min-height:100px;resize:vertical;outline:none"></textarea>
     <div style="display:flex;gap:10px;margin-top:16px"><button class="btn sm" id="notesSkip">Close</button><button class="btn pri" id="notesSave">Save</button></div>
   </div></div></div>
 
@@ -466,9 +503,9 @@
     </div>
   </div></div></div>
 
-<div class="scrim" id="editsScrim"><div class="sheet" style="max-width:800px;max-height:80vh;display:flex;flex-direction:column"><div class="sheet-h"><h2>Session Edits</h2><button class="x" data-close>×</button></div><div class="sheet-b" style="flex:1;overflow-y:auto;padding:0" id="editsContent"></div></div></div>
 
 <div class="toast" id="toast"></div>
+<div class="toast act" id="actionToast"></div>
 
 <script>
 var supabase=(function(e){function t(e,t){var n={};for(var r in e)Object.prototype.hasOwnProperty.call(e,r)&&t.indexOf(r)<0&&(n[r]=e[r]);if(e!=null&&typeof Object.getOwnPropertySymbols==`function`)for(var i=0,r=Object.getOwnPropertySymbols(e);i<r.length;i++)t.indexOf(r[i])<0&&Object.prototype.propertyIsEnumerable.call(e,r[i])&&(n[r[i]]=e[r[i]]);return n}function n(e,t,n,r){function i(e){return e instanceof n?e:new n(function(t){t(e)})}return new(n||=Promise)(function(n,a){function o(e){try{c(r.next(e))}catch(e){a(e)}}function s(e){try{c(r.throw(e))}catch(e){a(e)}}function c(e){e.done?n(e.value):i(e.value).then(o,s)}c((r=r.apply(e,t||[])).next())})}let r=e=>e?(...t)=>e(...t):(...e)=>fetch(...e);var i=class extends Error{constructor(e,t=`FunctionsError`,n){super(e),this.name=t,this.context=n}toJSON(){return{name:this.name,message:this.message,context:this.context}}},a=class extends i{constructor(e){super(`Failed to send a request to the Edge Function`,`FunctionsFetchError`,e)}},o=class extends i{constructor(e){super(`Relay Error invoking the Edge Function`,`FunctionsRelayError`,e)}},s=class extends i{constructor(e){super(`Edge Function returned a non-2xx status code`,`FunctionsHttpError`,e)}},c;(function(e){e.Any=`any`,e.ApNortheast1=`ap-northeast-1`,e.ApNortheast2=`ap-northeast-2`,e.ApSouth1=`ap-south-1`,e.ApSoutheast1=`ap-southeast-1`,e.ApSoutheast2=`ap-southeast-2`,e.CaCentral1=`ca-central-1`,e.EuCentral1=`eu-central-1`,e.EuWest1=`eu-west-1`,e.EuWest2=`eu-west-2`,e.EuWest3=`eu-west-3`,e.SaEast1=`sa-east-1`,e.UsEast1=`us-east-1`,e.UsWest1=`us-west-1`,e.UsWest2=`us-west-2`})(c||={});var l=class{constructor(e,{headers:t={},customFetch:n,region:i=c.Any}={}){this.url=e,this.headers=t,this.region=i,this.fetch=r(n)}setAuth(e){this.headers.Authorization=`Bearer ${e}`}invoke(e){return n(this,arguments,void 0,function*(e,t={}){var n;let r,i,c;try{let{headers:n,method:l,body:u,signal:d,timeout:f}=t,p={},{region:m}=t;m||=this.region;let h=new URL(`${this.url}/${e}`);m&&m!==`any`&&(p[`x-region`]=m,h.searchParams.set(`forceFunctionRegion`,m));let g,ee=!!n&&Object.keys(n).some(e=>e.toLowerCase()===`content-type`);u&&!ee?typeof Blob<`u`&&u instanceof Blob||u instanceof ArrayBuffer?(p[`Content-Type`]=`application/octet-stream`,g=u):typeof u==`string`?(p[`Content-Type`]=`text/plain`,g=u):typeof FormData<`u`&&u instanceof FormData?g=u:(p[`Content-Type`]=`application/json`,g=JSON.stringify(u)):g=u&&typeof u!=`string`&&!(typeof Blob<`u`&&u instanceof Blob)&&!(u instanceof ArrayBuffer)&&!(typeof FormData<`u`&&u instanceof FormData)?JSON.stringify(u):u;let te=d;f&&(i=new AbortController,r=setTimeout(()=>i.abort(),f),d?(te=i.signal,c=()=>i.abort(),d.addEventListener(`abort`,c)):te=i.signal);let _=yield this.fetch(h.toString(),{method:l||`POST`,headers:Object.assign(Object.assign(Object.assign({},p),this.headers),n),body:g,signal:te}).catch(e=>{throw new a(e)}),ne=_.headers.get(`x-relay-error`);if(ne&&ne===`true`)throw new o(_);if(!_.ok)throw new s(_);let re=(_.headers.get(`Content-Type`)??`text/plain`).split(`;`)[0].trim().toLowerCase(),ie;return ie=re===`application/json`?yield _.json():re===`application/octet-stream`||re===`application/pdf`?yield _.blob():re===`text/event-stream`?_:re===`multipart/form-data`?yield _.formData():yield _.text(),{data:ie,error:null,response:_}}catch(e){return{data:null,error:e,response:e instanceof s||e instanceof o?e.context:void 0}}finally{r&&clearTimeout(r),c&&((n=t.signal)==null||n.removeEventListener(`abort`,c))}})}};let u=e=>Math.min(1e3*2**e,3e4),d=[520,503],f=[`GET`,`HEAD`,`OPTIONS`];var p=class extends Error{constructor(e){super(e.message),this.name=`PostgrestError`,this.details=e.details,this.hint=e.hint,this.code=e.code}toJSON(){return{name:this.name,message:this.message,details:this.details,hint:this.hint,code:this.code}}};function m(e){"@babel/helpers - typeof";return m=typeof Symbol==`function`&&typeof Symbol.iterator==`symbol`?function(e){return typeof e}:function(e){return e&&typeof Symbol==`function`&&e.constructor===Symbol&&e!==Symbol.prototype?`symbol`:typeof e},m(e)}function h(e,t){if(m(e)!=`object`||!e)return e;var n=e[Symbol.toPrimitive];if(n!==void 0){var r=n.call(e,t||`default`);if(m(r)!=`object`)return r;throw TypeError(`@@toPrimitive must return a primitive value.`)}return(t===`string`?String:Number)(e)}function g(e){var t=h(e,`string`);return m(t)==`symbol`?t:t+``}function ee(e,t,n){return(t=g(t))in e?Object.defineProperty(e,t,{value:n,enumerable:!0,configurable:!0,writable:!0}):e[t]=n,e}function te(e,t){var n=Object.keys(e);if(Object.getOwnPropertySymbols){var r=Object.getOwnPropertySymbols(e);t&&(r=r.filter(function(t){return Object.getOwnPropertyDescriptor(e,t).enumerable})),n.push.apply(n,r)}return n}function _(e){for(var t=1;t<arguments.length;t++){var n=arguments[t]==null?{}:arguments[t];t%2?te(Object(n),!0).forEach(function(t){ee(e,t,n[t])}):Object.getOwnPropertyDescriptors?Object.defineProperties(e,Object.getOwnPropertyDescriptors(n)):te(Object(n)).forEach(function(t){Object.defineProperty(e,t,Object.getOwnPropertyDescriptor(n,t))})}return e}function ne(e,t){return new Promise(n=>{if(t?.aborted){n();return}let r=setTimeout(()=>{t?.removeEventListener(`abort`,i),n()},e);function i(){clearTimeout(r),n()}t?.addEventListener(`abort`,i)})}function re(e,t,n,r){return!(!r||n>=3||!f.includes(e)||!d.includes(t))}var ie=class{constructor(e){this.shouldThrowOnError=!1,this.retryEnabled=!0,this.method=e.method,this.url=e.url,this.headers=new Headers(e.headers),this.schema=e.schema,this.body=e.body,this.shouldThrowOnError=e.shouldThrowOnError??!1,this.signal=e.signal,this.isMaybeSingle=e.isMaybeSingle??!1,this.shouldStripNulls=e.shouldStripNulls??!1,this.urlLengthLimit=e.urlLengthLimit??8e3,this.retryEnabled=e.retry??!0,e.fetch?this.fetch=e.fetch:this.fetch=fetch}throwOnError(){return this.shouldThrowOnError=!0,this}stripNulls(){if(this.headers.get(`Accept`)===`text/csv`)throw Error(`stripNulls() cannot be used with csv()`);return this.shouldStripNulls=!0,this}setHeader(e,t){return this.headers=new Headers(this.headers),this.headers.set(e,t),this}retry(e){return this.retryEnabled=e,this}then(e,t){var n=this;if(this.schema===void 0||([`GET`,`HEAD`].includes(this.method)?this.headers.set(`Accept-Profile`,this.schema):this.headers.set(`Content-Profile`,this.schema)),this.method!==`GET`&&this.method!==`HEAD`&&this.headers.set(`Content-Type`,`application/json`),this.shouldStripNulls){let e=this.headers.get(`Accept`);e===`application/vnd.pgrst.object+json`?this.headers.set(`Accept`,`application/vnd.pgrst.object+json;nulls=stripped`):(!e||e===`application/json`)&&this.headers.set(`Accept`,`application/vnd.pgrst.array+json;nulls=stripped`)}let r=this.fetch,i=(async()=>{let e=0;for(;;){let t={};n.headers.forEach((e,n)=>{t[n]=e}),e>0&&(t[`X-Retry-Count`]=String(e));let i;try{i=await r(n.url.toString(),{method:n.method,headers:t,body:JSON.stringify(n.body,(e,t)=>typeof t==`bigint`?t.toString():t),signal:n.signal})}catch(t){if(t?.name===`AbortError`||t?.code===`ABORT_ERR`||!f.includes(n.method))throw t;if(n.retryEnabled&&e<3){let t=u(e);e++,await ne(t,n.signal);continue}throw t}if(re(n.method,i.status,e,n.retryEnabled)){let t=i.headers?.get(`Retry-After`)??null,r=t===null?u(e):Math.max(0,parseInt(t,10)||0)*1e3;await i.text(),e++,await ne(r,n.signal);continue}return await n.processResponse(i)}})();return this.shouldThrowOnError||(i=i.catch(e=>{let t=``,n=``,r=``,i=e?.cause;if(i){let n=i?.message??``,r=i?.code??``;t=`${e?.name??`FetchError`}: ${e?.message}`,t+=`\n\nCaused by: ${i?.name??`Error`}: ${n}`,r&&(t+=` (${r})`),i?.stack&&(t+=`\n${i.stack}`)}else t=e?.stack??``;let a=this.url.toString().length;return e?.name===`AbortError`||e?.code===`ABORT_ERR`?(r=``,n=`Request was aborted (timeout or manual cancellation)`,a>this.urlLengthLimit&&(n+=`. Note: Your request URL is ${a} characters, which may exceed server limits. If selecting many fields, consider using views. If filtering with large arrays (e.g., .in('id', [many IDs])), consider using an RPC function to pass values server-side.`)):(i?.name===`HeadersOverflowError`||i?.code===`UND_ERR_HEADERS_OVERFLOW`)&&(r=``,n=`HTTP headers exceeded server limits (typically 16KB)`,a>this.urlLengthLimit&&(n+=`. Your request URL is ${a} characters. If selecting many fields, consider using views. If filtering with large arrays (e.g., .in('id', [200+ IDs])), consider using an RPC function instead.`)),{success:!1,error:{message:`${e?.name??`FetchError`}: ${e?.message}`,details:t,hint:n,code:r},data:null,count:null,status:0,statusText:``}})),i.then(e,t)}async processResponse(e){var t=this;let n=null,r=null,i=null,a=e.status,o=e.statusText;if(e.ok){if(t.method!==`HEAD`){let i=await e.text();if(i!==``)if(t.headers.get(`Accept`)===`text/csv`)r=i;else if(t.headers.get(`Accept`)&&t.headers.get(`Accept`)?.includes(`application/vnd.pgrst.plan+text`))r=i;else try{r=JSON.parse(i)}catch{if(n={message:i},r=null,t.shouldThrowOnError)throw new p({message:i,details:``,hint:``,code:``})}}let s=t.headers.get(`Prefer`)?.match(/count=(exact|planned|estimated)/),c=e.headers.get(`content-range`)?.split(`/`);if(s&&c&&c.length>1&&(i=parseInt(c[1])),t.isMaybeSingle&&Array.isArray(r))if(r.length>1){if(n={code:`PGRST116`,details:`Results contain ${r.length} rows, application/vnd.pgrst.object+json requires 1 row`,hint:null,message:`JSON object requested, multiple (or no) rows returned`},r=null,i=null,a=406,o=`Not Acceptable`,t.shouldThrowOnError)throw new p(_(_({},n),{},{hint:n.hint??``}))}else r=r.length===1?r[0]:null}else{let i=await e.text();try{n=JSON.parse(i),Array.isArray(n)&&e.status===404&&(r=[],n=null,a=200,o=`OK`)}catch{e.status===404&&i===``?(a=204,o=`No Content`):n={message:i}}if(n&&t.shouldThrowOnError)throw new p(n)}return{success:n===null,error:n,data:r,count:i,status:a,statusText:o}}returns(){return this}overrideTypes(){return this}},ae=class extends ie{throwOnError(){return super.throwOnError()}select(e){let t=!1,n=(e??`*`).split(``).map(e=>/\s/.test(e)&&!t?``:(e===`"`&&(t=!t),e)).join(``);return this.url.searchParams.set(`select`,n),this.headers.append(`Prefer`,`return=representation`),this}order(e,{ascending:t=!0,nullsFirst:n,foreignTable:r,referencedTable:i=r}={}){let a=i?`${i}.order`:`order`,o=this.url.searchParams.get(a);return this.url.searchParams.set(a,`${o?`${o},`:``}${e}.${t?`asc`:`desc`}${n===void 0?``:n?`.nullsfirst`:`.nullslast`}`),this}limit(e,{foreignTable:t,referencedTable:n=t}={}){let r=n===void 0?`limit`:`${n}.limit`;return this.url.searchParams.set(r,`${e}`),this}range(e,t,{foreignTable:n,referencedTable:r=n}={}){let i=r===void 0?`offset`:`${r}.offset`,a=r===void 0?`limit`:`${r}.limit`;return this.url.searchParams.set(i,`${e}`),this.url.searchParams.set(a,`${t-e+1}`),this}abortSignal(e){return this.signal=e,this}single(){return this.headers.set(`Accept`,`application/vnd.pgrst.object+json`),this}maybeSingle(){return this.isMaybeSingle=!0,this}csv(){return this.headers.set(`Accept`,`text/csv`),this}geojson(){return this.headers.set(`Accept`,`application/geo+json`),this}explain({analyze:e=!1,verbose:t=!1,settings:n=!1,buffers:r=!1,wal:i=!1,format:a=`text`}={}){let o=[e?`analyze`:null,t?`verbose`:null,n?`settings`:null,r?`buffers`:null,i?`wal`:null].filter(Boolean).join(`|`),s=this.headers.get(`Accept`)??`application/json`;return this.headers.set(`Accept`,`application/vnd.pgrst.plan+${a}; for="${s}"; options=${o};`),this}rollback(){return this.headers.append(`Prefer`,`tx=rollback`),this}returns(){return this}maxAffected(e){return this.headers.append(`Prefer`,`handling=strict`),this.headers.append(`Prefer`,`max-affected=${e}`),this}};let oe=RegExp(`[,()]`);var se=class extends ae{throwOnError(){return super.throwOnError()}eq(e,t){return this.url.searchParams.append(e,`eq.${t}`),this}neq(e,t){return this.url.searchParams.append(e,`neq.${t}`),this}gt(e,t){return this.url.searchParams.append(e,`gt.${t}`),this}gte(e,t){return this.url.searchParams.append(e,`gte.${t}`),this}lt(e,t){return this.url.searchParams.append(e,`lt.${t}`),this}lte(e,t){return this.url.searchParams.append(e,`lte.${t}`),this}like(e,t){return this.url.searchParams.append(e,`like.${t}`),this}likeAllOf(e,t){return this.url.searchParams.append(e,`like(all).{${t.join(`,`)}}`),this}likeAnyOf(e,t){return this.url.searchParams.append(e,`like(any).{${t.join(`,`)}}`),this}ilike(e,t){return this.url.searchParams.append(e,`ilike.${t}`),this}ilikeAllOf(e,t){return this.url.searchParams.append(e,`ilike(all).{${t.join(`,`)}}`),this}ilikeAnyOf(e,t){return this.url.searchParams.append(e,`ilike(any).{${t.join(`,`)}}`),this}regexMatch(e,t){return this.url.searchParams.append(e,`match.${t}`),this}regexIMatch(e,t){return this.url.searchParams.append(e,`imatch.${t}`),this}is(e,t){return this.url.searchParams.append(e,`is.${t}`),this}isDistinct(e,t){return this.url.searchParams.append(e,`isdistinct.${t}`),this}in(e,t){let n=Array.from(new Set(t)).map(e=>typeof e==`string`&&oe.test(e)?`"${e}"`:`${e}`).join(`,`);return this.url.searchParams.append(e,`in.(${n})`),this}notIn(e,t){let n=Array.from(new Set(t)).map(e=>typeof e==`string`&&oe.test(e)?`"${e}"`:`${e}`).join(`,`);return this.url.searchParams.append(e,`not.in.(${n})`),this}contains(e,t){return typeof t==`string`?this.url.searchParams.append(e,`cs.${t}`):Array.isArray(t)?this.url.searchParams.append(e,`cs.{${t.join(`,`)}}`):this.url.searchParams.append(e,`cs.${JSON.stringify(t)}`),this}containedBy(e,t){return typeof t==`string`?this.url.searchParams.append(e,`cd.${t}`):Array.isArray(t)?this.url.searchParams.append(e,`cd.{${t.join(`,`)}}`):this.url.searchParams.append(e,`cd.${JSON.stringify(t)}`),this}rangeGt(e,t){return this.url.searchParams.append(e,`sr.${t}`),this}rangeGte(e,t){return this.url.searchParams.append(e,`nxl.${t}`),this}rangeLt(e,t){return this.url.searchParams.append(e,`sl.${t}`),this}rangeLte(e,t){return this.url.searchParams.append(e,`nxr.${t}`),this}rangeAdjacent(e,t){return this.url.searchParams.append(e,`adj.${t}`),this}overlaps(e,t){return typeof t==`string`?this.url.searchParams.append(e,`ov.${t}`):this.url.searchParams.append(e,`ov.{${t.join(`,`)}}`),this}textSearch(e,t,{config:n,type:r}={}){let i=``;r===`plain`?i=`pl`:r===`phrase`?i=`ph`:r===`websearch`&&(i=`w`);let a=n===void 0?``:`(${n})`;return this.url.searchParams.append(e,`${i}fts${a}.${t}`),this}match(e){return Object.entries(e).filter(([e,t])=>t!==void 0).forEach(([e,t])=>{this.url.searchParams.append(e,`eq.${t}`)}),this}not(e,t,n){return this.url.searchParams.append(e,`not.${t}.${n}`),this}or(e,{foreignTable:t,referencedTable:n=t}={}){let r=n?`${n}.or`:`or`;return this.url.searchParams.append(r,`(${e})`),this}filter(e,t,n){return this.url.searchParams.append(e,`${t}.${n}`),this}},ce=class{constructor(e,{headers:t={},schema:n,fetch:r,urlLengthLimit:i=8e3,retry:a}){this.url=e,this.headers=new Headers(t),this.schema=n,this.fetch=r,this.urlLengthLimit=i,this.retry=a}cloneRequestState(){return{url:new URL(this.url.toString()),headers:new Headers(this.headers)}}select(e,t){let{head:n=!1,count:r}=t??{},i=n?`HEAD`:`GET`,a=!1,o=(e??`*`).split(``).map(e=>/\s/.test(e)&&!a?``:(e===`"`&&(a=!a),e)).join(``),{url:s,headers:c}=this.cloneRequestState();return s.searchParams.set(`select`,o),r&&c.append(`Prefer`,`count=${r}`),new se({method:i,url:s,headers:c,schema:this.schema,fetch:this.fetch,urlLengthLimit:this.urlLengthLimit,retry:this.retry})}insert(e,{count:t,defaultToNull:n=!0}={}){let{url:r,headers:i}=this.cloneRequestState();if(t&&i.append(`Prefer`,`count=${t}`),n||i.append(`Prefer`,`missing=default`),Array.isArray(e)){let t=e.reduce((e,t)=>e.concat(Object.keys(t)),[]);if(t.length>0){let e=[...new Set(t)].map(e=>`"${e}"`);r.searchParams.set(`columns`,e.join(`,`))}}return new se({method:`POST`,url:r,headers:i,schema:this.schema,body:e,fetch:this.fetch??fetch,urlLengthLimit:this.urlLengthLimit,retry:this.retry})}upsert(e,{onConflict:t,ignoreDuplicates:n=!1,count:r,defaultToNull:i=!0}={}){let{url:a,headers:o}=this.cloneRequestState();if(o.append(`Prefer`,`resolution=${n?`ignore`:`merge`}-duplicates`),t!==void 0&&a.searchParams.set(`on_conflict`,t),r&&o.append(`Prefer`,`count=${r}`),i||o.append(`Prefer`,`missing=default`),Array.isArray(e)){let t=e.reduce((e,t)=>e.concat(Object.keys(t)),[]);if(t.length>0){let e=[...new Set(t)].map(e=>`"${e}"`);a.searchParams.set(`columns`,e.join(`,`))}}return new se({method:`POST`,url:a,headers:o,schema:this.schema,body:e,fetch:this.fetch??fetch,urlLengthLimit:this.urlLengthLimit,retry:this.retry})}update(e,{count:t}={}){let{url:n,headers:r}=this.cloneRequestState();return t&&r.append(`Prefer`,`count=${t}`),new se({method:`PATCH`,url:n,headers:r,schema:this.schema,body:e,fetch:this.fetch??fetch,urlLengthLimit:this.urlLengthLimit,retry:this.retry})}delete({count:e}={}){let{url:t,headers:n}=this.cloneRequestState();return e&&n.append(`Prefer`,`count=${e}`),new se({method:`DELETE`,url:t,headers:n,schema:this.schema,fetch:this.fetch??fetch,urlLengthLimit:this.urlLengthLimit,retry:this.retry})}},le=class e{constructor(e,{headers:t={},schema:n,fetch:r,timeout:i,urlLengthLimit:a=8e3,retry:o}={}){this.url=e,this.headers=new Headers(t),this.schemaName=n,this.urlLengthLimit=a;let s=r??globalThis.fetch;i!==void 0&&i>0?this.fetch=(e,t)=>{let n=new AbortController,r=setTimeout(()=>n.abort(),i),a=t?.signal;if(a){if(a.aborted)return clearTimeout(r),s(e,t);let i=()=>{clearTimeout(r),n.abort()};return a.addEventListener(`abort`,i,{once:!0}),s(e,_(_({},t),{},{signal:n.signal})).finally(()=>{clearTimeout(r),a.removeEventListener(`abort`,i)})}return s(e,_(_({},t),{},{signal:n.signal})).finally(()=>clearTimeout(r))}:this.fetch=s,this.retry=o}from(e){if(!e||typeof e!=`string`||e.trim()===``)throw Error(`Invalid relation name: relation must be a non-empty string.`);return new ce(new URL(`${this.url}/${e}`),{headers:new Headers(this.headers),schema:this.schemaName,fetch:this.fetch,urlLengthLimit:this.urlLengthLimit,retry:this.retry})}schema(t){return new e(this.url,{headers:this.headers,schema:t,fetch:this.fetch,urlLengthLimit:this.urlLengthLimit,retry:this.retry})}rpc(e,t={},{head:n=!1,get:r=!1,count:i}={}){let a,o=new URL(`${this.url}/rpc/${e}`),s,c=e=>typeof e==`object`&&!!e&&(!Array.isArray(e)||e.some(c)),l=n&&Object.values(t).some(c);l?(a=`POST`,s=t):n||r?(a=n?`HEAD`:`GET`,Object.entries(t).filter(([e,t])=>t!==void 0).map(([e,t])=>[e,Array.isArray(t)?`{${t.join(`,`)}}`:`${t}`]).forEach(([e,t])=>{o.searchParams.append(e,t)})):(a=`POST`,s=t);let u=new Headers(this.headers);return l?u.set(`Prefer`,i?`count=${i},return=minimal`:`return=minimal`):i&&u.set(`Prefer`,`count=${i}`),new se({method:a,url:o,headers:u,schema:this.schemaName,body:s,fetch:this.fetch??fetch,urlLengthLimit:this.urlLengthLimit,retry:this.retry})}},ue=class{constructor(){}static detectEnvironment(){if(typeof WebSocket<`u`)return{type:`native`,wsConstructor:WebSocket};let e=globalThis;if(typeof globalThis<`u`&&e.WebSocket!==void 0)return{type:`native`,wsConstructor:e.WebSocket};let t=typeof global<`u`?global:void 0;if(t&&t.WebSocket!==void 0)return{type:`native`,wsConstructor:t.WebSocket};if(typeof globalThis<`u`&&e.WebSocketPair!==void 0&&globalThis.WebSocket===void 0)return{type:`cloudflare`,error:`Cloudflare Workers detected. WebSocket clients are not supported in Cloudflare Workers.`,workaround:`Use Cloudflare Workers WebSocket API for server-side WebSocket handling, or deploy to a different runtime.`};if(typeof globalThis<`u`&&e.EdgeRuntime||typeof navigator<`u`&&navigator.userAgent?.includes(`Vercel-Edge`))return{type:`unsupported`,error:`Edge runtime detected (Vercel Edge/Netlify Edge). WebSockets are not supported in edge functions.`,workaround:`Use serverless functions or a different deployment target for WebSocket functionality.`};let n=globalThis.process;if(n){let e=n.versions;if(e&&e.node)return{type:`unsupported`,error:`Node.js detected but native WebSocket not found.`,workaround:`Ensure you are running Node.js 22+ or provide a WebSocket implementation via the transport option.`}}return{type:`unsupported`,error:`Unknown JavaScript runtime without WebSocket support.`,workaround:`Ensure you're running in a supported environment (browser, Node.js, Deno) or provide a custom WebSocket implementation.`}}static getWebSocketConstructor(){let e=this.detectEnvironment();if(e.wsConstructor)return e.wsConstructor;let t=e.error||`WebSocket not supported in this environment.`;throw e.workaround&&(t+=`\n\nSuggested solution: ${e.workaround}`),Error(t)}static isWebSocketSupported(){try{return this.detectEnvironment().type===`native`}catch{return!1}}};let v={closed:`closed`,errored:`errored`,joined:`joined`,joining:`joining`,leaving:`leaving`},de={close:`phx_close`,error:`phx_error`,join:`phx_join`,reply:`phx_reply`,leave:`phx_leave`,access_token:`access_token`},fe={connecting:`connecting`,open:`open`,closing:`closing`,closed:`closed`};var pe=class{constructor(e){this.HEADER_LENGTH=1,this.USER_BROADCAST_PUSH_META_LENGTH=6,this.KINDS={userBroadcastPush:3,userBroadcast:4},this.BINARY_ENCODING=0,this.JSON_ENCODING=1,this.BROADCAST_EVENT=`broadcast`,this.allowedMetadataKeys=[],this.allowedMetadataKeys=e??[]}encode(e,t){if(e.event===this.BROADCAST_EVENT&&!(e.payload instanceof ArrayBuffer)&&typeof e.payload.event==`string`)return t(this._binaryEncodeUserBroadcastPush(e));let n=[e.join_ref,e.ref,e.topic,e.event,e.payload];return t(JSON.stringify(n))}_binaryEncodeUserBroadcastPush(e){return this._isArrayBuffer(e.payload?.payload)?this._encodeBinaryUserBroadcastPush(e):this._encodeJsonUserBroadcastPush(e)}_encodeBinaryUserBroadcastPush(e){let t=e.payload?.payload??new ArrayBuffer(0);return this._encodeUserBroadcastPush(e,this.BINARY_ENCODING,t)}_encodeJsonUserBroadcastPush(e){let t=e.payload?.payload??{},n=new TextEncoder().encode(JSON.stringify(t)).buffer;return this._encodeUserBroadcastPush(e,this.JSON_ENCODING,n)}_encodeUserBroadcastPush(e,t,n){let r=new TextEncoder,i=r.encode(e.topic),a=r.encode(e.ref??``),o=r.encode(e.join_ref??``),s=r.encode(e.payload.event),c=this.allowedMetadataKeys?this._pick(e.payload,this.allowedMetadataKeys):{},l=r.encode(Object.keys(c).length===0?``:JSON.stringify(c));if(o.length>255)throw Error(`joinRef length ${o.length} exceeds maximum of 255`);if(a.length>255)throw Error(`ref length ${a.length} exceeds maximum of 255`);if(i.length>255)throw Error(`topic length ${i.length} exceeds maximum of 255`);if(s.length>255)throw Error(`userEvent length ${s.length} exceeds maximum of 255`);if(l.length>255)throw Error(`metadata length ${l.length} exceeds maximum of 255`);let u=this.USER_BROADCAST_PUSH_META_LENGTH+o.length+a.length+i.length+s.length+l.length,d=new ArrayBuffer(this.HEADER_LENGTH+u),f=new DataView(d),p=new Uint8Array(d),m=0;f.setUint8(m++,this.KINDS.userBroadcastPush),f.setUint8(m++,o.length),f.setUint8(m++,a.length),f.setUint8(m++,i.length),f.setUint8(m++,s.length),f.setUint8(m++,l.length),f.setUint8(m++,t),p.set(o,m),m+=o.length,p.set(a,m),m+=a.length,p.set(i,m),m+=i.length,p.set(s,m),m+=s.length,p.set(l,m),m+=l.length;var h=new Uint8Array(d.byteLength+n.byteLength);return h.set(new Uint8Array(d),0),h.set(new Uint8Array(n),d.byteLength),h.buffer}decode(e,t){if(this._isArrayBuffer(e))return t(this._binaryDecode(e));if(typeof e==`string`){let[n,r,i,a,o]=JSON.parse(e);return t({join_ref:n,ref:r,topic:i,event:a,payload:o})}return t({})}_binaryDecode(e){let t=new DataView(e),n=t.getUint8(0),r=new TextDecoder;switch(n){case this.KINDS.userBroadcast:return this._decodeUserBroadcast(e,t,r)}}_decodeUserBroadcast(e,t,n){let r=t.getUint8(1),i=t.getUint8(2),a=t.getUint8(3),o=t.getUint8(4),s=this.HEADER_LENGTH+4,c=n.decode(e.slice(s,s+r));s+=r;let l=n.decode(e.slice(s,s+i));s+=i;let u=n.decode(e.slice(s,s+a));s+=a;let d=e.slice(s,e.byteLength),f=o===this.JSON_ENCODING?JSON.parse(n.decode(d)):d,p={type:this.BROADCAST_EVENT,event:l,payload:f};return a>0&&(p.meta=JSON.parse(u)),{join_ref:null,ref:null,topic:c,event:this.BROADCAST_EVENT,payload:p}}_isArrayBuffer(e){return e instanceof ArrayBuffer||e?.constructor?.name===`ArrayBuffer`}_pick(e,t){return!e||typeof e!=`object`?{}:Object.fromEntries(Object.entries(e).filter(([e])=>t.includes(e)))}},y;(function(e){e.abstime=`abstime`,e.bool=`bool`,e.date=`date`,e.daterange=`daterange`,e.float4=`float4`,e.float8=`float8`,e.int2=`int2`,e.int4=`int4`,e.int4range=`int4range`,e.int8=`int8`,e.int8range=`int8range`,e.json=`json`,e.jsonb=`jsonb`,e.money=`money`,e.numeric=`numeric`,e.oid=`oid`,e.reltime=`reltime`,e.text=`text`,e.time=`time`,e.timestamp=`timestamp`,e.timestamptz=`timestamptz`,e.timetz=`timetz`,e.tsrange=`tsrange`,e.tstzrange=`tstzrange`})(y||={});let me=(e,t,n={})=>{let r=n.skipTypes??[];return t?Object.keys(t).reduce((n,i)=>(n[i]=he(i,e,t,r),n),{}):{}},he=(e,t,n,r)=>{let i=t.find(t=>t.name===e)?.type,a=n[e];return i&&!r.includes(i)?ge(i,a):_e(a)},ge=(e,t)=>{if(e.charAt(0)===`_`)return xe(t,e.slice(1,e.length));switch(e){case y.bool:return ve(t);case y.float4:case y.float8:case y.int2:case y.int4:case y.int8:case y.numeric:case y.oid:return ye(t);case y.json:case y.jsonb:return be(t);case y.timestamp:return Se(t);case y.abstime:case y.date:case y.daterange:case y.int4range:case y.int8range:case y.money:case y.reltime:case y.text:case y.time:case y.timestamptz:case y.timetz:case y.tsrange:case y.tstzrange:return _e(t);default:return _e(t)}},_e=e=>e,ve=e=>{switch(e){case`t`:return!0;case`f`:return!1;default:return e}},ye=e=>{if(typeof e==`string`){let t=parseFloat(e);if(!Number.isNaN(t))return t}return e},be=e=>{if(typeof e==`string`)try{return JSON.parse(e)}catch{return e}return e},xe=(e,t)=>{if(typeof e!=`string`)return e;let n=e.length-1,r=e[n];if(e[0]===`{`&&r===`}`){let r,i=e.slice(1,n);try{r=JSON.parse(`[`+i+`]`)}catch{r=i?i.split(`,`):[]}return r.map(e=>ge(t,e))}return e},Se=e=>typeof e==`string`?e.replace(` `,`T`):e,Ce=e=>{let t=new URL(e);return t.protocol=t.protocol.replace(/^ws/i,`http`),t.pathname=t.pathname.replace(/\/+$/,``).replace(/\/socket\/websocket$/i,``).replace(/\/socket$/i,``).replace(/\/websocket$/i,``),t.pathname===``||t.pathname===`/`?t.pathname=`/api/broadcast`:t.pathname+=`/api/broadcast`,t.href};var we=e=>typeof e==`function`?e:function(){return e},Te=typeof self<`u`?self:null,Ee=typeof window<`u`?window:null,b=Te||Ee||globalThis,De=`2.0.0`,Oe=1e4,ke=1e3,Ae=100,x={connecting:0,open:1,closing:2,closed:3},S={closed:`closed`,errored:`errored`,joined:`joined`,joining:`joining`,leaving:`leaving`},C={close:`phx_close`,error:`phx_error`,join:`phx_join`,reply:`phx_reply`,leave:`phx_leave`},je={longpoll:`longpoll`,websocket:`websocket`},Me={complete:4},Ne=`base64url.bearer.phx.`,Pe=class{constructor(e,t,n,r){this.channel=e,this.event=t,this.payload=n||function(){return{}},this.receivedResp=null,this.timeout=r,this.timeoutTimer=null,this.recHooks=[],this.sent=!1,this.ref=void 0}resend(e){this.timeout=e,this.reset(),this.send()}send(){this.hasReceived(`timeout`)||(this.startTimeout(),this.sent=!0,this.channel.socket.push({topic:this.channel.topic,event:this.event,payload:this.payload(),ref:this.ref,join_ref:this.channel.joinRef()}))}receive(e,t){return this.hasReceived(e)&&t(this.receivedResp.response),this.recHooks.push({status:e,callback:t}),this}reset(){this.cancelRefEvent(),this.ref=null,this.refEvent=null,this.receivedResp=null,this.sent=!1}destroy(){this.cancelRefEvent(),this.cancelTimeout()}matchReceive({status:e,response:t,_ref:n}){this.recHooks.filter(t=>t.status===e).forEach(e=>e.callback(t))}cancelRefEvent(){this.refEvent&&this.channel.off(this.refEvent)}cancelTimeout(){clearTimeout(this.timeoutTimer),this.timeoutTimer=null}startTimeout(){this.timeoutTimer&&this.cancelTimeout(),this.ref=this.channel.socket.makeRef(),this.refEvent=this.channel.replyEventName(this.ref),this.channel.on(this.refEvent,e=>{this.cancelRefEvent(),this.cancelTimeout(),this.receivedResp=e,this.matchReceive(e)}),this.timeoutTimer=setTimeout(()=>{this.trigger(`timeout`,{})},this.timeout)}hasReceived(e){return this.receivedResp&&this.receivedResp.status===e}trigger(e,t){this.channel.trigger(this.refEvent,{status:e,response:t})}},Fe=class{constructor(e,t){this.callback=e,this.timerCalc=t,this.timer=void 0,this.tries=0}reset(){this.tries=0,clearTimeout(this.timer)}scheduleTimeout(){clearTimeout(this.timer),this.timer=setTimeout(()=>{this.tries+=1,this.callback()},this.timerCalc(this.tries+1))}},Ie=class{constructor(e,t,n){this.state=S.closed,this.topic=e,this.params=we(t||{}),this.socket=n,this.bindings=[],this.bindingRef=0,this.timeout=this.socket.timeout,this.joinedOnce=!1,this.joinPush=new Pe(this,C.join,this.params,this.timeout),this.pushBuffer=[],this.stateChangeRefs=[],this.rejoinTimer=new Fe(()=>{this.socket.isConnected()&&this.rejoin()},this.socket.rejoinAfterMs),this.stateChangeRefs.push(this.socket.onError(()=>this.rejoinTimer.reset())),this.stateChangeRefs.push(this.socket.onOpen(()=>{this.rejoinTimer.reset(),this.isErrored()&&this.rejoin()})),this.joinPush.receive(`ok`,()=>{this.state=S.joined,this.rejoinTimer.reset(),this.pushBuffer.forEach(e=>e.send()),this.pushBuffer=[]}),this.joinPush.receive(`error`,e=>{this.state=S.errored,this.socket.hasLogger()&&this.socket.log(`channel`,`error ${this.topic}`,e),this.socket.isConnected()&&this.rejoinTimer.scheduleTimeout()}),this.onClose(()=>{this.rejoinTimer.reset(),this.socket.hasLogger()&&this.socket.log(`channel`,`close ${this.topic}`),this.state=S.closed,this.socket.remove(this)}),this.onError(e=>{this.socket.hasLogger()&&this.socket.log(`channel`,`error ${this.topic}`,e),this.isJoining()&&this.joinPush.reset(),this.state=S.errored,this.socket.isConnected()&&this.rejoinTimer.scheduleTimeout()}),this.joinPush.receive(`timeout`,()=>{this.socket.hasLogger()&&this.socket.log(`channel`,`timeout ${this.topic}`,this.joinPush.timeout),new Pe(this,C.leave,we({}),this.timeout).send(),this.state=S.errored,this.joinPush.reset(),this.socket.isConnected()&&this.rejoinTimer.scheduleTimeout()}),this.on(C.reply,(e,t)=>{this.trigger(this.replyEventName(t),e)})}join(e=this.timeout){if(this.joinedOnce)throw Error(`tried to join multiple times. 'join' can only be called a single time per channel instance`);return this.timeout=e,this.joinedOnce=!0,this.rejoin(),this.joinPush}teardown(){this.pushBuffer.forEach(e=>e.destroy()),this.pushBuffer=[],this.rejoinTimer.reset(),this.joinPush.destroy(),this.state=S.closed,this.bindings=[]}onClose(e){this.on(C.close,e)}onError(e){return this.on(C.error,t=>e(t))}on(e,t){let n=this.bindingRef++;return this.bindings.push({event:e,ref:n,callback:t}),n}off(e,t){this.bindings=this.bindings.filter(n=>!(n.event===e&&(t===void 0||t===n.ref)))}canPush(){return this.socket.isConnected()&&this.isJoined()}push(e,t,n=this.timeout){if(t||={},!this.joinedOnce)throw Error(`tried to push '${e}' to '${this.topic}' before joining. Use channel.join() before pushing events`);let r=new Pe(this,e,function(){return t},n);return this.canPush()?r.send():(r.startTimeout(),this.pushBuffer.push(r)),r}leave(e=this.timeout){this.rejoinTimer.reset(),this.joinPush.cancelTimeout(),this.state=S.leaving;let t=()=>{this.socket.hasLogger()&&this.socket.log(`channel`,`leave ${this.topic}`),this.trigger(C.close,`leave`)},n=new Pe(this,C.leave,we({}),e);return n.receive(`ok`,()=>t()).receive(`timeout`,()=>t()),n.send(),this.canPush()||n.trigger(`ok`,{}),n}onMessage(e,t,n){return t}filterBindings(e,t,n){return!0}isMember(e,t,n,r){return this.topic===e?r&&r!==this.joinRef()?(this.socket.hasLogger()&&this.socket.log(`channel`,`dropping outdated message`,{topic:e,event:t,payload:n,joinRef:r}),!1):!0:!1}joinRef(){return this.joinPush.ref}rejoin(e=this.timeout){this.isLeaving()||(this.socket.leaveOpenTopic(this.topic),this.state=S.joining,this.joinPush.resend(e))}trigger(e,t,n,r){let i=this.onMessage(e,t,n,r);if(t&&!i)throw Error(`channel onMessage callbacks must return the payload, modified or unmodified`);let a=this.bindings.filter(r=>r.event===e&&this.filterBindings(r,t,n));for(let e=0;e<a.length;e++)a[e].callback(i,n,r||this.joinRef())}replyEventName(e){return`chan_reply_${e}`}isClosed(){return this.state===S.closed}isErrored(){return this.state===S.errored}isJoined(){return this.state===S.joined}isJoining(){return this.state===S.joining}isLeaving(){return this.state===S.leaving}},Le=class{static request(e,t,n,r,i,a,o){if(b.XDomainRequest){let n=new b.XDomainRequest;return this.xdomainRequest(n,e,t,r,i,a,o)}else if(b.XMLHttpRequest){let s=new b.XMLHttpRequest;return this.xhrRequest(s,e,t,n,r,i,a,o)}else if(b.fetch&&b.AbortController)return this.fetchRequest(e,t,n,r,i,a,o);else throw Error(`No suitable XMLHttpRequest implementation found`)}static fetchRequest(e,t,n,r,i,a,o){let s={method:e,headers:n,body:r},c=null;return i&&(c=new AbortController,setTimeout(()=>c.abort(),i),s.signal=c.signal),b.fetch(t,s).then(e=>e.text()).then(e=>this.parseJSON(e)).then(e=>o&&o(e)).catch(e=>{e.name===`AbortError`&&a?a():o&&o(null)}),c}static xdomainRequest(e,t,n,r,i,a,o){return e.timeout=i,e.open(t,n),e.onload=()=>{let t=this.parseJSON(e.responseText);o&&o(t)},a&&(e.ontimeout=a),e.onprogress=()=>{},e.send(r),e}static xhrRequest(e,t,n,r,i,a,o,s){e.open(t,n,!0),e.timeout=a;for(let[t,n]of Object.entries(r))e.setRequestHeader(t,n);return e.onerror=()=>s&&s(null),e.onreadystatechange=()=>{e.readyState===Me.complete&&s&&s(this.parseJSON(e.responseText))},o&&(e.ontimeout=o),e.send(i),e}static parseJSON(e){if(!e||e===``)return null;try{return JSON.parse(e)}catch{return console&&console.log(`failed to parse JSON response`,e),null}}static serialize(e,t){let n=[];for(var r in e){if(!Object.prototype.hasOwnProperty.call(e,r))continue;let i=t?`${t}[${r}]`:r,a=e[r];typeof a==`object`?n.push(this.serialize(a,i)):n.push(encodeURIComponent(i)+`=`+encodeURIComponent(a))}return n.join(`&`)}static appendParams(e,t){return Object.keys(t).length===0?e:`${e}${e.match(/\?/)?`&`:`?`}${this.serialize(t)}`}},Re=e=>{let t=``,n=new Uint8Array(e),r=n.byteLength;for(let e=0;e<r;e++)t+=String.fromCharCode(n[e]);return btoa(t)},w=class{constructor(e,t){t&&t.length===2&&t[1].startsWith(Ne)&&(this.authToken=atob(t[1].slice(Ne.length))),this.endPoint=null,this.token=null,this.skipHeartbeat=!0,this.reqs=new Set,this.awaitingBatchAck=!1,this.currentBatch=null,this.currentBatchTimer=null,this.batchBuffer=[],this.onopen=function(){},this.onerror=function(){},this.onmessage=function(){},this.onclose=function(){},this.pollEndpoint=this.normalizeEndpoint(e),this.readyState=x.connecting,setTimeout(()=>this.poll(),0)}normalizeEndpoint(e){return e.replace(`ws://`,`http://`).replace(`wss://`,`https://`).replace(RegExp(`(.*)/`+je.websocket),`$1/`+je.longpoll)}endpointURL(){return Le.appendParams(this.pollEndpoint,{token:this.token})}closeAndRetry(e,t,n){this.close(e,t,n),this.readyState=x.connecting}ontimeout(){this.onerror(`timeout`),this.closeAndRetry(1005,`timeout`,!1)}isActive(){return this.readyState===x.open||this.readyState===x.connecting}poll(){let e={Accept:`application/json`};this.authToken&&(e[`X-Phoenix-AuthToken`]=this.authToken),this.ajax(`GET`,e,null,()=>this.ontimeout(),e=>{if(e){var{status:t,token:n,messages:r}=e;if(t===410&&this.token!==null){this.onerror(410),this.closeAndRetry(3410,`session_gone`,!1);return}this.token=n}else t=0;switch(t){case 200:r.forEach(e=>{setTimeout(()=>this.onmessage({data:e}),0)}),this.poll();break;case 204:this.poll();break;case 410:this.readyState=x.open,this.onopen({}),this.poll();break;case 403:this.onerror(403),this.close(1008,`forbidden`,!1);break;case 0:case 500:this.onerror(500),this.closeAndRetry(1011,`internal server error`,500);break;default:throw Error(`unhandled poll status ${t}`)}})}send(e){typeof e!=`string`&&(e=Re(e)),this.currentBatch?this.currentBatch.push(e):this.awaitingBatchAck?this.batchBuffer.push(e):(this.currentBatch=[e],this.currentBatchTimer=setTimeout(()=>{this.batchSend(this.currentBatch),this.currentBatch=null},0))}batchSend(e,t=0){this.awaitingBatchAck=!0;let n=t+Ae,r=e.slice(t,n);this.ajax(`POST`,{"Content-Type":`application/x-ndjson`},r.join(`
@@ -1098,9 +1135,9 @@ async function reconcileOpenSession(open){
 }
 async function switchTo(channelId){
   const t=now();
-  if(running&&running.channelId===channelId){ toast("Use Pause button to stop"); return; }
+  if(running&&running.channelId===channelId){ offerPause(); return; }
   const runningCh=running?state.channels.find(c=>c.id===running.channelId):null;
-  if(running&&runningCh?.parentChannelId===channelId){ toast("Use Pause button to stop"); return; }
+  if(running&&runningCh?.parentChannelId===channelId){ offerPause(); return; }
   const ch=state.channels.find(c=>c.id===channelId);
   if(!ch) return;
   const subs=state.channels.filter(c=>c.parentChannelId===channelId&&!c.archived);
@@ -1115,23 +1152,33 @@ async function startSessionOnChannel(channelId,t){
 }
 function showSubcategoryModal(parentId,subs){
   const ch=state.channels.find(c=>c.id===parentId);
+  const color=(ch&&ch.color)||"#3b74e0";
+  const ink=contrastInk(color);
   document.getElementById("subTitle").textContent=ch?ch.label:"Select";
   const list=document.getElementById("subList");
   list.innerHTML="";
-  for(const s of subs){
-    const it=document.createElement("button");
-    it.className="btn pri";
-    it.style.width="100%";
-    it.style.marginBottom="8px";
-    it.textContent=s.label;
-    it.addEventListener("click",async()=>{closeScrim("subScrim");await startSessionOnChannel(s.id,now());});
-    list.appendChild(it);
-  }
-  const sep=document.createElement("div");sep.style.margin="12px 0;border-top:1px solid var(--line)";list.appendChild(sep);
+
+  /* Tiles in the parent's colour, so this sheet reads like the dashboard it
+     was opened from instead of a stack of identical blue bars. */
+  const grid=document.createElement("div");
+  grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px";
+  subs.forEach(sub=>{
+    const b=document.createElement("button");
+    b.style.cssText="border:2px solid transparent;border-radius:14px;padding:16px 13px;min-height:78px;"+
+      "cursor:pointer;font-weight:800;font-size:15px;line-height:1.25;text-align:center;display:flex;"+
+      "align-items:center;justify-content:center;box-shadow:var(--shadow);color:"+ink+
+      ";background:linear-gradient(160deg,"+color+","+shade(color,.22)+")";
+    b.textContent=sub.label;
+    b.addEventListener("click",async()=>{closeScrim("subScrim");await startSessionOnChannel(sub.id,now());});
+    grid.appendChild(b);
+  });
+  list.appendChild(grid);
+
+  /* Outlined rather than filled: it is the same channel, not a sibling. */
   const gen=document.createElement("button");
-  gen.className="btn";
-  gen.style.width="100%";
-  gen.textContent="Generic ("+ch.label+")";
+  gen.style.cssText="width:100%;margin-top:12px;border-radius:14px;padding:14px 12px;cursor:pointer;"+
+    "font-weight:800;font-size:14px;background:transparent;border:2px dashed "+color+";color:"+color;
+  gen.textContent="Generic ("+(ch?ch.label:"")+")";
   gen.addEventListener("click",async()=>{closeScrim("subScrim");await startSessionOnChannel(parentId,now());});
   list.appendChild(gen);
   openScrim("subScrim");
@@ -1336,14 +1383,10 @@ function attrColor(key,v){
    and persisting that day's scores after every change.
    ===================================================================== */
 let dayEditorDate=null, editingSessId=null;
-/* Which session card is open, and whether its picker is showing every channel
-   rather than the ranked short list. Both are view state only. */
-let expandedSessId=null, chipsExpanded=null;
-
-/* Nudges for the shared boundary between two blocks. Small enough to correct a
-   late channel switch, large enough that a 45-minute miss is not forty taps. */
-const BOUNDARY_STEPS=[-15,-5,5,15];
-/* A nudge may never consume either side of the boundary entirely. */
+/* The drag in flight on the timeline, or null. View state only. */
+let tlDrag=null;
+/* A block may never be dragged below this; at that point it is absorbed by
+   whatever ran over it instead of surviving as a sliver. */
 const MIN_SESSION_MS=60000;
 
 function dayStartTs(dk){ const p=String(dk).split("-").map(Number); return new Date(p[0],p[1]-1,p[2],0,0,0,0).getTime(); }
@@ -1399,38 +1442,6 @@ async function reassignSession(id,channelId){
   return true;
 }
 
-/* One control, two records. Editing an end time and a start time separately is
-   exactly what let a correction leave a gap or an overlap behind; moving the
-   shared split point cannot. The guards keep the new time strictly inside the
-   day, so neither record's `date` can change. */
-async function moveBoundary(aId,bId,deltaMs){
-  const a=await idbGet("sessions",aId), b=await idbGet("sessions",bId);
-  if(!a||!b||!a.endTs) return "gone";
-  const t=a.endTs+deltaMs;
-  if(t-a.startTs<MIN_SESSION_MS) return "min";
-  if(b.endTs&&b.endTs-t<MIN_SESSION_MS) return "min";
-  if(t>now()) return "future";
-  a.endTs=t; a.durMs=t-a.startTs;
-  b.startTs=t; if(b.endTs) b.durMs=b.endTs-t;
-  await saveLocal("sessions",a); await saveLocal("sessions",b);
-  if(running&&running.sessionId===b.id) running.startTs=t;
-  return "ok";
-}
-
-/* Voided and zeroed rather than deleted, for the same reason the delete button
-   is: a real delete does not propagate to Supabase and the row would return on
-   the next pull. */
-async function mergeSessions(aId,bId){
-  const a=await idbGet("sessions",aId), b=await idbGet("sessions",bId);
-  if(!a||!b) return false;
-  a.endTs=b.endTs; a.durMs=a.endTs?a.endTs-a.startTs:0;
-  b.voided=true; b.endTs=b.startTs; b.durMs=0;
-  await saveLocal("sessions",a); await saveLocal("sessions",b);
-  /* Merging into a running tail leaves the head running in its place. */
-  if(running&&running.sessionId===b.id) running={sessionId:a.id,channelId:a.channelId,startTs:a.startTs};
-  return true;
-}
-
 /* Splits at the midpoint. The caller then opens the picker on the new half,
    because the reason to split is almost always that it was something else -
    and the boundary nudges move the cut afterwards. */
@@ -1452,19 +1463,20 @@ async function afterDayEdit(dk){
   await renderDayEditor();
 }
 function dayEditorGoto(dk){
-  dayEditorDate=dk; expandedSessId=null; chipsExpanded=null;
+  dayEditorDate=dk; tlDrag=null;
   renderDayEditor();
 }
 
 async function openDayEditor(dk){
   dayEditorDate=dk||todayKey();
-  expandedSessId=null; chipsExpanded=null;
+  setTlZoom(1);
+  tlDrag=null;
   const stage=document.querySelector(".app .stage");
   stage.innerHTML='<div id="dayEditorRoot" style="display:flex;flex-direction:column;height:100%;overflow:hidden"></div>';
   await renderDayEditor();
 }
 function closeDayEditor(){
-  dayEditorDate=null; expandedSessId=null; chipsExpanded=null;
+  dayEditorDate=null; tlDrag=null;
   const stage=document.querySelector(".app .stage");
   stage.innerHTML='<div class="grid" id="grid"></div>';
   renderAll();
@@ -1473,6 +1485,10 @@ function closeDayEditor(){
 async function renderDayEditor(){
   const root=document.getElementById("dayEditorRoot");
   if(!root||!dayEditorDate) return;
+  /* Every edit rebuilds this whole view, which would otherwise dump the
+     reader back at 8am after they added something at 6pm. */
+  const prevBody=document.getElementById("dayEditorBody");
+  const keepScroll=prevBody?prevBody.scrollTop:0;
   const dk=dayEditorDate, tk=todayKey();
   const isToday=dk===tk;
   const isFuture=dk>tk;                     /* YYYY-MM-DD compares correctly as text */
@@ -1486,7 +1502,7 @@ async function renderDayEditor(){
 
   /* ---------------- header ---------------- */
   const head=document.createElement("div");
-  head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap";
+  head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--glass);flex-wrap:wrap";
   const prev=document.createElement("button"); prev.className="btn sm"; prev.textContent="\u2039";
   const next=document.createElement("button"); next.className="btn sm"; next.textContent="\u203a";
   const dateInput=document.createElement("input");
@@ -1495,7 +1511,7 @@ async function renderDayEditor(){
      Bounded at +2 years so the picker stays sane. */
   const maxD=new Date(dayStartTs(tk)); maxD.setFullYear(maxD.getFullYear()+2);
   dateInput.max=dateKey(maxD.getTime());
-  dateInput.style.cssText="font-size:16px;background:#0a1424;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:7px 9px";
+  dateInput.style.cssText="font-size:16px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:7px 9px";
   const lbl=document.createElement("div");
   lbl.style.cssText="font-weight:700;font-size:13px;color:var(--ink2);white-space:nowrap";
   lbl.textContent=prettyDate(dk)+(isFuture?" \u00b7 upcoming":"");
@@ -1513,6 +1529,7 @@ async function renderDayEditor(){
 
   /* ---------------- body ---------------- */
   const body=document.createElement("div");
+  body.id="dayEditorBody";
   body.style.cssText="flex:1;overflow-y:auto;padding:12px";
 
   /* day type */
@@ -1550,8 +1567,23 @@ async function renderDayEditor(){
     f.textContent="This day has not happened yet, so there is no time to edit. You can mark it off in advance now.";
     body.appendChild(f);
   } else {
-    const sTitle=document.createElement("div"); sTitle.className="sect-title"; sTitle.textContent="Sessions";
-    body.appendChild(sTitle);
+    const sBar=document.createElement("div");
+    sBar.style.cssText="display:flex;align-items:center;gap:8px;margin:18px 0 10px";
+    const sTitle=document.createElement("div"); sTitle.className="sect-title";
+    sTitle.style.margin="0"; sTitle.style.flex="1"; sTitle.textContent="Sessions";
+    sBar.appendChild(sTitle);
+    if(sess.length){
+      TL_ZOOMS.forEach(z=>{
+        const zb=document.createElement("button");
+        zb.className="btn sm"+(tlZoom===z?" pri":"");
+        zb.style.cssText="padding:5px 9px;min-width:38px;font-size:12px";
+        zb.textContent=z+"×";
+        zb.title=z===1?"Whole day":"Stretch the day "+z+" times taller";
+        zb.addEventListener("click",()=>zoomTimeline(z));
+        sBar.appendChild(zb);
+      });
+    }
+    body.appendChild(sBar);
     if(!sess.length){
       const empty=document.createElement("div"); empty.className="hint"; empty.style.padding="4px 4px 8px";
       empty.textContent="No time recorded on this day yet.";
@@ -1559,14 +1591,10 @@ async function renderDayEditor(){
     }
     if(sess.length){
       const hint=document.createElement("div"); hint.className="hint"; hint.style.margin="-4px 0 10px";
-      hint.textContent="Tap a block to change its channel. The time between two blocks moves both at once.";
+      hint.textContent="Tap a block to change its channel. Drag the grip on its edge to move when it started or stopped, or the middle of a block to slide the whole thing. Zoom in if an hour is too busy to grab.";
       body.appendChild(hint);
     }
-    const pool=await rankedChannelsForPicker(sess);
-    sess.forEach((sn,i)=>{
-      body.appendChild(buildSessionCard(dk,sn,fmt,pool));
-      if(sess[i+1]) body.appendChild(buildBoundaryRow(dk,sn,sess[i+1],fmt));
-    });
+    body.appendChild(buildTimeline(dk,sess,fmt));
 
     /* rating + notes: retrospective, so today and past only - never the future */
     const rTitle=document.createElement("div"); rTitle.className="sect-title";
@@ -1593,7 +1621,7 @@ async function renderDayEditor(){
     ta.placeholder="How did this day go?";
     ta.value=note.notes||"";
     ta.rows=3;
-    ta.style.cssText="width:100%;font-size:16px;background:#0a1424;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;resize:vertical";
+    ta.style.cssText="width:100%;font-size:16px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;resize:vertical";
     ta.addEventListener("change",async()=>{ await saveDayRatingAndNotes(dk,note.rating||0,ta.value); toast("Notes saved"); });
     body.appendChild(ta);
   }
@@ -1601,7 +1629,7 @@ async function renderDayEditor(){
 
   /* ---------------- footer ---------------- */
   const foot=document.createElement("div");
-  foot.style.cssText="padding:10px 12px max(10px, env(safe-area-inset-bottom)) 12px;border-top:1px solid var(--line);background:rgba(10,16,28,.7);display:flex;align-items:center;gap:10px;flex-wrap:wrap";
+  foot.style.cssText="padding:10px 12px max(10px, env(safe-area-inset-bottom)) 12px;border-top:1px solid var(--line);background:var(--glass);display:flex;align-items:center;gap:10px;flex-wrap:wrap";
   if(!isFuture){
     const add=document.createElement("button");
     add.className="btn pri sm"; add.textContent="+ Add session";
@@ -1623,192 +1651,594 @@ async function renderDayEditor(){
   }
   foot.appendChild(tot);
   root.appendChild(foot);
+  if(keepScroll) body.scrollTop=keepScroll;
 }
 function tsToTimeInput(ts){ const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
 
-/* One block in the day. The whole header strip is the tap target, because
-   changing the channel is the common correction and it should not cost a
-   dialog - the picker opens in place instead. */
-function buildSessionCard(dk,sn,fmt,pool){
-  const ch=state.channels.find(c=>c.id===sn.channelId)||{label:"(deleted channel)",color:"#64748b"};
-  const open=expandedSessId===sn.id;
-  const isRun=!sn.endTs;
-  const card=document.createElement("div");
-  card.style.cssText="border:1px solid "+(open?"var(--accent)":"var(--line)")+
-    ";border-radius:12px;margin-bottom:6px;background:var(--panel2);overflow:hidden";
+/* =====================================================================
+   THE DAY AS A TIMELINE
+   A list cannot show a gap, and editing an end time and a start time as
+   separate fields is what let a correction leave a gap or an overlap
+   behind. The day is drawn to scale against an hour rail instead: blocks
+   are dragged by their edges, and the drag itself enforces the invariant
+   that two channels can never be running at the same moment.
+   ===================================================================== */
+const TL_BASE_PX_PER_MIN=1.15; /* ~69px an hour at 1x */
+const TL_ZOOMS=[1,2,4];
+/* Derived, not independent: every position on the timeline goes through
+   tlY(), so changing this one number rescales the whole day. The drag math
+   works in deltas and needs no changes. */
+let tlZoom=1, TL_PX_PER_MIN=TL_BASE_PX_PER_MIN;
+function setTlZoom(z){
+  tlZoom=TL_ZOOMS.indexOf(z)>=0?z:1;
+  TL_PX_PER_MIN=TL_BASE_PX_PER_MIN*tlZoom;
+}
+/* Zoom is a tool for one crowded hour, not a preference: the editor always
+   opens showing the whole day at 1x. It does persist while you stay in the
+   editor, including across day navigation. */
+const TL_RAIL=52;              /* width of the hour rail */
+const TL_SNAP_MIN=5;           /* every drag lands on a 5-minute grid */
+const TL_MAGNET_MIN=10;        /* ...and jumps a neighbour's edge within 10 */
+const TL_MIN_BLOCK_MIN=5;      /* thinner than this and the block is absorbed */
+const TL_HANDLE=20;            /* tap height of a drag handle */
+const TL_EDGE_ADD_MS=3600000;  /* most a + adds beyond the first or last block */
+const TL_PAD=34;               /* rail headroom, so an edge + is never clipped */
 
-  const head=document.createElement("div");
-  head.style.cssText="display:flex;align-items:center;gap:10px;padding:11px 10px;cursor:pointer";
-  head.setAttribute("role","button");
-  head.setAttribute("aria-expanded",open?"true":"false");
-  const dot=document.createElement("span");
-  dot.style.cssText="width:12px;height:12px;border-radius:50%;flex:none;background:"+ch.color;
-  const info=document.createElement("div"); info.style.cssText="flex:1;min-width:0";
-  const nm=document.createElement("div");
-  nm.style.cssText="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
-  nm.textContent=ch.label;
-  const tm=document.createElement("div"); tm.className="hint"; tm.style.margin="2px 0 0";
-  tm.textContent=fmtClock(sn.startTs,fmt)+" – "+(isRun?"running":fmtClock(sn.endTs,fmt))+
-    "  ·  "+fmtDurShort(isRun?(now()-sn.startTs):sn.durMs);
-  info.appendChild(nm); info.appendChild(tm);
-  const car=document.createElement("span");
-  car.style.cssText="flex:none;color:var(--muted);font-size:18px;line-height:1;padding:0 2px";
-  car.textContent=open?"⌄":"›";
-  head.appendChild(dot); head.appendChild(info); head.appendChild(car);
-  head.addEventListener("click",()=>{
-    expandedSessId=open?null:sn.id;
-    if(!open) chipsExpanded=null;
-    renderDayEditor();
+let tlRangeCur=null, tlSessions=[], tlFmt=null, tlDk=null;
+/* A finger down on a block before it is known to be a tap or a drag. */
+let tlPress=null;
+
+function tlEndOf(s){ return s.endTs||now(); }
+
+/* The rail covers the planned working day, widened to whatever actually
+   happened - so a day that started at 6am is not drawn off the top. */
+function tlRange(dk,sess){
+  let s=planState.startHour, e=planState.endHour;
+  (sess||[]).forEach(x=>{
+    const a=new Date(x.startTs), b=new Date(tlEndOf(x));
+    s=Math.min(s,a.getHours());
+    e=Math.max(e,b.getHours()+((b.getMinutes()||b.getSeconds())?1:0));
   });
-  card.appendChild(head);
+  s=Math.max(0,Math.min(s,23));
+  e=Math.min(24,Math.max(e,s+4));
+  const base=dayStartTs(dk);
+  return {startHour:s,endHour:e,startTs:base+s*3600000,endTs:base+e*3600000};
+}
+function tlY(ts){ return TL_PAD+((ts-tlRangeCur.startTs)/60000)*TL_PX_PER_MIN; }
+/* Today's blocks stop at the present; a past day may use the whole rail. */
+function tlMaxTs(){ return tlDk===todayKey()?Math.min(tlRangeCur.endTs,now()):tlRangeCur.endTs; }
 
-  if(open) card.appendChild(buildSessionPanel(dk,sn,pool));
-  return card;
+/* Pure. Given the day's blocks and a proposed new time for one edge, work out
+   what the day becomes. Overlaps are unreachable by construction: a block
+   dragged into its neighbour pushes that neighbour back, and one dragged
+   clean past a neighbour absorbs it - which is the "I left the timer running
+   and it was really all one thing" case. */
+function resolveEdgeDrag(list,id,edge,rawTs){
+  const items=list.map(s=>({id:s.id,startTs:s.startTs,endTs:tlEndOf(s),locked:!s.endTs}))
+                  .sort((a,b)=>a.startTs-b.startTs);
+  const i=items.findIndex(x=>x.id===id);
+  if(i<0) return null;
+  const me=items[i];
+  const snapU=TL_SNAP_MIN*60000, magnet=TL_MAGNET_MIN*60000, minB=TL_MIN_BLOCK_MIN*60000;
+  let ts=Math.round(rawTs/snapU)*snapU;
+  const absorbed=[];
+
+  if(edge==="end"){
+    ts=Math.max(me.startTs+minB,Math.min(ts,tlMaxTs()));
+    const nxt=items[i+1];
+    /* Only magnet toward an edge there is still a gap to close. Snapping to an
+       edge already touched would pin the pair together and eat every nudge
+       smaller than the magnet radius. */
+    const flush=nxt&&Math.abs(me.endTs-nxt.startTs)<1000;
+    if(nxt&&!flush&&Math.abs(ts-nxt.startTs)<=magnet) ts=nxt.startTs;
+    me.endTs=ts;
+    for(let j=i+1;j<items.length;j++){
+      const b=items[j];
+      if(me.endTs<=b.startTs) break;
+      /* A running block is never absorbed or pushed - stop short of it. */
+      if(b.locked){ me.endTs=b.startTs; break; }
+      if(me.endTs>=b.endTs-minB){ me.endTs=Math.max(me.endTs,b.endTs); b.gone=true; absorbed.push(b.id); }
+      else { b.startTs=me.endTs; break; }
+    }
+  } else {
+    ts=Math.min(me.endTs-minB,Math.max(ts,tlRangeCur.startTs));
+    const prv=items[i-1];
+    const flush=prv&&Math.abs(me.startTs-prv.endTs)<1000;
+    if(prv&&!flush&&Math.abs(ts-prv.endTs)<=magnet) ts=prv.endTs;
+    me.startTs=ts;
+    for(let j=i-1;j>=0;j--){
+      const b=items[j];
+      if(me.startTs>=b.endTs) break;
+      if(b.locked){ me.startTs=b.endTs; break; }
+      if(me.startTs<=b.startTs+minB){ me.startTs=Math.min(me.startTs,b.startTs); b.gone=true; absorbed.push(b.id); }
+      else { b.endTs=me.startTs; break; }
+    }
+  }
+  const edgeTs=edge==="end"?me.endTs:me.startTs;
+  return {items:items.filter(x=>!x.gone),absorbed,edgeTs,badge:fmtClock(edgeTs,tlFmt)};
 }
 
-function buildSessionPanel(dk,sn,pool){
+/* Moving a whole block slides it through the free space around it and stops
+   at a neighbour. It deliberately never absorbs one: an edge drag is a
+   deliberate reach for a grip, but a body drag starts anywhere on the block,
+   and losing a neighbour to a clumsy thumb would be unrecoverable. */
+function resolveBlockMove(list,id,rawStart){
+  const items=list.map(s=>({id:s.id,startTs:s.startTs,endTs:tlEndOf(s),locked:!s.endTs}))
+                  .sort((a,b)=>a.startTs-b.startTs);
+  const i=items.findIndex(x=>x.id===id);
+  if(i<0) return null;
+  const me=items[i], dur=me.endTs-me.startTs;
+  const snapU=TL_SNAP_MIN*60000, magnet=TL_MAGNET_MIN*60000;
+  const lo=items[i-1]?items[i-1].endTs:tlRangeCur.startTs;
+  const hi=(items[i+1]?items[i+1].startTs:tlMaxTs())-dur;
+  if(hi<lo) return null;                       /* wedged in with no room */
+  let st=Math.round(rawStart/snapU)*snapU;
+  const atLo=Math.abs(me.startTs-lo)<1000, atHi=Math.abs(me.startTs-hi)<1000;
+  if(!atLo&&Math.abs(st-lo)<=magnet) st=lo;    /* sit flush against either side */
+  if(!atHi&&Math.abs(st-hi)<=magnet) st=hi;
+  st=Math.max(lo,Math.min(st,hi));
+  me.startTs=st; me.endTs=st+dur;
+  return {items,absorbed:[],edgeTs:st,
+          badge:fmtClock(st,tlFmt)+" – "+fmtClock(st+dur,tlFmt)};
+}
+
+async function commitTimelineDrag(dk,plan){
+  for(const it of plan.items){
+    const rec=await idbGet("sessions",it.id);
+    if(!rec||rec.voided) continue;
+    if(rec.startTs===it.startTs&&rec.endTs===it.endTs) continue;
+    rec.startTs=it.startTs;
+    /* Never hand an end time to a block that is still running. */
+    if(rec.endTs){ rec.endTs=it.endTs; rec.durMs=it.endTs-it.startTs; }
+    rec.date=dateKey(it.startTs);
+    await saveLocal("sessions",rec);
+    if(running&&running.sessionId===rec.id) running.startTs=rec.startTs;
+  }
+  /* Voided and zeroed, never deleted: a delete does not propagate to Supabase
+     and the row would come back on the next pull. */
+  for(const id of plan.absorbed){
+    const rec=await idbGet("sessions",id);
+    if(!rec) continue;
+    rec.voided=true; rec.endTs=rec.startTs; rec.durMs=0;
+    await saveLocal("sessions",rec);
+    if(running&&running.sessionId===id) running=null;
+  }
+}
+
+/* Zooming around the top of the scroll area would throw the reader hours
+   away from what they were looking at, so the moment currently in the
+   middle of the screen is measured first and put back afterwards. */
+async function zoomTimeline(z){
+  const body=document.getElementById("dayEditorBody");
+  const wrap=document.getElementById("tlWrap");
+  let anchorTs=null;
+  if(body&&wrap&&tlRangeCur){
+    const wrapTop=wrap.getBoundingClientRect().top-body.getBoundingClientRect().top+body.scrollTop;
+    const centre=body.scrollTop+body.clientHeight/2-wrapTop-TL_PAD;
+    anchorTs=tlRangeCur.startTs+(centre/TL_PX_PER_MIN)*60000;
+  }
+  setTlZoom(z);
+  await renderDayEditor();
+  const b=document.getElementById("dayEditorBody"), w=document.getElementById("tlWrap");
+  if(!b||!w||anchorTs===null) return;
+  const wrapTop=w.getBoundingClientRect().top-b.getBoundingClientRect().top+b.scrollTop;
+  const y=((anchorTs-tlRangeCur.startTs)/60000)*TL_PX_PER_MIN;
+  b.scrollTop=Math.max(0,wrapTop+TL_PAD+y-b.clientHeight/2);
+}
+
+function buildTimeline(dk,sess,fmt){
+  tlRangeCur=tlRange(dk,sess); tlSessions=sess.slice(); tlFmt=fmt; tlDk=dk;
   const wrap=document.createElement("div");
-  wrap.style.cssText="padding:0 10px 12px;border-top:1px solid var(--line)";
+  wrap.id="tlWrap";
+  wrap.style.cssText="position:relative;margin:4px 0 6px;height:"+
+    Math.round((tlRangeCur.endTs-tlRangeCur.startTs)/60000*TL_PX_PER_MIN+2*TL_PAD)+"px;"+
+    "user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent";
 
-  const t=document.createElement("div"); t.className="sect-title"; t.style.margin="10px 0 8px";
-  t.textContent="Change channel";
-  wrap.appendChild(t);
+  for(let h=tlRangeCur.startHour;h<=tlRangeCur.endHour;h++){
+    const t=dayStartTs(dk)+h*3600000, top=tlY(t);
+    const line=document.createElement("div");
+    line.style.cssText="position:absolute;left:"+TL_RAIL+"px;right:0;top:"+top+
+      "px;border-top:1px solid var(--line);opacity:.55";
+    const lab=document.createElement("div");
+    lab.style.cssText="position:absolute;left:0;top:"+(top-8)+"px;width:"+(TL_RAIL-10)+
+      "px;text-align:right;font-size:11px;font-weight:700;color:var(--muted)";
+    lab.textContent=fmtClock(t,fmt).replace(":00","");
+    wrap.appendChild(line); wrap.appendChild(lab);
+  }
 
+  const ordered=sess.slice().sort((a,b)=>a.startTs-b.startTs);
+  ordered.forEach((sn,i)=>{
+    const ch=state.channels.find(c=>c.id===sn.channelId)||{label:"(deleted channel)",color:"#64748b"};
+    const en=tlEndOf(sn), top=tlY(sn.startTs);
+    const h=Math.max(2,tlY(en)-top);
+    const b=document.createElement("div");
+    b.dataset.sid=sn.id;
+    b.style.cssText="position:absolute;left:"+TL_RAIL+"px;right:0;top:"+top+"px;height:"+h+
+      "px;border-radius:"+(h<14?"5px":"10px")+";border:1px solid "+ch.color+";background:"+ch.color+
+      "2e;box-shadow:inset 4px 0 0 "+ch.color+";overflow:hidden;cursor:pointer;padding:"+
+      (h>=24?"4px 10px 4px 14px":"0 0 0 14px");
+    const nm=document.createElement("div");
+    nm.style.cssText="font-weight:800;font-size:13px;line-height:1.25;overflow:hidden;"+
+      "text-overflow:ellipsis;white-space:nowrap;color:var(--ink)";
+    nm.textContent=ch.label;
+    /* Below this the text would be clipped to a meaningless sliver; the colour
+       bar still says which channel it is, and zooming in reveals the rest. */
+    if(h>=24) b.appendChild(nm);
+    if(h>=42){
+      const tm=document.createElement("div");
+      tm.dataset.times="1";
+      tm.style.cssText="font-size:11px;color:var(--ink2);margin-top:1px;white-space:nowrap";
+      tm.textContent=fmtClock(sn.startTs,fmt)+" – "+(sn.endTs?fmtClock(en,fmt):"running")+
+        "  ·  "+fmtDurShort(en-sn.startTs);
+      b.appendChild(tm);
+    }
+    b.addEventListener("pointerdown",ev=>tlBodyDown(ev,dk,sn,b));
+    b.addEventListener("pointermove",tlBodyMove);
+    b.addEventListener("pointerup",tlBodyUp);
+    b.addEventListener("pointercancel",tlBodyCancel);
+    wrap.appendChild(b);
+
+    /* A gap is visible as a gap; it is also labelled, because eight untracked
+       minutes and eighty look similar at this scale. */
+    const nxt=ordered[i+1];
+    if(nxt&&nxt.startTs-en>60000){
+      const gh=Math.max(2,tlY(nxt.startTs)-tlY(en));
+      const g=document.createElement("div");
+      g.style.cssText="position:absolute;left:"+TL_RAIL+"px;right:0;top:"+tlY(en)+"px;height:"+gh+
+        "px;border-radius:8px;border:1px dashed var(--line);"+
+        "display:flex;align-items:center;justify-content:center;pointer-events:none";
+      if(gh>=20){
+        const gl=document.createElement("div");
+        gl.style.cssText="font-size:10px;font-weight:700;color:var(--muted)";
+        gl.textContent=fmtDurShort(nxt.startTs-en)+" untracked";
+        g.appendChild(gl);
+      }
+      /* Pinned right rather than centred: the two drag grips own the middle of
+         a gap, and on a short one they would sit on top of this. */
+      const add=document.createElement("button");
+      add.className="btn sm";
+      add.textContent="+";
+      add.title="Fill this time with a channel";
+      add.style.cssText="position:absolute;right:8px;top:50%;transform:translateY(-50%);"+
+        "pointer-events:auto;z-index:6;padding:3px 11px;font-size:15px;font-weight:800;line-height:1.15";
+      const gs=en, ge=nxt.startTs;
+      add.addEventListener("click",ev=>{ ev.stopPropagation(); openGapSheet(dk,gs,ge); });
+      add.addEventListener("pointerdown",ev=>ev.stopPropagation());
+      g.appendChild(add);
+      wrap.appendChild(g);
+    }
+
+    /* Handles live in the wrapper, not the block: the block clips its
+       contents and would cut the grip in half. */
+    if(sn.endTs) wrap.appendChild(tlHandle(dk,sn.id,"end",tlY(en),ch.color));
+    const prv=ordered[i-1];
+    if(!prv||prv.startTs===undefined||tlEndOf(prv)<sn.startTs-60000)
+      wrap.appendChild(tlHandle(dk,sn.id,"start",top,ch.color));
+  });
+
+  /* The rail runs on past the first and last block, and that space is not a
+     gap between two things - it is the rest of the planned day. It gets a +
+     but no dashed region: an empty afternoon is not "untracked", it is empty.
+     The + adds at most an hour, because unlike a real gap this span has data
+     on one side only and its far edge is the plan's boundary, not a fact. */
+  const dayLo=dayStartTs(dk), dayHi=dayLo+86400000;
+  const nowCap=dk===todayKey()?now():dayHi;
+  if(ordered.length){
+    const first=ordered[0], last=ordered[ordered.length-1];
+    if(first.startTs>dayLo){
+      const st=Math.max(dayLo,first.startTs-TL_EDGE_ADD_MS);
+      wrap.appendChild(tlEdgeAdd(dk,st,first.startTs,tlY(first.startTs)-32,"Add time before "+fmtClock(first.startTs,fmt)));
+    }
+    const le=tlEndOf(last);
+    if(le<nowCap){
+      wrap.appendChild(tlEdgeAdd(dk,le,Math.min(nowCap,le+TL_EDGE_ADD_MS),tlY(le)+6,"Add time after "+fmtClock(le,fmt)));
+    }
+  } else {
+    const st=Math.max(dayLo,tlRangeCur.startTs), en=Math.min(nowCap,st+TL_EDGE_ADD_MS);
+    if(en>st) wrap.appendChild(tlEdgeAdd(dk,st,en,tlY(st)+6,"Add time"));
+  }
+
+  const badge=document.createElement("div");
+  badge.id="tlBadge";
+  badge.style.cssText="position:absolute;left:"+TL_RAIL+"px;display:none;z-index:6;padding:3px 8px;"+
+    "border-radius:8px;background:var(--panel);border:1px solid var(--accent);font-size:12px;"+
+    "font-weight:800;color:var(--ink);pointer-events:none;white-space:nowrap";
+  wrap.appendChild(badge);
+  return wrap;
+}
+
+function tlHandle(dk,sid,edge,y,color){
+  const el=document.createElement("div");
+  el.className="tlHandle";
+  el.dataset.sid=sid; el.dataset.edge=edge;
+  el.style.cssText="position:absolute;left:"+TL_RAIL+"px;right:0;top:"+(y-TL_HANDLE/2)+"px;height:"+
+    TL_HANDLE+"px;z-index:5;display:flex;align-items:center;justify-content:center;"+
+    "cursor:ns-resize;touch-action:none";
+  const grip=document.createElement("div");
+  grip.style.cssText="width:52px;height:6px;border-radius:3px;background:"+color+
+    ";box-shadow:0 0 0 2px var(--panel);opacity:.95";
+  el.appendChild(grip);
+  el.addEventListener("pointerdown",ev=>tlDragStart(ev,dk,sid,edge,el));
+  el.addEventListener("pointermove",tlDragMove);
+  el.addEventListener("pointerup",tlDragEnd);
+  el.addEventListener("pointercancel",tlDragEnd);
+  return el;
+}
+
+/* Right-aligned like the gap +, so it never lands under a drag grip. */
+function tlEdgeAdd(dk,fillStart,fillEnd,top,label){
+  const b=document.createElement("button");
+  b.className="btn sm";
+  b.textContent="+";
+  b.title=label;
+  b.style.cssText="position:absolute;right:0;top:"+Math.max(0,top)+"px;z-index:6;"+
+    "padding:3px 11px;font-size:15px;font-weight:800;line-height:1.15";
+  b.addEventListener("click",ev=>{ ev.stopPropagation(); openGapSheet(dk,fillStart,fillEnd,"edge"); });
+  b.addEventListener("pointerdown",ev=>ev.stopPropagation());
+  return b;
+}
+
+function tlDragStart(ev,dk,sid,edge,el){
+  ev.preventDefault(); ev.stopPropagation();
+  try{ el.setPointerCapture(ev.pointerId); }catch(e){}
+  const s=tlSessions.find(x=>x.id===sid); if(!s) return;
+  tlDrag={dk,sid,edge,el,pid:ev.pointerId,y0:ev.clientY,
+          ts0:edge==="end"?tlEndOf(s):s.startTs,plan:null};
+  document.querySelectorAll("#tlWrap .tlHandle").forEach(h=>{ if(h!==el) h.style.visibility="hidden"; });
+}
+
+function tlDragMove(ev){
+  if(!tlDrag||ev.pointerId!==tlDrag.pid) return;
+  ev.preventDefault();
+  const dMin=(ev.clientY-tlDrag.y0)/TL_PX_PER_MIN;
+  const plan=resolveEdgeDrag(tlSessions,tlDrag.sid,tlDrag.edge,tlDrag.ts0+dMin*60000);
+  if(!plan) return;
+  tlDrag.plan=plan;
+  tlPaint(plan);
+}
+
+/* Repaints from the resolved plan without touching the database, so a drag
+   that is abandoned costs nothing. */
+function tlPaint(plan){
+  const wrap=document.getElementById("tlWrap"); if(!wrap) return;
+  const gone=new Set(plan.absorbed);
+  plan.items.forEach(it=>{
+    const el=wrap.querySelector('[data-sid="'+it.id+'"]');
+    if(!el||el.classList.contains("tlHandle")) return;
+    const top=tlY(it.startTs), h=Math.max(2,tlY(it.endTs)-top);
+    el.style.top=top+"px"; el.style.height=h+"px"; el.style.opacity="1";
+    const tm=el.querySelector("[data-times]");
+    if(tm) tm.textContent=fmtClock(it.startTs,tlFmt)+" – "+fmtClock(it.endTs,tlFmt)+
+      "  ·  "+fmtDurShort(it.endTs-it.startTs);
+  });
+  gone.forEach(id=>{
+    const el=wrap.querySelector('div[data-sid="'+id+'"]:not(.tlHandle)');
+    if(el){ el.style.opacity=".2"; }
+  });
+  const y=tlY(plan.edgeTs);
+  if(tlDrag&&tlDrag.el) tlDrag.el.style.top=(y-TL_HANDLE/2)+"px";
+  const badge=document.getElementById("tlBadge");
+  if(badge){
+    badge.style.display="block";
+    badge.style.top=(y-30)+"px";
+    badge.textContent=(plan.badge||fmtClock(plan.edgeTs,tlFmt))+
+      (plan.absorbed.length?"  ·  absorbing "+plan.absorbed.length:"");
+  }
+}
+
+async function tlDragEnd(ev){
+  if(!tlDrag||(ev&&ev.pointerId!==undefined&&ev.pointerId!==tlDrag.pid)) return;
+  const d=tlDrag; tlDrag=null;
+  try{ d.el.releasePointerCapture(d.pid); }catch(e){}
+  const badge=document.getElementById("tlBadge"); if(badge) badge.style.display="none";
+  if(d.plan) await commitTimelineDrag(d.dk,d.plan);
+  await afterDayEdit(d.dk);
+}
+
+/* ---------------------------------------------------------------------
+   Pressing a block is ambiguous until it resolves: a tap opens the sheet, a
+   drag slides the block. A mouse commits on movement; a finger has to hold
+   first, because otherwise every attempt to scroll the day would pick up
+   whatever block happened to be under the thumb.
+   --------------------------------------------------------------------- */
+const TL_HOLD_MS=280, TL_SLOP=5;
+
+function tlBodyDown(ev,dk,sn,el){
+  if(tlDrag||!sn.endTs) return;              /* a running block is not movable */
+  try{ el.setPointerCapture(ev.pointerId); }catch(e){}
+  tlPress={dk,sn,el,pid:ev.pointerId,y0:ev.clientY,moved:false,
+           armed:ev.pointerType==="mouse",timer:null};
+  if(ev.pointerType!=="mouse"){
+    tlPress.timer=setTimeout(()=>{
+      if(tlPress&&!tlPress.moved){ tlPress.armed=true; tlArmMove(); }
+    },TL_HOLD_MS);
+  }
+}
+
+function tlArmMove(){
+  const p=tlPress; if(!p||tlDrag) return;
+  tlDrag={kind:"move",dk:p.dk,sid:p.sn.id,el:p.el,pid:p.pid,y0:p.y0,s0:p.sn.startTs,plan:null};
+  p.el.style.zIndex="7";
+  p.el.style.filter="brightness(1.25)";
+  document.querySelectorAll("#tlWrap .tlHandle").forEach(h=>h.style.visibility="hidden");
+}
+
+function tlBodyMove(ev){
+  const p=tlPress; if(!p||ev.pointerId!==p.pid) return;
+  const dy=ev.clientY-p.y0;
+  if(!p.moved&&Math.abs(dy)>TL_SLOP){
+    p.moved=true;
+    if(p.timer){ clearTimeout(p.timer); p.timer=null; }
+  }
+  if(!tlDrag||tlDrag.kind!=="move"){
+    if(p.armed&&p.moved) tlArmMove(); else return;
+  }
+  ev.preventDefault();
+  const plan=resolveBlockMove(tlSessions,tlDrag.sid,tlDrag.s0+(dy/TL_PX_PER_MIN)*60000);
+  if(plan){ tlDrag.plan=plan; tlPaint(plan); }
+}
+
+async function tlBodyUp(ev){
+  const p=tlPress; if(!p||ev.pointerId!==p.pid) return;
+  if(p.timer) clearTimeout(p.timer);
+  try{ p.el.releasePointerCapture(p.pid); }catch(e){}
+  tlPress=null;
+  const badge=document.getElementById("tlBadge"); if(badge) badge.style.display="none";
+  p.el.style.zIndex=""; p.el.style.filter="";
+  if(tlDrag&&tlDrag.kind==="move"){
+    const d=tlDrag; tlDrag=null;
+    if(d.plan) await commitTimelineDrag(d.dk,d.plan);
+    await afterDayEdit(d.dk);
+    return;
+  }
+  if(!p.moved) openBlockSheet(p.dk,p.sn);     /* it was a tap after all */
+}
+
+function tlBodyCancel(ev){
+  const p=tlPress; if(!p||(ev&&ev.pointerId!==p.pid)) return;
+  if(p.timer) clearTimeout(p.timer);
+  p.el.style.zIndex=""; p.el.style.filter="";
+  tlPress=null; tlDrag=null;
+  const badge=document.getElementById("tlBadge"); if(badge) badge.style.display="none";
+  renderDayEditor();
+}
+
+/* Pointer events cannot cancel a scroll that iOS has already started, so the
+   scroll is refused at the touch level for as long as a drag is live. */
+document.addEventListener("touchmove",e=>{ if(tlDrag) e.preventDefault(); },{passive:false});
+
+/* ---------------------------------------------------------------------
+   Block sheet - everything that is not a drag. Opening a sheet rather than
+   expanding inline keeps the timeline's geometry intact underneath.
+   --------------------------------------------------------------------- */
+function tlEnsureSheet(){
+  let sc=document.getElementById("blockScrim");
+  if(sc) return sc;
+  sc=document.createElement("div");
+  sc.className="scrim"; sc.id="blockScrim";
+  sc.innerHTML='<div class="sheet" style="max-width:520px">'+
+    '<div class="sheet-h"><h2 id="blkTitle">Block</h2>'+
+    '<button class="x" id="blkClose">&times;</button></div>'+
+    '<div class="sheet-b" id="blkBody"></div></div>';
+  document.body.appendChild(sc);
+  sc.addEventListener("click",e=>{ if(e.target===sc) closeScrim("blockScrim"); });
+  sc.querySelector("#blkClose").addEventListener("click",()=>closeScrim("blockScrim"));
+  return sc;
+}
+
+function tlChipRow(pool,currentId,onPick){
   const chips=document.createElement("div");
   chips.style.cssText="display:flex;gap:6px;flex-wrap:wrap";
-  const all=activeChannels();
-  const showAll=chipsExpanded===sn.id;
-  const shortList=pool.slice(0,10);
-  const list=showAll?all.slice().sort((a,b)=>a.order-b.order):shortList;
-  list.forEach(c=>{
-    const b=document.createElement("button");
-    b.className="btn sm";
-    b.style.cssText="display:inline-flex;align-items:center;gap:6px";
-    b.textContent=showAll?channelPath(c):c.label;
+  pool.forEach(c=>{
+    const btn=document.createElement("button");
+    btn.className="btn sm";
+    btn.style.cssText="display:inline-flex;align-items:center;gap:6px";
+    btn.textContent=c.label;
     const d=document.createElement("span");
     d.style.cssText="width:9px;height:9px;border-radius:50%;flex:none;background:"+c.color;
-    b.prepend(d);
-    if(c.id===sn.channelId){ b.style.borderColor="var(--accent)"; b.style.fontWeight="800"; }
-    b.addEventListener("click",async()=>{
-      await reassignSession(sn.id,c.id);
-      expandedSessId=null; chipsExpanded=null;
-      await afterDayEdit(dk);
-      toast("Moved to "+c.label);
-    });
-    chips.appendChild(b);
+    btn.prepend(d);
+    if(currentId&&c.id===currentId){ btn.style.borderColor="var(--accent)"; btn.style.fontWeight="800"; }
+    btn.addEventListener("click",()=>onPick(c));
+    chips.appendChild(btn);
   });
-  if(!showAll&&all.length>shortList.length){
-    const more=document.createElement("button");
-    more.className="btn sm"; more.textContent="More…";
-    more.addEventListener("click",()=>{ chipsExpanded=sn.id; renderDayEditor(); });
-    chips.appendChild(more);
-  }
-  wrap.appendChild(chips);
+  return chips;
+}
+
+/* Filling a gap takes the whole gap. Splitting it afterwards is one tap, and
+   guessing at a partial fill would be inventing data. */
+async function openGapSheet(dk,startTs,endTs,mode){
+  tlEnsureSheet();
+  const fmt=state.profile&&state.profile.hourFmt;
+  const edge=mode==="edge";
+  const span=fmtDurShort(endTs-startTs);
+  document.getElementById("blkTitle").textContent=(edge?"Add ":"Fill ")+span;
+  const body=document.getElementById("blkBody");
+  body.innerHTML="";
+  const when=document.createElement("div"); when.className="hint"; when.style.margin="0 0 16px";
+  when.textContent=edge
+    ? "Adds "+span+" at "+fmtClock(startTs,fmt)+" – "+fmtClock(endTs,fmt)+
+      ". Drag its edge afterwards to make it longer or shorter."
+    : fmtClock(startTs,fmt)+" – "+fmtClock(endTs,fmt)+
+      " is untracked. Pick a channel and it takes the whole gap.";
+  body.appendChild(when);
+  const t=document.createElement("div"); t.className="sect-title"; t.style.margin="0 0 8px";
+  t.textContent="Channel"; body.appendChild(t);
+  const pool=await rankedChannelsForPicker(await sessionsForDay(dk));
+  body.appendChild(tlChipRow(pool,null,async c=>{
+    await saveLocal("sessions",{id:uid(),profileId:state.profileId,channelId:c.id,
+      startTs:startTs,endTs:endTs,durMs:endTs-startTs,date:dateKey(startTs),voided:false});
+    closeScrim("blockScrim");
+    await afterDayEdit(dk);
+    toast(fmtDurShort(endTs-startTs)+" added to "+c.label);
+  }));
+  openScrim("blockScrim");
+}
+
+async function openBlockSheet(dk,sn){
+  tlEnsureSheet();
+  const fresh=(await sessionsForDay(dk)).find(x=>x.id===sn.id)||sn;
+  const ch=state.channels.find(c=>c.id===fresh.channelId);
+  const fmt=state.profile&&state.profile.hourFmt;
+  document.getElementById("blkTitle").textContent=ch?ch.label:"Block";
+  const body=document.getElementById("blkBody");
+  body.innerHTML="";
+
+  const when=document.createElement("div"); when.className="hint"; when.style.margin="0 0 16px";
+  when.textContent=fmtClock(fresh.startTs,fmt)+" – "+(fresh.endTs?fmtClock(fresh.endTs,fmt):"running")+
+    "  ·  "+fmtDurShort(tlEndOf(fresh)-fresh.startTs);
+  body.appendChild(when);
+
+  const t=document.createElement("div"); t.className="sect-title"; t.style.margin="0 0 8px";
+  t.textContent="Change channel"; body.appendChild(t);
+  const pool=await rankedChannelsForPicker(await sessionsForDay(dk));
+  body.appendChild(tlChipRow(pool,fresh.channelId,async c=>{
+    await reassignSession(fresh.id,c.id);
+    closeScrim("blockScrim");
+    await afterDayEdit(dk);
+    toast("Moved to "+c.label);
+  }));
 
   const acts=document.createElement("div");
-  acts.style.cssText="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px";
+  acts.style.cssText="display:flex;gap:6px;flex-wrap:wrap;margin-top:18px";
 
   const sp=document.createElement("button");
   sp.className="btn sm"; sp.textContent="Split in two";
-  if(!sn.endTs||sn.durMs<2*MIN_SESSION_MS){ sp.disabled=true; sp.style.opacity=".4"; }
+  if(!fresh.endTs||fresh.durMs<2*TL_MIN_BLOCK_MIN*60000){ sp.disabled=true; sp.style.opacity=".4"; }
   sp.addEventListener("click",async()=>{
-    const nid=await splitSession(sn.id);
+    const nid=await splitSession(fresh.id);
+    closeScrim("blockScrim");
     if(!nid){ toast("Too short to split"); return; }
-    /* Land on the new half with its picker open - relabelling it is the point. */
-    expandedSessId=nid; chipsExpanded=null;
     await afterDayEdit(dk);
+    const made=(await sessionsForDay(dk)).find(x=>x.id===nid);
+    if(made) openBlockSheet(dk,made);           /* relabelling it is the point */
   });
   acts.appendChild(sp);
 
   const ex=document.createElement("button");
   ex.className="btn sm"; ex.textContent="Exact times…";
-  ex.addEventListener("click",()=>openSessionEditor(dk,sn));
+  ex.addEventListener("click",()=>{ closeScrim("blockScrim"); openSessionEditor(dk,fresh); });
   acts.appendChild(ex);
 
   const del=document.createElement("button");
-  del.className="btn sm"; del.textContent="Delete"; del.style.color="#fca5a5";
+  del.className="btn sm"; del.textContent="Delete"; del.style.color="var(--bad-ink)";
   del.addEventListener("click",async()=>{
-    const ok=await uiConfirm("Remove this session from the day? Its time stops counting toward every total and score.",
-      {title:"Delete session",okLabel:"Delete",danger:true});
+    const ok=await uiConfirm("Remove this block from the day? Its time stops counting toward every total and score.",
+      {title:"Delete block",okLabel:"Delete",danger:true});
     if(!ok) return;
-    const rec=await idbGet("sessions",sn.id);
+    const rec=await idbGet("sessions",fresh.id);
     if(rec){
       rec.voided=true; rec.endTs=rec.startTs; rec.durMs=0;
       await saveLocal("sessions",rec);
       if(running&&running.sessionId===rec.id) running=null;
     }
-    expandedSessId=null;
+    closeScrim("blockScrim");
     await afterDayEdit(dk);
-    toast("Session removed");
+    toast("Block removed");
   });
   acts.appendChild(del);
 
-  wrap.appendChild(acts);
-  return wrap;
-}
-
-/* The seam between two blocks. A boundary only exists where they actually
-   touch; a gap or an overlap is reported instead, because closing one is a
-   judgement about what happened rather than an adjustment. */
-function buildBoundaryRow(dk,a,b,fmt){
-  const wrap=document.createElement("div");
-  /* Flush to the body, not inset like the cards: the seam should align with
-     the card edge and it needs every pixel to stay on one line at 320px. */
-  wrap.style.cssText="display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:2px 0 8px";
-  if(!a.endTs) return wrap;                       /* a is still running */
-
-  const delta=b.startTs-a.endTs;
-  if(Math.abs(delta)>1000){
-    const n=document.createElement("div");
-    n.style.cssText="display:flex;align-items:center;gap:8px;width:100%";
-    const txt=document.createElement("span");
-    txt.style.cssText="flex:none;font-size:12px;font-weight:700;color:var(--ink2)";
-    txt.textContent=delta>0?fmtDurShort(delta)+" untracked":"overlaps by "+fmtDurShort(-delta);
-    if(delta<0) txt.style.color="#fbbf24";
-    const rule=document.createElement("span");
-    rule.style.cssText="flex:1;height:0;border-top:1px dashed var(--line)";
-    n.appendChild(rule); n.appendChild(txt); n.appendChild(rule.cloneNode());
-    wrap.appendChild(n);
-    return wrap;
-  }
-
-  const at=document.createElement("div");
-  at.style.cssText="font-size:12px;color:var(--muted);font-weight:800;min-width:54px;letter-spacing:.2px";
-  at.textContent=fmtClock(a.endTs,fmt);
-  wrap.appendChild(at);
-
-  /* Deliberately lighter than a session card: this is a seam between two
-     blocks, and it must not read as a third block. */
-  BOUNDARY_STEPS.forEach(mins=>{
-    const btn=document.createElement("button");
-    btn.className="btn sm";
-    btn.style.cssText="padding:7px 6px;min-width:40px;font-size:13px;text-align:center";
-    btn.textContent=(mins>0?"+":"−")+Math.abs(mins);
-    btn.title=mins>0?"Move the switch "+mins+" minutes later"
-                    :"Move the switch "+Math.abs(mins)+" minutes earlier";
-    btn.addEventListener("click",async()=>{
-      const r=await moveBoundary(a.id,b.id,mins*60000);
-      if(r==="min"){ toast("That would leave nothing on one side"); return; }
-      if(r==="future"){ toast("That would run past now"); return; }
-      if(r==="gone"){ toast("That session no longer exists"); }
-      await afterDayEdit(dk);
-    });
-    wrap.appendChild(btn);
-  });
-
-  if(a.channelId===b.channelId){
-    const mg=document.createElement("button");
-    mg.className="btn sm"; mg.textContent="Merge";
-    mg.style.cssText="padding:7px 8px;font-size:13px";
-    mg.addEventListener("click",async()=>{
-      await mergeSessions(a.id,b.id);
-      expandedSessId=null;
-      await afterDayEdit(dk);
-      toast("Merged");
-    });
-    wrap.appendChild(mg);
-  }
-  return wrap;
+  body.appendChild(acts);
+  openScrim("blockScrim");
 }
 
 /* =====================================================================
@@ -1888,7 +2318,7 @@ async function renderPriorities(){
   root.innerHTML="";
 
   const head=document.createElement("div");
-  head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap";
+  head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--glass);flex-wrap:wrap";
   const h=document.createElement("h2"); h.style.cssText="margin:0;font-size:14px;font-weight:700"; h.textContent="Priorities";
   const sp=document.createElement("div"); sp.style.flex="1";
   const home=document.createElement("button"); home.className="btn sm"; home.textContent="Home";
@@ -1909,6 +2339,22 @@ async function renderPriorities(){
 
   const body=document.createElement("div");
   body.style.cssText="flex:1;overflow-y:auto;padding:14px 12px max(14px, env(safe-area-inset-bottom))";
+
+  /* This whole page is opt-in, and the tags it reports on are edited
+     somewhere else entirely. Saying both up front stops it reading as a
+     thing you are failing to fill in. */
+  const intro=document.createElement("div");
+  intro.style.cssText="margin:0 0 16px;padding:12px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)";
+  const introTxt=document.createElement("div");
+  introTxt.className="hint"; introTxt.style.margin="0";
+  introTxt.textContent="Completely optional. Your time is tracked whether or not you use this. It is here for when you want to know not just where the time went, but what kind of time it was — tag channels as Must/Will/Want, DRIP, or urgent/important, and this page reports against those tags. Anything untagged is shown separately rather than quietly dropped.";
+  intro.appendChild(introTxt);
+  const introGo=document.createElement("button");
+  introGo.className="btn sm"; introGo.style.marginTop="11px";
+  introGo.textContent="Edit tags in Channels";
+  introGo.addEventListener("click",()=>openChannels());
+  intro.appendChild(introGo);
+  body.appendChild(intro);
 
   if(!data.total){
     const e=document.createElement("div"); e.className="hint"; e.style.padding="18px 4px";
@@ -2017,7 +2463,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=12;
+const APP_RELEASE=13;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -2071,7 +2517,7 @@ function uiDialog(opts){
 
     const scrim=document.createElement("div");
     scrim.className="scrim";
-    scrim.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.7);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px";
+    scrim.style.cssText="position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px";
 
     const card=document.createElement("div");
     card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:400px;width:100%;box-shadow:var(--shadow)";
@@ -2092,7 +2538,7 @@ function uiDialog(opts){
       input=document.createElement("input");
       input.type="text";
       input.value=o.value||"";
-      input.style.cssText="width:100%;margin-top:14px;padding:11px;background:#0a1424;border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:14px;outline:none";
+      input.style.cssText="width:100%;margin-top:14px;padding:11px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:14px;outline:none";
       card.appendChild(input);
     }
 
@@ -2146,7 +2592,7 @@ function uiChoice(opts){
     const done=v=>{ if(settled)return; settled=true; cleanup(); resolve(v); };
     const scrim=document.createElement("div");
     scrim.className="scrim";
-    scrim.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.7);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px";
+    scrim.style.cssText="position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px";
     const card=document.createElement("div");
     card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:400px;width:100%;box-shadow:var(--shadow)";
     if(o.title){
@@ -2178,9 +2624,82 @@ function uiChoice(opts){
   });
 }
 
+/* Tapping the tile that is already running used to answer with a sentence
+   about a button somewhere else. It now offers the button itself, briefly.
+   The top bar's pause is unchanged - this is an extra way in, not a move. */
+let actionToastT;
+function hideActionToast(){
+  const t=document.getElementById("actionToast");
+  if(t) t.classList.remove("show");
+  clearTimeout(actionToastT);
+}
+function toastAction(msg,label,onClick,ms){
+  const t=document.getElementById("actionToast");
+  if(!t) return;
+  t.innerHTML="";
+  const s=document.createElement("span"); s.textContent=msg;
+  const b=document.createElement("button");
+  b.className="btn sm";
+  b.style.cssText="background:var(--bad);border-color:var(--bad);color:#fff;font-weight:800;padding:8px 16px";
+  b.textContent=label;
+  b.addEventListener("click",()=>{ hideActionToast(); onClick(); });
+  t.appendChild(s); t.appendChild(b);
+  t.classList.add("show");
+  clearTimeout(actionToastT);
+  /* Longer than a plain toast because there is something to reach for. */
+  actionToastT=setTimeout(hideActionToast,ms||4500);
+}
+async function offerPause(){
+  toastAction("Already running","Pause",async()=>{
+    if(!running) return;
+    const st=await stopRunning(now());
+    undoStack.push({type:"pause",prev:st});
+    toast("Paused"); renderAll();
+  });
+}
 function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),1500);}
 
 /* ===== avatar menu ===== */
+/* Theme. Device-local rather than a profile field: which look someone wants
+   depends on the screen in front of them, not on who they are, and a profile
+   field would sync a phone's night mode onto a desktop. The boot script in
+   <head> reads the same key. */
+function currentTheme(){
+  try{ return localStorage.getItem("dtt-theme")==="light"?"light":"dark"; }catch(e){ return "dark"; }
+}
+function applyTheme(t){
+  const th=t==="light"?"light":"dark";
+  document.documentElement.setAttribute("data-theme",th);
+  try{ localStorage.setItem("dtt-theme",th); }catch(e){}
+  const m=document.querySelector('meta[name="theme-color"]');
+  if(m) m.setAttribute("content",th==="light"?"#f2f5fb":"#0f172a");
+}
+function toggleTheme(){
+  applyTheme(currentTheme()==="light"?"dark":"light");
+  renderAvatarMenu();
+  toast(currentTheme()==="light"?"Light mode":"Dark mode");
+}
+
+/* One row of the avatar menu. The icons are emoji, which arrive in their own
+   colours; a grayscale filter keeps the menu monochrome without shipping an
+   icon set. Profile rows are built separately and keep their colour. */
+function avatarMenuItem(icon,label,onClick,color,keepOpen){
+  const it=document.createElement("div");
+  it.className="menu-item";
+  it.style="padding:11px 14px;cursor:pointer;display:flex;align-items:center;gap:14px;color:"+(color||"var(--ink)");
+  const ic=document.createElement("span");
+  ic.style="filter:grayscale(1);opacity:.8;font-size:15px;line-height:1;width:18px;text-align:center;flex:none";
+  ic.textContent=icon;
+  const tx=document.createElement("span"); tx.style="flex:1"; tx.textContent=label;
+  it.appendChild(ic); it.appendChild(tx);
+  it.addEventListener("click",()=>{
+    if(!keepOpen) document.getElementById("avatarMenu").style.display="none";
+    onClick();
+  });
+  return it;
+}
+
+
 function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.innerHTML="";
   const profInitial=state.profile?state.profile.name[0].toUpperCase():"?";
   document.getElementById("avatarBtn").textContent=profInitial;
@@ -2190,11 +2709,14 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
       it.innerHTML=`<span style="width:24px;height:24px;border-radius:50%;background:${strColor(p.name)};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white">${p.name[0].toUpperCase()}</span><span class="grow">${escapeHtml(p.name)}</span>${p.id===state.profileId?"✓":""}`;
       it.addEventListener("click",()=>{loadProfile(p.id);document.getElementById("avatarMenu").style.display="none";renderAvatarMenu();});m.appendChild(it);}}
   const sep=document.createElement("div");sep.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep);
-  const pastDayItem=document.createElement("div");pastDayItem.className="menu-item";pastDayItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";pastDayItem.textContent="📅 Edit a day";pastDayItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openDayEditor(todayKey());});m.appendChild(pastDayItem);
-  const prioItem=document.createElement("div");prioItem.className="menu-item";prioItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";prioItem.textContent="🎯 Priorities";prioItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openPriorities();});m.appendChild(prioItem);
-  const channelsItem=document.createElement("div");channelsItem.className="menu-item";channelsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";channelsItem.textContent="🎨 Channels";channelsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openChannels();});m.appendChild(channelsItem);
-  
-  const settingsItem=document.createElement("div");settingsItem.className="menu-item";settingsItem.style="padding:10px 12px;cursor:pointer;color:var(--ink)";settingsItem.textContent="⚙️ Settings";settingsItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";openSettings();});m.appendChild(settingsItem);
+  m.appendChild(avatarMenuItem("📅","Edit a day",()=>openDayEditor(todayKey())));
+  m.appendChild(avatarMenuItem("🎨","Channels",()=>openChannels()));
+  m.appendChild(avatarMenuItem("🎯","Priorities",()=>openPriorities()));
+  m.appendChild(avatarMenuItem(
+    currentTheme()==="light"?"🌙":"☀️",
+    currentTheme()==="light"?"Dark mode":"Light mode",
+    ()=>toggleTheme(),null,true));
+  m.appendChild(avatarMenuItem("⚙️","Settings",()=>openSettings()));
 
   const sep2=document.createElement("div");sep2.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep2);
   if(window._acctEmail){
@@ -2203,9 +2725,7 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
     who.textContent=window._acctEmail;
     m.appendChild(who);
   }
-  const signOutItem=document.createElement("div");signOutItem.className="menu-item";signOutItem.style="padding:10px 12px;cursor:pointer;color:var(--warn)";signOutItem.textContent="🚪 Sign out";
-  signOutItem.addEventListener("click",()=>{document.getElementById("avatarMenu").style.display="none";doSignOut();});
-  m.appendChild(signOutItem);
+  m.appendChild(avatarMenuItem("🚪","Sign out",()=>doSignOut(),"var(--warn)"));
 
   const ver=document.createElement("div");
   ver.style="padding:9px 12px 11px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px";
@@ -2238,19 +2758,25 @@ function initializeEventListeners(){
     if(t.endTs<=t.startTs){ toast("End must be after start"); return; }
     if(t.endTs>now()){ toast("That end time is in the future"); return; }
 
-    /* Overlaps would double-count the same minutes in every total, so they are
-       worth a question. They are still allowed - two things genuinely can be
-       worked at once, and it is the user's data. */
+    /* Overlaps are refused outright. Two channels cannot be running in the
+       same minute, and allowing it double-counts that minute in every total
+       and every score. The timeline makes this unreachable by construction;
+       this form is the only other way in, so it is closed here too. */
     const others=(await sessionsForDay(dk)).filter(x=>x.id!==editingSessId);
     const clash=others.find(x=>{ const xe=x.endTs||now(); return t.startTs<xe && x.startTs<t.endTs; });
     if(clash){
       const ch=state.channels.find(c=>c.id===clash.channelId);
-      const fmt=state.profile&&state.profile.hourFmt;
-      const ok=await uiConfirm("This overlaps "+(ch?ch.label:"another session")+" ("+
-        fmtClock(clash.startTs,fmt)+" \u2013 "+(clash.endTs?fmtClock(clash.endTs,fmt):"running")+
-        "). Both will be counted, so that time will be double counted in your totals.",
-        {title:"Overlapping session",okLabel:"Save anyway"});
-      if(!ok) return;
+      const cf=state.profile&&state.profile.hourFmt;
+      const span=fmtClock(clash.startTs,cf)+" to "+(clash.endTs?fmtClock(clash.endTs,cf):"running");
+      await uiChoice({
+        title:"Times overlap",
+        message:"That would run at the same time as "+(ch?ch.label:"another block")+
+          " ("+span+")." + String.fromCharCode(10,10) +
+          "Two channels cannot both be running in the same minute. Shorten that one "+
+          "first, or drag the edge on the timeline - it moves both at once.",
+        choices:[{label:"OK",value:"ok"}]
+      });
+      return;
     }
 
     if(editingSessId){
@@ -2427,8 +2953,8 @@ function initializeEventListeners(){
 /* ===== settings ===== */
 function openChannels(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;stage.innerHTML=`
   <div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">
-    <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap">
-      <h2 style="margin:0;font-size:18px;font-weight:700">🎨 Channels</h2>
+    <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--glass);flex-wrap:wrap">
+      <h2 style="margin:0;font-size:18px;font-weight:700">Channels</h2>
       <button class="btn sm" id="closeChannelsBtn" style="margin-left:auto">Done</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:20px 24px;background:var(--bg)">
@@ -2447,8 +2973,8 @@ function openChannels(){const app=document.querySelector('.app');const stage=app
 
 function openSettings(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;stage.innerHTML=`
   <div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">
-    <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7);flex-wrap:wrap">
-      <h2 style="margin:0;font-size:18px;font-weight:700">⚙️ Settings</h2>
+    <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--glass);flex-wrap:wrap">
+      <h2 style="margin:0;font-size:18px;font-weight:700">Settings</h2>
       <button class="btn sm" id="closeSettingsBtn" style="margin-left:auto">Done</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:20px 24px;background:var(--bg)">
@@ -2649,7 +3175,7 @@ function renderChannelSettings(){
       al.innerHTML="";
       arch.forEach(c=>{
         const row=document.createElement("div"); row.className="row";
-        row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b> <span class="archived-tag">Archived</span></div><button class="btn sm">Restore</button><button class="btn sm" style="background:rgba(240,68,68,.2);border-color:#f87171;color:#f87171">Delete</button>`;
+        row.innerHTML=`<div class="swatch" style="background:${c.color}"></div><div class="grow"><b>${escapeHtml(c.label)}</b> <span class="archived-tag">Archived</span></div><button class="btn sm">Restore</button><button class="btn sm" style="background:rgba(240,68,68,.2);border-color:#f87171;color:var(--bad-ink)">Delete</button>`;
         row.querySelector(".btn").addEventListener("click",()=>restoreChannel(c.id));
         row.querySelectorAll(".btn")[1].addEventListener("click",()=>deleteChannel(c.id));
         al.appendChild(row);
@@ -2772,8 +3298,7 @@ function renderPalette(sel){const p=document.getElementById("chanPalette");p.inn
 function updateChanPreview(){const col=document.getElementById("chanColor").value;const lbl=document.getElementById("chanLabel").value||"Preview";const prev=document.getElementById("chanPreview");prev.style.background=`linear-gradient(160deg,${col},${shade(col,.22)})`;prev.style.color=contrastInk(col);document.getElementById("cpLabel").textContent=lbl;document.getElementById("chanPreviewSw").style.background=col;}
 
 /* ===== timeline ===== */
-async function openEditsModal(){try{const content=document.getElementById("editsContent");if(!content){console.error("editsContent not found");return;}content.innerHTML="";if(!state.profileId){console.error("No profile ID set");content.innerHTML='<div class="hint" style="padding:20px">Error: No profile selected.</div>';openScrim("editsScrim");return;}const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const today=todayKey();const filtered=all.filter(s=>s.date===today).sort((a,b)=>a.startTs-b.startTs);if(!filtered.length){content.innerHTML='<div class="hint" style="padding:20px">No sessions yet today.</div>';}else{filtered.forEach(s=>{const c=state.channels.find(x=>x.id===s.channelId)||{label:"(deleted)",color:"#64748b"};const dur=s.endTs?s.durMs:(now()-s.startTs);const open=!s.endTs;const row=document.createElement("div");row.style.display="flex";row.style.alignItems="center";row.style.gap="12px";row.style.padding="12px 14px";row.style.borderBottom="1px solid var(--line)";const leftDiv=document.createElement("div");leftDiv.style.display="flex";leftDiv.style.alignItems="center";leftDiv.style.gap="8px";leftDiv.style.flex="0 1 auto";const colorDot=document.createElement("div");colorDot.style.width="12px";colorDot.style.height="12px";colorDot.style.borderRadius="50%";colorDot.style.background=c.color;colorDot.style.flexShrink="0";leftDiv.appendChild(colorDot);const infoDiv=document.createElement("div");infoDiv.style.minWidth="0";const labelDiv=document.createElement("div");labelDiv.style.fontSize="12px";labelDiv.style.fontWeight="600";labelDiv.style.color="var(--ink)";labelDiv.innerHTML=`${escapeHtml(c.label)}${open?' <span style="color:var(--good);font-size:11px">● running</span>':''}`;infoDiv.appendChild(labelDiv);const timeDiv=document.createElement("div");timeDiv.style.fontSize="11px";timeDiv.style.color="var(--ink2)";timeDiv.textContent=`${fmtClock(s.startTs,state.profile.hourFmt)} — ${s.endTs?fmtClock(s.endTs,state.profile.hourFmt):"now"}`;infoDiv.appendChild(timeDiv);leftDiv.appendChild(infoDiv);row.appendChild(leftDiv);const durDiv=document.createElement("div");durDiv.style.fontSize="11px";durDiv.style.fontWeight="600";durDiv.style.color="var(--ink2)";durDiv.style.whiteSpace="nowrap";durDiv.textContent=fmtDur(dur);row.appendChild(durDiv);if(s.endTs){const adjBtn=document.createElement("button");adjBtn.className="btn sm";adjBtn.textContent="Adjust";adjBtn.addEventListener("click",()=>{closeScrim("editsScrim");openAdjustModal(s);});row.appendChild(adjBtn);}content.appendChild(row);});}openScrim("editsScrim");}catch(e){console.error("Error in openEditsModal:",e);const content=document.getElementById("editsContent");if(content)content.innerHTML='<div class="hint" style="padding:20px">Error loading sessions: '+escapeHtml(e.message)+'</div>';openScrim("editsScrim");}}
-async function openTimeline(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';const today=new Date();const dayName=today.toLocaleDateString('en-US',{weekday:'short'});const dateStr=today.toLocaleDateString('en-US',{month:'short',day:'numeric'});html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)">';html+='<div style="display:flex;align-items:center;gap:12px">';html+='<div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">'+dayName+' '+dateStr+'</div>';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Edits</h2>';html+='</div>';html+='<button class="btn sm" onclick="closeTimelineView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:0" id="tlContent"></div>';html+='</div>';stage.innerHTML=html;window.closeTimelineView=()=>{stage.innerHTML=origStage;renderGrid();};const all=(await idbAll("sessions","profile",IDBKeyRange.only(state.profileId))).filter(s=>s.date===todayKey()).sort((a,b)=>a.startTs-b.startTs);const tlContent=document.getElementById("tlContent");if(!all.length){tlContent.innerHTML='<div class="hint" style="padding:20px">No sessions yet today.</div>';}else{tlContent.innerHTML="";all.forEach(s=>{const c=state.channels.find(x=>x.id===s.channelId)||{label:"(deleted)",color:"#64748b"};const dur=s.endTs?s.durMs:(now()-s.startTs);const open=!s.endTs;const row=document.createElement("div");row.style.display="flex";row.style.alignItems="center";row.style.gap="12px";row.style.padding="12px 14px";row.style.borderBottom="1px solid var(--line)";const leftDiv=document.createElement("div");leftDiv.style.display="flex";leftDiv.style.alignItems="center";leftDiv.style.gap="8px";leftDiv.style.flex="0 1 auto";const colorDot=document.createElement("div");colorDot.style.width="12px";colorDot.style.height="12px";colorDot.style.borderRadius="50%";colorDot.style.background=c.color;colorDot.style.flexShrink="0";leftDiv.appendChild(colorDot);const infoDiv=document.createElement("div");infoDiv.style.minWidth="0";const labelDiv=document.createElement("div");labelDiv.style.fontSize="12px";labelDiv.style.fontWeight="600";labelDiv.style.color="var(--ink)";labelDiv.innerHTML=`${escapeHtml(c.label)}${open?' <span style="color:var(--good);font-size:11px">● running</span>':''}`;infoDiv.appendChild(labelDiv);const timeDiv=document.createElement("div");timeDiv.style.fontSize="11px";timeDiv.style.color="var(--ink2)";timeDiv.textContent=`${fmtClock(s.startTs,state.profile.hourFmt)} — ${s.endTs?fmtClock(s.endTs,state.profile.hourFmt):"now"}`;infoDiv.appendChild(timeDiv);leftDiv.appendChild(infoDiv);row.appendChild(leftDiv);const durDiv=document.createElement("div");durDiv.style.fontSize="11px";durDiv.style.fontWeight="600";durDiv.style.color="var(--ink2)";durDiv.style.whiteSpace="nowrap";durDiv.textContent=fmtDur(dur);row.appendChild(durDiv);if(s.endTs){const adjBtn=document.createElement("button");adjBtn.className="btn sm";adjBtn.textContent="Adjust";adjBtn.addEventListener("click",()=>openAdjustModal(s));row.appendChild(adjBtn);}tlContent.appendChild(row);});}}
+async function openTimeline(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';const today=new Date();const dayName=today.toLocaleDateString('en-US',{weekday:'short'});const dateStr=today.toLocaleDateString('en-US',{month:'short',day:'numeric'});html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)">';html+='<div style="display:flex;align-items:center;gap:12px">';html+='<div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">'+dayName+' '+dateStr+'</div>';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Edits</h2>';html+='</div>';html+='<button class="btn sm" onclick="closeTimelineView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:0" id="tlContent"></div>';html+='</div>';stage.innerHTML=html;window.closeTimelineView=()=>{stage.innerHTML=origStage;renderGrid();};const all=(await idbAll("sessions","profile",IDBKeyRange.only(state.profileId))).filter(s=>s.date===todayKey()).sort((a,b)=>a.startTs-b.startTs);const tlContent=document.getElementById("tlContent");if(!all.length){tlContent.innerHTML='<div class="hint" style="padding:20px">No sessions yet today.</div>';}else{tlContent.innerHTML="";all.forEach(s=>{const c=state.channels.find(x=>x.id===s.channelId)||{label:"(deleted)",color:"#64748b"};const dur=s.endTs?s.durMs:(now()-s.startTs);const open=!s.endTs;const row=document.createElement("div");row.style.display="flex";row.style.alignItems="center";row.style.gap="12px";row.style.padding="12px 14px";row.style.borderBottom="1px solid var(--line)";const leftDiv=document.createElement("div");leftDiv.style.display="flex";leftDiv.style.alignItems="center";leftDiv.style.gap="8px";leftDiv.style.flex="0 1 auto";const colorDot=document.createElement("div");colorDot.style.width="12px";colorDot.style.height="12px";colorDot.style.borderRadius="50%";colorDot.style.background=c.color;colorDot.style.flexShrink="0";leftDiv.appendChild(colorDot);const infoDiv=document.createElement("div");infoDiv.style.minWidth="0";const labelDiv=document.createElement("div");labelDiv.style.fontSize="12px";labelDiv.style.fontWeight="600";labelDiv.style.color="var(--ink)";labelDiv.innerHTML=`${escapeHtml(c.label)}${open?' <span style="color:var(--good);font-size:11px">● running</span>':''}`;infoDiv.appendChild(labelDiv);const timeDiv=document.createElement("div");timeDiv.style.fontSize="11px";timeDiv.style.color="var(--ink2)";timeDiv.textContent=`${fmtClock(s.startTs,state.profile.hourFmt)} — ${s.endTs?fmtClock(s.endTs,state.profile.hourFmt):"now"}`;infoDiv.appendChild(timeDiv);leftDiv.appendChild(infoDiv);row.appendChild(leftDiv);const durDiv=document.createElement("div");durDiv.style.fontSize="11px";durDiv.style.fontWeight="600";durDiv.style.color="var(--ink2)";durDiv.style.whiteSpace="nowrap";durDiv.textContent=fmtDur(dur);row.appendChild(durDiv);if(s.endTs){const adjBtn=document.createElement("button");adjBtn.className="btn sm";adjBtn.textContent="Adjust";adjBtn.addEventListener("click",()=>openAdjustModal(s));row.appendChild(adjBtn);}tlContent.appendChild(row);});}}
 /* Adherence cell: Timing on top, Budget beneath. Returns HTML so it drops
    into the existing <td>/<div> WITHOUT changing any table column count. */
 function fmtHM(ms){
@@ -2788,15 +3313,29 @@ function adhCellHtml(match,budgetPct){
   if(typeof budgetPct==="number") h+='<div style="font-size:11px;font-weight:700;color:'+adhTone(budgetPct)+'">'+budgetPct+'%<span style="font-size:10px;font-weight:600;color:var(--ink2);margin-left:4px">budget</span></div>';
   return h;
 }
+/* Every edit on the Summary rebuilds the entire page, so the reader's place
+   has to be carried across by hand. The history log arrives later, in a
+   setTimeout, so the restore runs twice: once for the main content and
+   again once the log has given the container its full height. */
+let summaryOrigStage=null, summaryScroll=0;
+function restoreSummaryScroll(){
+  const sc=document.getElementById("summaryContent");
+  if(sc&&summaryScroll) sc.scrollTop=summaryScroll;
+}
 async function openCombinedSummary(){
+  const prevContent=document.getElementById("summaryContent");
+  summaryScroll=prevContent?prevContent.scrollTop:0;
   await refreshTodayScores();
   try{
     console.log("openCombinedSummary: Starting, db=",db,"profileId=",state.profileId);
     const app=document.querySelector('.app');
     const stage=app.querySelector('.stage');
-    const origStage=stage.innerHTML;
+    /* Re-entering would otherwise capture the summary itself, and Home
+       would then 'close' the summary back into the summary. */
+    const origStage=(prevContent&&summaryOrigStage!==null)?summaryOrigStage:stage.innerHTML;
+    summaryOrigStage=origStage;
     let html='<div style="display:flex;flex-direction:column;height:100%">';
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)">';
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)">';
     html+='<h2 style="margin:0;font-size:14px;font-weight:700">Summary</h2>';
     html+='</div>';
     html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:16px" id="summaryContent">Loading...</div>';
@@ -2883,6 +3422,11 @@ async function openCombinedSummary(){
       const dRating=dayNote.rating||0;
       const dNotes=dayNote.notes||"";
       const dName=day.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+      /* Saturday and Sunday are tagged so they do not read as ordinary
+         working days that happened to go badly. */
+      const wkDay=day.date.getDay();
+      const wkndTag=(wkDay===0||wkDay===6)
+        ? '<span style="margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--muted);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px">Weekend</span>' : '';
       const chRows=Object.entries(day.channels).map(([chId,dur])=>{
         const ch=state.channels.find(x=>x.id===chId)||{label:"(deleted)",color:"#64748b"};
         return`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:10px"><div style="width:6px;height:6px;border-radius:50%;background:${ch.color}"></div><div style="flex:1;min-width:0;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ch.label)}</div><div style="font-weight:600;color:var(--ink2);min-width:40px;text-align:right">${fmtDur(dur)}</div></div>`
@@ -2898,14 +3442,14 @@ async function openCombinedSummary(){
       const adhStr=adhCellHtml(dayNote.matchScore,dayNote.budgetScore?dayNote.budgetScore.pct:undefined);
       
       weekTotal+=day.total;
-      content+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)">${dName}</div><div style="margin-bottom:6px">${dTypeSelCard}</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">${fmtDur(day.total)}</div><div style="font-size:11px;color:var(--ink2);margin-bottom:6px">${adhStr}</div><div style="margin:8px 0">${starHtml}</div>${notesDisplay}<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:9px">${chRows||'<div style="color:var(--muted)">No sessions</div>'}</div></div>`;
+      content+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)">${dName}${wkndTag}</div><div style="margin-bottom:6px">${dTypeSelCard}</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">${fmtDur(day.total)}</div><div style="font-size:11px;color:var(--ink2);margin-bottom:6px">${adhStr}</div><div style="margin:8px 0">${starHtml}</div>${notesDisplay}<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:9px">${chRows||'<div style="color:var(--muted)">No sessions</div>'}</div></div>`;
     }
     content+='</div>';
     content+=`<div style="margin-top:14px;padding:12px;background:linear-gradient(180deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.3);border-radius:12px"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Total</div><div style="font-size:22px;font-weight:800;color:var(--good)">${fmtDur(weekTotal)}</div></div>`;
     
     // NEW SECTION: Day by Day Breakdown Table
     content+='<div style="margin-top:24px;padding-top:20px;border-top:2px solid var(--line)"><div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Day by Day Breakdown</div>';
-    content+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody>';
+    content+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day type</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody>';
     for(const day of Object.values(weekData).slice(0,7)){
       const dKey=fmtDateKey(day.date);
       const dayNote=await idbGet("day_notes",dKey)||{};
@@ -2918,13 +3462,13 @@ async function openCombinedSummary(){
       const rowBg=isWeekend?'rgba(100,116,139,.15)':'transparent';
       
       const starHtml=starCellHtml(dKey,dRating,"editWeekStar");
-      const dTypeSel=dayTypeSelectHtml(dKey,await getDayType(dKey));
+      const dTypeSel=dayTypeSelectHtml(dKey,await getDayType(dKey),true);
       
       const adhData=await idbGet("day_notes",dKey);
       const adhStr=adhCellHtml(adhData&&adhData.matchScore,adhData&&adhData.budgetScore?adhData.budgetScore.pct:undefined);
       
       weekTotal+=day.total;
-      content+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink)">${dName}${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editWeekNotes('${dKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
+      content+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink);white-space:nowrap">${dName}</td><td style="padding:12px">${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editWeekNotes('${dKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
     }
     content+='</tbody></table></div></div>';
     
@@ -2961,9 +3505,10 @@ async function openCombinedSummary(){
     
     // FULL HISTORY LOG SECTION - Very Bottom
     content+='<div style="margin-top:32px;padding-top:24px;border-top:2px solid var(--line)"><div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:14px">Complete History Log</div>';
-    content+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Date</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody id="historyTableBody"></tbody></table></div></div>';
+    content+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Date</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day type</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody id="historyTableBody"></tbody></table></div></div>';
 
     document.getElementById("summaryContent").innerHTML=content;
+    restoreSummaryScroll();
     
     // Build and populate history log
     setTimeout(async()=>{
@@ -2993,15 +3538,18 @@ async function openCombinedSummary(){
         const dName=dayDate.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
         
         const starHtml=starCellHtml(dateKey,dRating,"editHistoryStar");
-        const dTypeSel=dayTypeSelectHtml(dateKey,await getDayType(dateKey));
+        const dTypeSel=dayTypeSelectHtml(dateKey,await getDayType(dateKey),true);
         
-        historyHtml+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink)">${dName}${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editHistoryNotes('${dateKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
+        historyHtml+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink);white-space:nowrap">${dName}</td><td style="padding:12px">${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editHistoryNotes('${dateKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
       }
       
       const historyBody=document.getElementById("historyTableBody");
       if(historyBody){
         historyBody.innerHTML=historyHtml;
       }
+      /* The container only reaches its full height now, so a scrollTop that
+         was clamped a moment ago can finally be honoured. */
+      restoreSummaryScroll();
     },0);
     
     window.editHistoryStar=async(dateKey,rating)=>{
@@ -3257,7 +3805,7 @@ async function openCombinedSummary(){
     if(stage)stage.innerHTML='<div style="padding:20px"><div class="hint">Error loading summary: '+escapeHtml(e.message)+'</div></div>';
   }
 }
-async function openWeekView(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)">';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Week View</h2>';html+='<button class="btn sm" onclick="closeWeekView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:16px" id="weekContent"></div>';html+='</div>';stage.innerHTML=html;window.closeWeekView=()=>{stage.innerHTML=origStage;renderGrid();};const today=new Date();const weekStart=new Date(today);weekStart.setDate(today.getDate()-today.getDay()+(today.getDay()===0?-6:1));const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const weekData={};for(let i=0;i<7;i++){const d=new Date(weekStart);d.setDate(d.getDate()+i);const key=fmtDateKey(d);weekData[key]={date:d,total:0,channels:{}};}allSessions.forEach(s=>{if(weekData[s.date]){const dur=parseInt(s.endTs||s.startTs)-parseInt(s.startTs);weekData[s.date].total+=dur;const chId=s.channelId;if(!weekData[s.date].channels[chId]){weekData[s.date].channels[chId]=0;}weekData[s.date].channels[chId]+=dur;}});let content='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">';let weekTotal=0;Object.values(weekData).slice(0,5).forEach(day=>{const dName=day.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});const chRows=Object.entries(day.channels).map(([chId,dur])=>{const ch=state.channels.find(x=>x.id===chId)||{label:"(deleted)",color:"#64748b"};return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0"><div style="width:8px;height:8px;border-radius:50%;background:${ch.color}"></div><div style="flex:1;font-size:11px">${escapeHtml(ch.label)}</div><div style="font-size:11px;font-weight:600;color:var(--ink2);min-width:50px;text-align:right">${fmtDur(dur)}</div></div>`}).join('');weekTotal+=day.total;content+=`<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px"><div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--accent)">${dName}</div><div style="font-size:16px;font-weight:800;margin-bottom:8px">${fmtDur(day.total)}</div><div style="font-size:10px;color:var(--ink2)">${Object.keys(day.channels).length} channels</div><div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">${chRows||'<div style="color:var(--muted);font-size:11px">No sessions</div>'}</div></div>`;});content+='</div>';content+=`<div style="margin-top:20px;padding:12px;background:linear-gradient(180deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.3);border-radius:12px"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Total</div><div style="font-size:24px;font-weight:800;color:var(--good)">${fmtDur(weekTotal)}</div></div>`;document.getElementById("weekContent").innerHTML=content;}
+async function openWeekView(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)">';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Week View</h2>';html+='<button class="btn sm" onclick="closeWeekView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:16px" id="weekContent"></div>';html+='</div>';stage.innerHTML=html;window.closeWeekView=()=>{stage.innerHTML=origStage;renderGrid();};const today=new Date();const weekStart=new Date(today);weekStart.setDate(today.getDate()-today.getDay()+(today.getDay()===0?-6:1));const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const weekData={};for(let i=0;i<7;i++){const d=new Date(weekStart);d.setDate(d.getDate()+i);const key=fmtDateKey(d);weekData[key]={date:d,total:0,channels:{}};}allSessions.forEach(s=>{if(weekData[s.date]){const dur=parseInt(s.endTs||s.startTs)-parseInt(s.startTs);weekData[s.date].total+=dur;const chId=s.channelId;if(!weekData[s.date].channels[chId]){weekData[s.date].channels[chId]=0;}weekData[s.date].channels[chId]+=dur;}});let content='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">';let weekTotal=0;Object.values(weekData).slice(0,5).forEach(day=>{const dName=day.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});const chRows=Object.entries(day.channels).map(([chId,dur])=>{const ch=state.channels.find(x=>x.id===chId)||{label:"(deleted)",color:"#64748b"};return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0"><div style="width:8px;height:8px;border-radius:50%;background:${ch.color}"></div><div style="flex:1;font-size:11px">${escapeHtml(ch.label)}</div><div style="font-size:11px;font-weight:600;color:var(--ink2);min-width:50px;text-align:right">${fmtDur(dur)}</div></div>`}).join('');weekTotal+=day.total;content+=`<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px"><div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--accent)">${dName}</div><div style="font-size:16px;font-weight:800;margin-bottom:8px">${fmtDur(day.total)}</div><div style="font-size:10px;color:var(--ink2)">${Object.keys(day.channels).length} channels</div><div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">${chRows||'<div style="color:var(--muted);font-size:11px">No sessions</div>'}</div></div>`;});content+='</div>';content+=`<div style="margin-top:20px;padding:12px;background:linear-gradient(180deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.3);border-radius:12px"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Total</div><div style="font-size:24px;font-weight:800;color:var(--good)">${fmtDur(weekTotal)}</div></div>`;document.getElementById("weekContent").innerHTML=content;}
 
 
 
@@ -3320,6 +3868,23 @@ async function ensureDayPlan(date){
   await saveLocal("dayplans",dp);
   return dp;
 }
+/* Grey once today already matches the chosen template exactly. It goes blue
+   again the moment re-applying would actually change something: a different
+   template picked in the dropdown, or the day edited away from the one it
+   came from. */
+function syncApplyTodayBtn(){
+  const btn=document.getElementById("applyTodayBtn"), sel=document.getElementById("applyTplSelect");
+  if(!btn||!sel) return;
+  const dp=planState.today;
+  const applied=!!dp&&dp.planId===sel.value&&!dp.edited;
+  btn.classList.toggle("pri",!applied);
+  btn.disabled=applied;
+  btn.style.opacity=applied?".55":"";
+  btn.style.cursor=applied?"default":"pointer";
+  btn.textContent=applied?"Applied":"Apply to today";
+}
+
+
 async function applyTemplateToToday(planId){
   const src=(planState.plans||[]).find(p=>p.id===planId);
   if(!src) return;
@@ -3441,7 +4006,7 @@ async function renderPlanPageUI(){
         <select id="applyTplSelect" style="flex:1;min-width:130px;padding:9px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:13px">
           ${planState.plans.map(p=>`<option value="${p.id}"${linked&&linked.id===p.id?" selected":""}>${escapeHtml(p.name)}</option>`).join("")}
         </select>
-        <button class="btn sm pri" onclick="applyTemplateToToday(document.getElementById('applyTplSelect').value)">Apply to today</button>
+        <button id="applyTodayBtn" class="btn sm pri" onclick="applyTemplateToToday(document.getElementById('applyTplSelect').value)">Apply to today</button>
         ${canPush?`<button class="btn sm" onclick="saveTodayToTemplate()">Save to template</button>`:``}
         ${canPush?`<button class="btn sm warn" onclick="resetTodayToTemplate()">Discard edits</button>`:``}
       </div>
@@ -3497,6 +4062,11 @@ async function renderPlanPageUI(){
 
   stage.innerHTML=html;
 
+  const applySel=document.getElementById("applyTplSelect");
+  if(applySel) applySel.addEventListener("change",syncApplyTodayBtn);
+  syncApplyTodayBtn();
+
+
   const planSelect=document.getElementById("planSelect");
   if(planSelect){
     planSelect.value=planState.selectedPlanIdx;
@@ -3520,7 +4090,7 @@ async function clearPlanSlot(slot){ await setPlanSlot(slot,null); }
 function openPlanSlotModal(slot){
   const modal=document.createElement("div");
   modal.className="scrim";
-  modal.style.cssText="position:fixed;inset:0;background:rgba(4,8,16,.66);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px";
+  modal.style.cssText="position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px";
   const card=document.createElement("div");
   card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:320px;width:100%;max-height:80vh;overflow-y:auto";
   const header=document.createElement("div");
@@ -3542,7 +4112,7 @@ function openPlanSlotModal(slot){
   });
   card.appendChild(options);
   const clearBtn=document.createElement("button");
-  clearBtn.style.cssText="width:100%;padding:10px;background:rgba(240,68,68,.15);border:1px solid rgba(240,68,68,.5);color:#f87171;border-radius:6px;font-weight:600;cursor:pointer";
+  clearBtn.style.cssText="width:100%;padding:10px;background:rgba(240,68,68,.15);border:1px solid rgba(240,68,68,.5);color:var(--bad-ink);border-radius:6px;font-weight:600;cursor:pointer";
   clearBtn.textContent="Clear slot";
   clearBtn.onclick=async()=>{ modal.remove(); await setPlanSlot(slot,null); };
   card.appendChild(clearBtn);
@@ -3569,7 +4139,7 @@ function renderPlanSelect(){
 function renderPlanSelect(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const curVal=planSelect.value;planSelect.innerHTML="";planState.plans.forEach((p,i)=>{const opt=document.createElement("option");opt.value=i;opt.textContent=p.name;planSelect.appendChild(opt);});planSelect.value=curVal;}async function setForTodayPlan(){const planSelect=document.getElementById("planSelect");if(!planSelect)return;const idx=parseInt(planSelect.value);if(idx<0||!planState.plans[idx])return;const plan=planState.plans[idx];planState.selectedPlanIdx=idx;const dayKey=todayKey();await saveLocal("selected_plan",{date:dayKey,profileId:state.profileId,planId:plan.id});toast("Plan '"+plan.name+"' set for today");}async function addPlan(){const newPlan={id:uid(),profileId:state.profileId,name:"New Template",schedule:{},order:planState.plans.length};await saveLocal("plans",newPlan);planState.plans.push(newPlan);planState.mode="templates";planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Template added - use Rename to name it");}async function deletePlan(idx){if(planState.plans.length<=1){toast("Cannot delete the last plan");return;}const plan=planState.plans[idx];await db.transaction(["plans"],"readwrite").objectStore("plans").delete(plan.id);planState.plans.splice(idx,1);if(planState.selectedPlanIdx>=planState.plans.length)planState.selectedPlanIdx=planState.plans.length-1;await renderPlanPageUI();toast("Plan deleted");}
 function renderPlanSlots(){const times=document.getElementById("planSlots");const schedules=document.getElementById("planSchedule");let timesHtml='';let schedHtml='';for(let h=planState.startHour;h<planState.endHour;h++){for(let m=0;m<60;m+=planState.increment){const slot=h+':'+(m===0?'00':m);const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+planState.increment>=60?h+1:h)%12||12;const endMin=String((m+planState.increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;const scheduled=planState.schedule[slot];const ch=scheduled?state.channels.find(x=>x.id===scheduled):null;timesHtml+=`<div style="padding:8px 4px;text-align:center;font-size:11px;font-weight:600;color:var(--ink2);flex-shrink:0;border-bottom:1px solid var(--line)">${timeStr}</div>`;schedHtml+=`<div class="time-block-target" data-slot="${slot}" style="padding:8px;min-height:42px;background:${ch?ch.color+'15':'var(--panel2)'};border:2px solid ${ch?ch.color:'var(--line)'};border-radius:6px;display:flex;align-items:center;justify-content:center;text-align:center;color:${ch?ch.color:'var(--ink2)'};font-size:11px;font-weight:${ch?'700':'500'};cursor:move;flex-shrink:0;transition:all .15s;word-break:break-word">${ch?ch.label:''}</div>`;}}times.innerHTML=timesHtml;schedules.innerHTML=schedHtml;}
 function renderPlanChannels(){const ch=document.getElementById("planChannels");let html='';if(state.channels){state.channels.filter(c=>!c.archived).forEach(c=>{html+=`<div draggable="true" data-ch="${c.id}" style="padding:6px 4px;border:2px solid ${c.color};background:${c.color}15;color:${c.color};border-radius:5px;cursor:move;font-weight:700;font-size:11px;text-align:center;flex-shrink:0;transition:all .15s;word-break:break-word">${escapeHtml(c.label)}</div>`;});}ch.innerHTML=html;ch.querySelectorAll('[draggable="true"]').forEach(el=>{el.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',el.dataset.ch);});el.addEventListener('dragend',e=>{el.style.opacity='1';});});}
-async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,16,28,.7)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",openEditsModal);}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}/* ===== daily scoring =====
+async function openPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;const today=todayKey();const dayKey=todayKey();let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'});const dateStr=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase">${dayName} ${dateStr}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} - Adherence</h2></div><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",()=>openDayEditor(todayKey()));}const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}/* ===== daily scoring =====
    Two independent measures, because they answer different questions:
 
      Timing  - did you do the planned channel in the planned block.
@@ -3679,7 +4249,7 @@ async function refreshDayScores(dk){
 }
 async function refreshTodayScores(){ return refreshDayScores(todayKey()); }
 
-async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;flex-wrap:wrap;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;min-height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;min-height:36px;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
+async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden;flex-wrap:nowrap;min-width:0;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;height:36px;overflow:hidden;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
   
   (async ()=>{
     const S=computeDayScores(plan,today,todaySessions);
@@ -3943,12 +4513,12 @@ function starCellHtml(dateKey,rating,fnName,size){
    existing date cell rather than as a new column: the Summary tables are read
    on a phone, and a fifth column would push them into horizontal scrolling.
    It also avoids the header/body column-count trap documented in Landmines. */
-function dayTypeSelectHtml(dateKey,current){
+function dayTypeSelectHtml(dateKey,current,inline){
   const opts=[{v:"",label:"Working"}].concat(DAY_TYPES.map(d=>({v:d.v,label:d.label})));
   const cur=current||"";
   const def=dayTypeDef(cur);
   return '<select onchange="window.setDayTypeFromSummary(\''+dateKey+'\',this.value)" '+
-    'style="margin-top:5px;font-size:16px;padding:3px 5px;border-radius:8px;background:#0a1424;color:'+(def?def.color:"var(--ink2)")+';border:1px solid '+(def?def.color:"var(--line)")+'">'+
+    'style="'+(inline?'width:100%;':'margin-top:5px;')+'font-size:16px;padding:3px 5px;border-radius:8px;background:var(--field);color:'+(def?def.color:"var(--ink2)")+';border:1px solid '+(def?def.color:"var(--line)")+'">'+
     opts.map(o=>'<option value="'+o.v+'"'+(o.v===cur?" selected":"")+'>'+escapeHtml(o.label)+'</option>').join("")+
     '</select>';
 }
@@ -4140,7 +4710,7 @@ function showBootError(err){
   box.innerHTML='<div style="max-width:420px;width:100%;background:var(--panel);border:1px solid var(--warn);border-radius:14px;padding:22px">'+
     '<div style="font-size:17px;font-weight:800;color:var(--ink);margin-bottom:8px">This device could not load your data</div>'+
     '<div class="hint" style="margin-bottom:14px">Your time and channels are safe in the cloud. This is a problem with the copy stored on this device.</div>'+
-    '<div style="font-size:11px;font-family:ui-monospace,monospace;color:var(--ink2);background:#0a1424;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:16px;word-break:break-word">'+escapeHtml(msg)+'</div>'+
+    '<div style="font-size:11px;font-family:ui-monospace,monospace;color:var(--ink2);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:16px;word-break:break-word">'+escapeHtml(msg)+'</div>'+
     '<button class="btn pri" id="bootFixBtn" style="width:100%">Reset this device and reload</button>'+
     '<button class="btn sm" id="bootRetryBtn" style="width:100%;margin-top:8px">Just reload</button></div>';
   document.body.appendChild(box);
