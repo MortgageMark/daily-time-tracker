@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v19
-- **Last deployed:** v19, 2026-08-27
+- **Current release:** v20
+- **Last deployed:** v20, 2026-08-27
 - **Status:** stable, in daily use
 
 > **Verify before believing any release claim in this file.** It has been
@@ -966,6 +966,29 @@ both names so the app works before the migration is run.
 
 `supabase-channels-joy-drain-migration.sql` **has not been run.** Until it does,
 joy and drain are stored and reported on the device but do not sync.
+
+### First-run orientation, v20
+
+`showIntroOnce()` puts one sheet in front of everyone - existing users as well
+as new ones - saying the default channels are only a starting point and
+pointing at the avatar menu.
+
+The problem it solves: a new account lands on default channels that are not
+theirs, with nothing on screen saying they can be changed, exactly when someone
+is deciding whether the tool is for them.
+
+- **Device-local** (`localStorage`, `dtt-intro-seen`), not a profile field. It
+  records whether this person has read it; a profile field would sync the
+  dismissal to a phone they have not opened yet. **If storage throws it counts
+  as seen** - nagging every load is worse than never showing it.
+- **The backdrop does not dismiss it.** Both buttons do, and both mark it seen.
+  The point is that it gets read once.
+- The pointer is a **small DOM mock of the top bar**, not a screenshot: it
+  cannot go stale, it themes itself, and it sits next to real live chrome.
+- Called at the end of `enterApp()`, inside a try/catch, so it can never break
+  entry - `enterAppSafe()` would otherwise show the boot-error panel.
+
+To show a new intro later, bump the key rather than reusing it.
 
 ---
 
