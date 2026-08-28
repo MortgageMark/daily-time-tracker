@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v21
-- **Last deployed:** v21, 2026-08-27
+- **Current release:** v22
+- **Last deployed:** v22, 2026-08-27
 - **Status:** stable, in daily use
 
 > **Verify before believing any release claim in this file.** It has been
@@ -43,7 +43,7 @@ supabase-channel-attributes-migration.sql
 supabase-dayplans-daytype-migration.sql
                                 RUN 2026-08-27. Adds dayplans.day_type.
 supabase-channels-joy-drain-migration.sql
-                                NOT YET RUN - adds channels.joy/.drain.
+                                RUN 2026-08-27. Adds channels.joy/.drain.
 apple-touch-icon.png            180px, iOS home screen
 icon-192.png / icon-512.png     manifest icons (512 doubles as maskable)
 favicon-32.png                  browser tab
@@ -964,8 +964,8 @@ Beyond the table, only the explicit serialisers needed touching: `toRow()` /
 `fromRow()` list channel columns by hand, and `OPTIONAL_COLUMNS.channels` gained
 both names so the app works before the migration is run.
 
-`supabase-channels-joy-drain-migration.sql` **has not been run.** Until it does,
-joy and drain are stored and reported on the device but do not sync.
+`supabase-channels-joy-drain-migration.sql` **was run on 2026-08-27**, so joy
+and drain sync normally.
 
 ### First-run orientation, v20
 
@@ -1007,6 +1007,27 @@ hard to see where one ended and the next began.
 correct can fail to match while the same text matches with the other ending.
 Any script editing this file should try CRLF and LF before giving up, or anchor
 on single lines.
+
+### All five Data Management actions were dead, v22
+
+`exportDataBackup`, `checkDeletedDaysCount`, `restoreDeletedDays`,
+`showDeleteRangePrompt` and `showCompleteResetConfirm` each called
+`idbAll("day_notes","profile", ...)`. **`day_notes` has no `profile` index** -
+it is keyed by date alone, which is the documented reason it does not sync - so
+every one of those calls threw `The specified index was not found` and the
+action did nothing. Long-standing; it only became visible because v20 promoted
+Export backup to the avatar menu, where a silent failure would have been
+obvious. They now read every note, which is correct: `day_notes` is not
+profile-scoped in the first place.
+
+**This is the landmine about missing indexes, in its quieter form.** The
+documented version renders the whole app blank. This one killed five actions
+behind buttons nobody presses often, silently, for an unknown length of time.
+Worth running the sweep below after any change that touches storage.
+
+A smoke pass over 22 views and transitions - every screen, both themes, day
+navigation, zoom, all modals - now raises no errors, no unhandled rejections
+and nothing on `console.error`.
 
 ---
 

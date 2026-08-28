@@ -2495,7 +2495,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=21;
+const APP_RELEASE=22;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -4492,7 +4492,12 @@ async function exportCsv(){
 /* ===== DATA MANAGEMENT ===== */
 async function exportDataBackup(){
   const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
-  const allNotes=await idbAll("day_notes","profile",IDBKeyRange.only(state.profileId));
+  /* day_notes is keyed by date ALONE and carries no `profile` index - that is
+     deliberate, and the documented reason it does not sync. Asking for one
+     threw on every call, so all five Data Management actions, Export backup
+     included, failed outright. Fetch every note instead; they are not
+     profile-scoped in the first place. */
+  const allNotes=await idbAll("day_notes");   /* no profile index - see below */
   const backup={
     exportDate:new Date().toISOString(),
     profile:state.profile,
@@ -4512,7 +4517,7 @@ async function exportDataBackup(){
 }
 
 async function checkDeletedDaysCount(){
-  const allNotes=await idbAll("day_notes","profile",IDBKeyRange.only(state.profileId));
+  const allNotes=await idbAll("day_notes");   /* no profile index - see below */
   const deletedCount=allNotes.filter(n=>n.deleted).length;
   const countDiv=document.getElementById("deletedDaysCount");
   const restoreBtn=document.getElementById("restoreDeletedBtn");
@@ -4529,7 +4534,7 @@ async function checkDeletedDaysCount(){
 
 async function restoreDeletedDays(){
   if(!await uiConfirm("Restore all deleted days to your history?"))return;
-  const allNotes=await idbAll("day_notes","profile",IDBKeyRange.only(state.profileId));
+  const allNotes=await idbAll("day_notes");   /* no profile index - see below */
   const deletedNotes=allNotes.filter(n=>n.deleted);
   for(const note of deletedNotes){
     note.deleted=false;
@@ -4558,7 +4563,7 @@ async function showDeleteRangePrompt(){
     return;
   }
   
-  const allNotes=await idbAll("day_notes","profile",IDBKeyRange.only(state.profileId));
+  const allNotes=await idbAll("day_notes");   /* no profile index - see below */
   let deleteCount=0;
   
   for(const note of allNotes){
@@ -4595,7 +4600,7 @@ async function showCompleteResetConfirm(){
   toast("Resetting your data...");
   
   const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
-  const allNotes=await idbAll("day_notes","profile",IDBKeyRange.only(state.profileId));
+  const allNotes=await idbAll("day_notes");   /* no profile index - see below */
   
   for(const s of allSessions){
     await idbDelete("sessions",s.id);
