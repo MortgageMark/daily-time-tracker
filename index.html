@@ -946,6 +946,12 @@ async function runSync(){
   }
   // PULL
   await pullRemote();
+  /* A pull is exactly when the other device's open session shows up. */
+  const merged=await reconcileMultipleOpen();
+  if(merged){
+    await updateTodayTotals(); renderAll();
+    toast("Two timers were running on different devices — kept "+merged.kept);
+  }
   const rem=(await dirtyRecords()).length;
   setSync(rem?"pending":"synced", rem);
 }
@@ -985,10 +991,12 @@ async function reloadFromLocal(){
   
   console.log("reloadFromLocal: Found", chs.length, "channels");
   chs.sort((a,b)=>a.order-b.order); state.channels=chs;
+  const merged=await reconcileMultipleOpen();
   const sess=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
   const open=sess.find(s=>s.endTs===null||s.endTs===undefined);
   running=open?{sessionId:open.id,channelId:open.channelId,startTs:open.startTs}:null;
   renderAll();
+  if(merged) toast("Two timers were running on different devices — kept "+merged.kept);
   /* Paint first, then reconcile: an overnight session raises a dialog, and it
      should appear over the rendered app rather than over a blank screen. */
   if(open) await reconcileOpenSession(open);
@@ -1129,6 +1137,37 @@ async function reconcileOpenSession(open){
     await updateTodayTotals(); renderAll();
   } finally { reconcilingSession=false; }
 }
+/* Two devices can each open a session before either has pulled the other's.
+   stopRunning() only ends what THIS device knows is running, so nothing stops
+   the second one being created - and because updateTodayTotals() treats every
+   session with a null endTs as still accruing, two tiles then count up at once.
+   reloadFromLocal() only ever noticed the FIRST open session, so the other ran
+   invisibly and forever.
+
+   The newest open session wins: it is what the person most recently chose.
+   Each older one is closed at the moment the next one began, which is exactly
+   what would have happened had both taps landed on the same device. Nothing is
+   deleted, and the times stay correctable in the Day Editor. */
+async function reconcileMultipleOpen(){
+  if(!db||!state.profileId) return null;
+  const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
+  const open=liveSessions(all)
+    .filter(x=>x.endTs===null||x.endTs===undefined)
+    .sort((a,b)=>a.startTs-b.startTs);
+  if(open.length<2) return null;
+  for(let i=0;i<open.length-1;i++){
+    const s=open[i];
+    /* Never invent negative time if the clocks disagreed. */
+    s.endTs=Math.max(s.startTs,open[i+1].startTs);
+    s.durMs=s.endTs-s.startTs;
+    await saveLocal("sessions",s);
+  }
+  const win=open[open.length-1];
+  running={sessionId:win.id,channelId:win.channelId,startTs:win.startTs};
+  const ch=state.channels.find(c=>c.id===win.channelId);
+  return {closed:open.length-1,kept:ch?ch.label:""};
+}
+
 async function switchTo(channelId){
   const t=now();
   const ch=state.channels.find(c=>c.id===channelId);
@@ -2495,7 +2534,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=22;
+const APP_RELEASE=23;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){

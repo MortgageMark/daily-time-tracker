@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v22
-- **Last deployed:** v22, 2026-08-27
+- **Current release:** v23
+- **Last deployed:** v23, 2026-08-27
 - **Status:** stable, in daily use
 
 > **Verify before believing any release claim in this file.** It has been
@@ -1028,6 +1028,37 @@ Worth running the sweep below after any change that touches storage.
 A smoke pass over 22 views and transitions - every screen, both themes, day
 navigation, zoom, all modals - now raises no errors, no unhandled rejections
 and nothing on `console.error`.
+
+### Two timers at once across devices, v23
+
+Reported from a real iPad/iPhone pair, and reproduced exactly.
+
+`startSessionOnChannel()` calls `stopRunning()` first, which ends only what
+**this device** knows is running. So: the phone opens Admin and pushes it; the
+iPad has not pulled yet, opens Marketing, and ends nothing. After the next sync
+two rows carry `endTs: null`.
+
+Both then accrue, because `updateTodayTotals()` counts any null-ended session
+as `now() - startTs`. Only one tile shows the *Running* badge - `running` is a
+single in-memory pointer - but two tiles count upward, which is what it looks
+like from the outside. `reloadFromLocal()` made it permanent: it took the
+**first** open session with `.find()` and never looked at the rest, so the
+loser ran invisibly and forever.
+
+`reconcileMultipleOpen()` runs on load and after every pull - a pull being
+exactly when the other device's session arrives. The newest open session wins,
+since it is what the person most recently chose, and each older one is closed
+at the moment the next began: precisely what would have happened had both taps
+landed on one device. Nothing is deleted and every time stays correctable in
+the Day Editor. A toast says what happened rather than fixing it silently.
+
+Verified: two-way and three-way pileups, identical start times producing no
+negative durations, a single open session left untouched, and the load path.
+
+**The underlying asymmetry is unchanged and is the thing to revisit** if this
+recurs in another form: a device can only ever end sessions it knows about, so
+any state that must be globally exclusive has this shape. Backlog 7.7 made the
+same point about the merge rule.
 
 ---
 
