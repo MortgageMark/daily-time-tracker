@@ -726,7 +726,7 @@ async function updatePendingCount(){ const cnt=document.getElementById("pendingC
 
 function toRow(store,r){
   if(store==="profiles")return {id:r.id,name:r.name,hour_fmt:r.hourFmt||"12",confirm_end:(r.confirmEnd!=="0")};
-  if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived,parent_channel_id:r.parentChannelId||null,tier:r.tier||null,drip:r.drip||null,urgency:r.urgency||null,importance:r.importance||null};
+  if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived,parent_channel_id:r.parentChannelId||null,tier:r.tier||null,drip:r.drip||null,urgency:r.urgency||null,importance:r.importance||null,joy:r.joy||null,drain:r.drain||null};
   if(store==="sessions")return {id:r.id,profile_id:r.profileId,channel_id:r.channelId,start_ts:new Date(r.startTs).toISOString(),end_ts:r.endTs?new Date(r.endTs).toISOString():null,duration_seconds:r.endTs?Math.round((r.endTs-r.startTs)/1000):null,business_date:r.date,voided:!!r.voided,revision:r.revision||0};
   if(store==="plans")return {id:r.id,profile_id:r.profileId,name:r.name,schedule:r.schedule||{},sort_order:r.order||0};
   if(store==="dayplans")return {id:r.id,profile_id:r.profileId,date:r.date,plan_id:r.planId||null,plan_name:r.planName||null,schedule:r.schedule||{},edited:!!r.edited,day_type:r.dayType||null};
@@ -734,7 +734,7 @@ function toRow(store,r){
 function fromRow(store,row){
   const u=row.updated_at?Date.parse(row.updated_at):now();
   if(store==="profiles")return {id:row.id,name:row.name,hourFmt:row.hour_fmt||"12",confirmEnd:row.confirm_end?"1":"0",_u:u,_dirty:false};
-  if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,parentChannelId:row.parent_channel_id||null,tier:row.tier||null,drip:row.drip||null,urgency:row.urgency||null,importance:row.importance||null,_u:u,_dirty:false};
+  if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,parentChannelId:row.parent_channel_id||null,tier:row.tier||null,drip:row.drip||null,urgency:row.urgency||null,importance:row.importance||null,joy:row.joy||null,drain:row.drain||null,_u:u,_dirty:false};
   if(store==="plans")return {id:row.id,profileId:row.profile_id,name:row.name,schedule:row.schedule||{},order:row.sort_order||0,_u:u,_dirty:false};
   if(store==="dayplans")return {id:row.id,profileId:row.profile_id,date:row.date,planId:row.plan_id||null,planName:row.plan_name||null,schedule:row.schedule||{},edited:!!row.edited,dayType:row.day_type||null,_u:u,_dirty:false};
   if(store==="sessions")return {id:row.id,profileId:row.profile_id,channelId:row.channel_id,startTs:Date.parse(row.start_ts),endTs:row.end_ts?Date.parse(row.end_ts):null,durMs:row.end_ts?(Date.parse(row.end_ts)-Date.parse(row.start_ts)):0,date:row.business_date,voided:!!row.voided,revision:row.revision||0,_u:u,_dirty:false};
@@ -776,7 +776,7 @@ function noteMissingTable(store,error){
    new fields. So on that error the new columns are stripped and the push is
    retried, and the full set is retried periodically in case the migration
    lands later. Same shape as the missing-table handling above. */
-const OPTIONAL_COLUMNS={channels:["tier","drip","urgency","importance"],dayplans:["day_type"]};
+const OPTIONAL_COLUMNS={channels:["tier","drip","urgency","importance","joy","drain"],dayplans:["day_type"]};
 const missingRemoteColumns=new Map();
 const MISSING_COLUMN_RETRY_MS=10*60*1000;
 function columnsSkipped(store){
@@ -1348,7 +1348,11 @@ const CHANNEL_ATTRS=[
             {v:"I",label:"Invest",color:"#22c55e"},
             {v:"P",label:"Produce",color:"#4f8cff"}]},
   {key:"urgency",label:"Urgency",hint:"1 = can wait, 5 = needs doing now",scale:true},
-  {key:"importance",label:"Importance",hint:"1 = low impact, 5 = high impact",scale:true}
+  {key:"importance",label:"Importance",hint:"1 = low impact, 5 = high impact",scale:true},
+  /* invert flips the colour ramp: on these two a 5 is the good end for joy
+     and the bad end for drain, and they should not both paint red. */
+  {key:"joy",label:"Joy",hint:"1 = you dread it, 5 = you love it",scale:true,invert:true},
+  {key:"drain",label:"Drain",hint:"1 = leaves you energised, 5 = wipes you out",scale:true}
 ];
 const HIGH_SCALE=4;   /* 4-5 counts as urgent / important on the quadrant */
 
@@ -1374,7 +1378,10 @@ function attrColor(key,v){
   if(v===null||v===undefined||v==="") return "#475569";
   const o=attrOption(key,v); if(o) return o.color;
   const n=parseInt(v,10);
-  if(!isNaN(n)) return ["#475569","#22c55e","#84cc16","#f59e0b","#f97316","#ef4444"][Math.max(1,Math.min(5,n))];
+  if(!isNaN(n)){
+    const d=attrDef(key), i=Math.max(1,Math.min(5,n));
+    return ["#475569","#22c55e","#84cc16","#f59e0b","#f97316","#ef4444"][d&&d.invert?6-i:i];
+  }
   return "#475569";
 }
 
@@ -2474,7 +2481,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=18;
+const APP_RELEASE=19;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
