@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v18
-- **Last deployed:** v18, 2026-08-27
+- **Current release:** v19
+- **Last deployed:** v19, 2026-08-27
 - **Status:** stable, in daily use
 
 > **Verify before believing any release claim in this file.** It has been
@@ -42,6 +42,8 @@ supabase-channel-attributes-migration.sql
                                 RUN 2026-08-26. Channel attribute columns.
 supabase-dayplans-daytype-migration.sql
                                 RUN 2026-08-27. Adds dayplans.day_type.
+supabase-channels-joy-drain-migration.sql
+                                NOT YET RUN - adds channels.joy/.drain.
 apple-touch-icon.png            180px, iOS home screen
 icon-192.png / icon-512.png     manifest icons (512 doubles as maskable)
 favicon-32.png                  browser tab
@@ -196,6 +198,8 @@ report section is generated from it, so a fourth scheme is a few lines.
 | `drip` | `D` Delegate / `R` Replace / `I` Invest / `P` Produce |
 | `urgency` | 1-5 |
 | `importance` | 1-5 |
+| `joy` | 1-5, 5 = loves it |
+| `drain` | 1-5, 5 = wipes you out |
 
 `channelAttr(ch,key)` resolves a value, falling back to the parent channel, so
 a subcategory inherits its parent unless tagged itself. **Unset values are
@@ -943,6 +947,25 @@ the left side is just the date controls and the plan name.
   blue the moment applying would change something.
 - **Export Data Backup moved out of Settings** into the avatar menu, between
   Light mode and Settings. Settings keeps the other Data Management rows.
+
+### Joy and Drain, v19
+
+Proof that `CHANNEL_ATTRS` was worth building. Two new 1-5 schemes cost two
+entries in that table; the channel editor's pickers, the Priorities sections,
+`attrTotals()` and parent-to-subcategory inheritance all came for free, because
+every one of them is generated from the table rather than written per scheme.
+
+The only genuinely new code is a colour rule. The 1-5 ramp runs green to red,
+which is right for drain and backwards for joy, so a scheme can now set
+`invert:true` and `attrColor()` reads its ramp from the other end. Without it a
+5 for joy would have been painted like a warning.
+
+Beyond the table, only the explicit serialisers needed touching: `toRow()` /
+`fromRow()` list channel columns by hand, and `OPTIONAL_COLUMNS.channels` gained
+both names so the app works before the migration is run.
+
+`supabase-channels-joy-drain-migration.sql` **has not been run.** Until it does,
+joy and drain are stored and reported on the device but do not sync.
 
 ---
 
