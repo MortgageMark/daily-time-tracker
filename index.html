@@ -1338,21 +1338,21 @@ async function setDayType(dk,v){
    from this table, so a fourth scheme is a few lines rather than a feature.
    ===================================================================== */
 const CHANNEL_ATTRS=[
-  {key:"tier",label:"Commitment",hint:"How negotiable is this work?",
+  {key:"tier",label:"Commitment",hint:"How negotiable is this work?",group:"Type of work",
    options:[{v:"must",label:"Must",hint:"Non-negotiable",color:"#ef4444"},
             {v:"will",label:"Will",hint:"Committed to it",color:"#4f8cff"},
             {v:"want",label:"Want",hint:"Only if time allows",color:"#22c55e"}]},
-  {key:"drip",label:"DRIP",hint:"What should happen to this work over time?",
+  {key:"drip",label:"DRIP",hint:"What should happen to this work over time?",group:"Type of work",
    options:[{v:"D",label:"Delegate",color:"#f59e0b"},
             {v:"R",label:"Replace",color:"#a855f7"},
             {v:"I",label:"Invest",color:"#22c55e"},
             {v:"P",label:"Produce",color:"#4f8cff"}]},
-  {key:"urgency",label:"Urgency",hint:"1 = can wait, 5 = needs doing now",scale:true},
-  {key:"importance",label:"Importance",hint:"1 = low impact, 5 = high impact",scale:true},
+  {key:"urgency",label:"Urgency",hint:"1 = can wait, 5 = needs doing now",scale:true,group:"Priority"},
+  {key:"importance",label:"Importance",hint:"1 = low impact, 5 = high impact",scale:true,group:"Priority"},
   /* invert flips the colour ramp: on these two a 5 is the good end for joy
      and the bad end for drain, and they should not both paint red. */
-  {key:"joy",label:"Joy",hint:"1 = you dread it, 5 = you love it",scale:true,invert:true},
-  {key:"drain",label:"Drain",hint:"1 = leaves you energised, 5 = wipes you out",scale:true}
+  {key:"joy",label:"Joy",hint:"1 = you dread it, 5 = you love it",scale:true,invert:true,group:"Energy"},
+  {key:"drain",label:"Drain",hint:"1 = leaves you energised, 5 = wipes you out",scale:true,group:"Energy"}
 ];
 const HIGH_SCALE=4;   /* 4-5 counts as urgent / important on the quadrant */
 
@@ -2385,10 +2385,19 @@ async function renderPriorities(){
   totalLine.textContent="Total tracked: "+fmtDurShort(data.total);
   body.appendChild(totalLine);
 
+  /* One bordered card per scheme. As a flat stack of bars these read as a
+     single long list, and it was hard to see where Commitment ended and DRIP
+     began. */
   CHANNEL_ATTRS.forEach(def=>{
-    const sect=document.createElement("div"); sect.style.cssText="margin-bottom:22px";
-    const t=document.createElement("div"); t.className="sect-title"; t.style.marginTop="0"; t.textContent=def.label;
+    const sect=document.createElement("div");
+    sect.style.cssText="margin-bottom:12px;padding:13px 14px 10px;border:1px solid var(--line);"+
+      "border-radius:12px;background:var(--panel2)";
+    const t=document.createElement("div"); t.className="sect-title"; t.style.marginTop="0";
+    t.style.marginBottom="4px"; t.textContent=def.label;
     sect.appendChild(t);
+    const dh=document.createElement("div"); dh.className="hint"; dh.style.margin="0 0 11px";
+    dh.textContent=def.hint||"";
+    sect.appendChild(dh);
     const buckets=def.scale?["1","2","3","4","5"]:def.options.map(o=>o.v);
     let shown=0;
     buckets.concat([""]).forEach(v=>{
@@ -2405,12 +2414,16 @@ async function renderPriorities(){
     body.appendChild(sect);
   });
 
-  /* Eisenhower quadrant */
-  const qt=document.createElement("div"); qt.className="sect-title"; qt.textContent="Eisenhower quadrant";
-  body.appendChild(qt);
-  const qh=document.createElement("div"); qh.className="hint"; qh.style.margin="0 0 10px";
+  /* Eisenhower quadrant - same card as every section above it. */
+  const qcard=document.createElement("div");
+  qcard.style.cssText="margin-bottom:12px;padding:13px 14px;border:1px solid var(--line);"+
+    "border-radius:12px;background:var(--panel2)";
+  const qt=document.createElement("div"); qt.className="sect-title"; qt.style.marginTop="0";
+  qt.style.marginBottom="4px"; qt.textContent="Eisenhower quadrant";
+  qcard.appendChild(qt);
+  const qh=document.createElement("div"); qh.className="hint"; qh.style.margin="0 0 11px";
   qh.textContent="Urgent and Important both mean a rating of "+HIGH_SCALE+" or 5.";
-  body.appendChild(qh);
+  qcard.appendChild(qh);
   const grid=document.createElement("div");
   grid.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:8px";
   QUADRANTS.forEach(q=>{
@@ -2424,12 +2437,13 @@ async function renderPriorities(){
       '<div class="hint" style="margin:2px 0 0">'+pct+'% of tracked time</div>';
     grid.appendChild(cell);
   });
-  body.appendChild(grid);
+  qcard.appendChild(grid);
   if(data.quad.untagged){
     const u=document.createElement("div"); u.className="hint"; u.style.margin="10px 0 0";
     u.textContent=fmtDurShort(data.quad.untagged)+" is not on the grid because those channels have no urgency or importance rating yet.";
-    body.appendChild(u);
+    qcard.appendChild(u);
   }
+  body.appendChild(qcard);
   root.appendChild(body);
 }
 
@@ -2481,7 +2495,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=20;
+const APP_RELEASE=21;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -3352,6 +3366,24 @@ function renderChannelAttrs(ch){
   const host=document.getElementById("chanAttrs");
   if(!host) return;
   host.innerHTML=""; editingAttrs={};
+  /* One card per group, so six schemes read as three questions rather than a
+     flat list. The grouping is data on CHANNEL_ATTRS like everything else
+     here, so a new scheme joins a card simply by naming one. */
+  const groupHosts={};
+  CHANNEL_ATTRS.forEach(d=>{
+    const g=d.group||"Other";
+    if(groupHosts[g]) return;
+    const card=document.createElement("div");
+    card.style.cssText="margin-bottom:14px;padding:13px 14px 0;border:1px solid var(--line);"+
+      "border-radius:12px;background:var(--panel2)";
+    const gt=document.createElement("div");
+    gt.style.cssText="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;"+
+      "letter-spacing:.6px;margin-bottom:13px";
+    gt.textContent=g;
+    card.appendChild(gt);
+    host.appendChild(card);
+    groupHosts[g]=card;
+  });
   CHANNEL_ATTRS.forEach(def=>{
     const cur=(ch&&ch[def.key]!==undefined&&ch[def.key]!==null)?String(ch[def.key]):"";
     editingAttrs[def.key]=cur;
@@ -3389,7 +3421,7 @@ function renderChannelAttrs(ch){
     });
     paint();
     wrap.appendChild(t); wrap.appendChild(h); wrap.appendChild(row);
-    host.appendChild(wrap);
+    groupHosts[def.group||"Other"].appendChild(wrap);
   });
 }
 function applyEditingAttrs(rec){
