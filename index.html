@@ -2481,7 +2481,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=19;
+const APP_RELEASE=20;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -2754,6 +2754,94 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
   ver.innerHTML='<span>Version</span><span style="font-variant-numeric:tabular-nums;color:var(--ink2)">v'+APP_RELEASE+'</span><span style="font-variant-numeric:tabular-nums;opacity:.75">'+fmtBuild(BUILD_ID)+'</span>';
   ver.title="Release v"+APP_RELEASE+"  build "+String(BUILD_ID);
   m.appendChild(ver);
+}
+
+/* ---------------------------------------------------------------------
+   First-run orientation.
+   A new account lands on a set of default channels that are not theirs, and
+   nothing on screen says they can be changed - so the app reads as "this is
+   about somebody else's work" exactly when someone is deciding whether to
+   keep it. Shown once per device, to existing users as well as new ones.
+
+   Device-local (localStorage), not a profile field: it is about whether this
+   person has read it, and a profile field would sync the dismissal to a phone
+   they have not opened yet. If storage throws, treat it as already seen -
+   nagging on every load is worse than never showing it.
+   --------------------------------------------------------------------- */
+const INTRO_KEY="dtt-intro-seen";
+function introSeen(){ try{ return localStorage.getItem(INTRO_KEY)==="1"; }catch(e){ return true; } }
+function markIntroSeen(){ try{ localStorage.setItem(INTRO_KEY,"1"); }catch(e){} }
+
+function showIntroOnce(){
+  if(introSeen()||document.getElementById("introScrim")) return;
+  const scrim=document.createElement("div");
+  scrim.className="scrim open"; scrim.id="introScrim";
+  scrim.style.cssText="position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);"+
+    "display:flex;align-items:center;justify-content:center;z-index:210;padding:20px";
+  const card=document.createElement("div");
+  card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:18px;"+
+    "padding:24px;max-width:430px;width:100%;box-shadow:var(--shadow);max-height:88vh;overflow:auto";
+
+  const h=document.createElement("div");
+  h.style.cssText="font-size:19px;font-weight:800;color:var(--ink);margin-bottom:10px";
+  h.textContent="These channels are only a starting point";
+  card.appendChild(h);
+
+  const p1=document.createElement("div");
+  p1.className="hint"; p1.style.cssText="margin:0 0 16px;font-size:14px";
+  p1.textContent="The buttons on your dashboard are examples, not a fixed list. "+
+    "Rename them, recolour them, add your own, group them into subcategories, "+
+    "or delete the ones that have nothing to do with your work. Most people "+
+    "replace nearly all of them.";
+  card.appendChild(p1);
+
+  /* A small mock of the top bar rather than a screenshot: it cannot go stale,
+     it themes itself, and it points at the real thing in the right place. */
+  const mockWrap=document.createElement("div");
+  mockWrap.style.cssText="margin:0 0 8px";
+  const mock=document.createElement("div");
+  mock.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;"+
+    "background:var(--panel2);border:1px solid var(--line)";
+  const mockDate=document.createElement("div");
+  mockDate.style.cssText="font-size:11px;font-weight:700;color:var(--ink2);flex:1";
+  mockDate.textContent="Today";
+  const mockPill=document.createElement("div");
+  mockPill.style.cssText="font-size:10px;font-weight:700;color:var(--muted);border:1px solid var(--line);"+
+    "border-radius:999px;padding:3px 9px";
+  mockPill.textContent="Idle";
+  const mockAv=document.createElement("div");
+  mockAv.style.cssText="width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;"+
+    "display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;"+
+    "box-shadow:0 0 0 3px var(--accent)55";
+  mockAv.textContent=(state.profile&&state.profile.name?state.profile.name[0]:"M").toUpperCase();
+  [mockDate,mockPill,mockAv].forEach(n=>mock.appendChild(n));
+  mockWrap.appendChild(mock);
+  const point=document.createElement("div");
+  point.className="hint";
+  point.style.cssText="margin:8px 0 18px;font-size:13px;text-align:right";
+  point.textContent="↑  Tap your initial, top right, then Channels";
+  mockWrap.appendChild(point);
+  card.appendChild(mockWrap);
+
+  const row=document.createElement("div");
+  row.style.cssText="display:flex;flex-direction:column;gap:8px";
+  const close=()=>{ markIntroSeen(); if(scrim.parentNode) scrim.parentNode.removeChild(scrim); };
+  const go=document.createElement("button");
+  go.className="btn sm pri"; go.style.width="100%";
+  go.textContent="Set up my channels";
+  go.addEventListener("click",()=>{ close(); openChannels(); });
+  const later=document.createElement("button");
+  later.className="btn sm"; later.style.width="100%";
+  later.textContent="I will do it later";
+  later.addEventListener("click",close);
+  row.appendChild(go); row.appendChild(later);
+  card.appendChild(row);
+
+  scrim.appendChild(card);
+  /* Deliberately NOT dismissible by tapping the backdrop: the whole point is
+     that it gets read once. Both buttons close it and both mark it seen. */
+  document.body.appendChild(scrim);
+  setTimeout(()=>go.focus(),40);
 }
 
 /* ===== scrims ===== */
@@ -4856,6 +4944,8 @@ async function enterApp(){
   const pid=(last&&profs.find(p=>p.id===last.v))?last.v:(profs[0]&&profs[0].id);
   if(pid) await loadProfile(pid);
   setSync("syncing"); runSync();
+  /* After the app is on screen, and never allowed to break entry. */
+  try{ showIntroOnce(); }catch(e){ console.warn("intro failed",e); }
 }
 
 /* ===== sync triggers ===== */
