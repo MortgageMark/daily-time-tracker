@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v20
-- **Last deployed:** v20, 2026-08-27
+- **Current release:** v21
+- **Last deployed:** v21, 2026-08-27
 - **Status:** stable, in daily use
 
 > **Verify before believing any release claim in this file.** It has been
@@ -989,6 +989,24 @@ is deciding whether the tool is for them.
   entry - `enterAppSafe()` would otherwise show the boot-error panel.
 
 To show a new intro later, bump the key rather than reusing it.
+
+### Attribute grouping, v21
+
+Six schemes had become a flat stack in both places that show them, and it was
+hard to see where one ended and the next began.
+
+- **Priorities**: every scheme is now its own bordered card carrying its own
+  hint, and the Eisenhower quadrant uses the same card, so the page reads as
+  uniform blocks rather than one long list of bars.
+- **Channel editor**: three cards - **Type of work** (Commitment, DRIP),
+  **Priority** (Urgency, Importance), **Energy** (Joy, Drain). Membership is a
+  `group` field on `CHANNEL_ATTRS`, so a new scheme joins a card by naming one
+  and an unnamed scheme falls into "Other" rather than disappearing.
+
+**`index.html` line endings are not uniform.** A multi-line anchor that looks
+correct can fail to match while the same text matches with the other ending.
+Any script editing this file should try CRLF and LF before giving up, or anchor
+on single lines.
 
 ---
 
