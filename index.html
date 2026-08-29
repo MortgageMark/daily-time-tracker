@@ -2846,6 +2846,7 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
      the rename never existed, which is half of why this was hidden. */
   const sep=document.createElement("div");sep.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep);
   m.appendChild(avatarMenuItem("📅","Edit a day",()=>openDayEditor(todayKey())));
+  m.appendChild(avatarMenuItem("📆","Week",()=>openWeekEditor(todayKey())));
   m.appendChild(avatarMenuItem("🎨","Channels",()=>openChannels()));
   m.appendChild(avatarMenuItem("🎯","Priorities",()=>openPriorities()));
   m.appendChild(avatarMenuItem(
@@ -4452,6 +4453,145 @@ let adhDate=null, adhOrigStage=null;
 /* The Tracker walks through days like the Day Editor. The stage snapshot is
    taken once on entry: recapturing it on every day change would make Home
    close the tracker back into the tracker - the trap the Summary hit. */
+/* =====================================================================
+   WEEK VIEW - modelled on the Tracker: a time rail, one column per unit,
+   dense coloured rows. The Tracker compares one day against its plan; this
+   has no plan to compare against, so it is Actual only, seven days wide.
+   `openWeekView`/`closeWeekView` above are older, unreferenced dead code for
+   a card layout - unrelated, left alone, named differently on purpose so
+   nothing here can shadow or be shadowed by it.
+   ===================================================================== */
+let weekEditorDate=null, weekEditorOrigStage=null;
+function mondayOf(dk){
+  const d=new Date(dayStartTs(dk));
+  const day=d.getDay();                       /* 0=Sun..6=Sat */
+  d.setDate(d.getDate()+(day===0?-6:1-day));
+  return dateKey(d.getTime());
+}
+async function openWeekEditor(dk){
+  const stage=document.querySelector('.app .stage');
+  /* Same guard the Tracker needed: re-entering must not recapture this page
+     as the thing Home returns to. */
+  if(!document.getElementById("wkGrid")||weekEditorOrigStage===null) weekEditorOrigStage=stage.innerHTML;
+  weekEditorDate=mondayOf(dk||todayKey());
+  await renderWeekEditor();
+}
+function weekGoto(dk){ weekEditorDate=mondayOf(dk); renderWeekEditor(); }
+
+async function renderWeekEditor(){
+  const stage=document.querySelector('.app .stage');
+  const origStage=weekEditorOrigStage;
+  const monKey=weekEditorDate;
+  const days=[];
+  for(let i=0;i<7;i++){ const d=new Date(dayStartTs(monKey)); d.setDate(d.getDate()+i); days.push(dateKey(d.getTime())); }
+  const isCurrentWeek=monKey===mondayOf(todayKey());
+  const fmt=state.profile&&state.profile.hourFmt;
+
+  const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
+  const weekSessions=liveSessions(allSessions).filter(s=>days.includes(s.date));
+
+  /* The window is whatever the week actually needed, same idea as the Day
+     Editor's own rail - not a fixed 5am-10pm nobody asked for. */
+  let startHour=8, endHour=18;
+  if(weekSessions.length){
+    startHour=Math.min(8,...weekSessions.map(s=>new Date(s.startTs).getHours()));
+    endHour=Math.max(18,...weekSessions.map(s=>{ const e=new Date(tlEndOf(s)); return e.getHours()+((e.getMinutes()||e.getSeconds())?1:0); }));
+    endHour=Math.min(24,endHour);
+  }
+  const increment=30;
+
+  const d0=new Date(dayStartTs(days[0])), d6=new Date(dayStartTs(days[6]));
+  const rangeLabel=d0.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+
+    d6.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const dayLabels=days.map(dk=>{ const d=new Date(dayStartTs(dk));
+    return {short:d.toLocaleDateString('en-US',{weekday:'short'}), num:d.getDate(), isToday:dk===todayKey()}; });
+
+  let timeHtml='', dayHtml=days.map(()=>'');
+  for(let h=startHour;h<endHour;h++){
+    for(let m=0;m<60;m+=increment){
+      const label=fmtHourMin(h,m,fmt);
+      timeHtml+=`<div style="padding:4px 6px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:9px;height:34px;overflow:hidden;font-weight:600;color:var(--ink2);white-space:nowrap">${label}</div>`;
+      days.forEach((dk,di)=>{
+        const dayStart=dayStartTs(dk);
+        const blockStart=dayStart+(h*60+m)*60000, blockEnd=blockStart+increment*60000;
+        const hits=weekSessions.filter(s=>s.date===dk&&s.startTs<blockEnd&&tlEndOf(s)>blockStart);
+        let cellHtml='<span style="color:var(--muted)">−</span>', title='';
+        if(hits.length===1){
+          const s=hits[0], ch=state.channels.find(x=>x.id===s.channelId)||{label:'(deleted)',color:'#64748b'};
+          /* Stacked, not side by side: a chip plus note text sharing one 9px
+             line in an 84px column left almost nothing for either, and the
+             two together needed more height than the row had - stacking
+             gives each its own line within the same 34px box. */
+          const noteBit=s.note?'<div style="font-size:8px;color:var(--ink2);line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+            escapeHtml(s.note.length>14?s.note.slice(0,14)+'…':s.note)+'</div>':'';
+          title=ch.label+(s.note?' — '+s.note:'');
+          cellHtml='<div style="display:flex;flex-direction:column;align-items:center;gap:1px;max-width:100%;overflow:hidden">'+
+            '<span style="display:inline-block;padding:2px 5px;background:'+ch.color+'22;border:1px solid '+ch.color+'66;'+
+            'border-radius:3px;font-size:9px;color:'+ch.color+';font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+            escapeHtml(ch.label)+'</span>'+noteBit+'</div>';
+        } else if(hits.length>1){
+          const names=hits.map(s=>{ const c=state.channels.find(x=>x.id===s.channelId); return c?c.label:'?'; });
+          title=names.join(', ');
+          cellHtml='<span style="font-size:9px;color:var(--accent);font-weight:700">'+hits.length+' activities</span>';
+        }
+        dayHtml[di]+=`<div style="padding:2px 6px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:4px;height:34px;overflow:hidden" title="${escapeHtml(title)}">${cellHtml}</div>`;
+      });
+    }
+  }
+
+  /* Channel totals across the week - the closest thing to Tracker's own
+     Timing/Budget footer, but there is no plan here to score against, so it
+     is simply what the week actually held, ranked by time. */
+  const totals={};
+  weekSessions.forEach(s=>{ const dur=s.endTs?s.durMs:(now()-s.startTs); totals[s.channelId]=(totals[s.channelId]||0)+dur; });
+  const totalMs=Object.values(totals).reduce((a,b)=>a+b,0);
+  const totalRows=Object.entries(totals).sort((a,b)=>b[1]-a[1]).map(([chId,ms])=>{
+    const ch=state.channels.find(x=>x.id===chId)||{label:'(deleted)',color:'#64748b'};
+    const pct=totalMs>0?Math.round(ms/totalMs*100):0;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0">
+      <span style="width:9px;height:9px;border-radius:50%;background:${ch.color};flex:none"></span>
+      <span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ch.label)}</span>
+      <span style="font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums">${fmtDurShort(ms)} · ${pct}%</span>
+    </div>`;
+  }).join('') || '<div class="hint">No time tracked this week yet.</div>';
+
+  const dayColsCss='repeat(7,minmax(84px,1fr))';
+  stage.innerHTML=`<div style="display:flex;flex-direction:column;height:100%">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0">
+        <button class="btn sm" id="wkPrev">&lsaquo;</button>
+        <h2 style="margin:0;font-size:14px;font-weight:700;white-space:nowrap">${rangeLabel}</h2>
+        <button class="btn sm" id="wkNext">&rsaquo;</button>
+      </div>
+      <button class="btn sm${isCurrentWeek?'':' pri'}" id="wkThisWeek"${isCurrentWeek?' disabled style="opacity:.4"':''}>This week</button>
+    </div>
+    <div style="flex:1;overflow:auto;padding:12px">
+      <div style="overflow-x:auto">
+        <div style="min-width:${60+7*84}px">
+          <div style="display:grid;grid-template-columns:56px ${dayColsCss};gap:0;background:var(--bg);border:1px solid var(--line);border-radius:8px 8px 0 0;overflow:hidden">
+            <div style="padding:6px 4px;background:var(--panel2);font-weight:700;font-size:9px;text-transform:uppercase;border-bottom:1px solid var(--line);border-right:1px solid var(--line);display:flex;align-items:center;justify-content:center">Time</div>
+            ${dayLabels.map(d=>`<div style="padding:6px 4px;background:${d.isToday?'var(--accent)22':'var(--panel2)'};font-weight:700;font-size:10px;border-bottom:1px solid var(--line);text-align:center;color:${d.isToday?'var(--accent)':'var(--ink)'}">${d.short}<div style="font-size:9px;font-weight:600;color:var(--ink2)">${d.num}</div></div>`).join('')}
+          </div>
+          <div id="wkGrid" style="display:grid;grid-template-columns:56px ${dayColsCss};gap:0;background:var(--bg);border:1px solid var(--line);border-top:none">
+            <div style="border-right:1px solid var(--line)">${timeHtml}</div>
+            ${dayHtml.map(h=>`<div>${h}</div>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="sect-title" style="margin-top:20px">This week's totals</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+        ${totalRows}
+        ${totalMs>0?`<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;font-size:12px;font-weight:800"><span>Total</span><span>${fmtDurShort(totalMs)}</span></div>`:''}
+      </div>
+    </div>
+  </div>`;
+  window.closeWeekEditor=()=>{ stage.innerHTML=origStage; weekEditorOrigStage=null; renderGrid(); };
+  document.getElementById("wkPrev").addEventListener("click",()=>weekGoto(shiftDateKey(monKey,-7)));
+  document.getElementById("wkNext").addEventListener("click",()=>weekGoto(shiftDateKey(monKey,7)));
+  const twb=document.getElementById("wkThisWeek");
+  if(twb) twb.addEventListener("click",()=>weekGoto(todayKey()));
+}
+
 async function openPlanAdherence(dk){const stage=document.querySelector('.app .stage');/* Tapping Tracker while already on Tracker must not capture the tracker as the thing Home returns to - the same trap openCombinedSummary() hit. */if(!document.getElementById("adhTime")||adhOrigStage===null) adhOrigStage=stage.innerHTML;adhDate=dk||todayKey();await renderPlanAdherence();}
 function adhGoto(dk){adhDate=dk;renderPlanAdherence();}
 async function renderPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=adhOrigStage;const today=adhDate;const dayKey=adhDate;let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const _ad=new Date(dayStartTs(dayKey));const dayName=_ad.toLocaleDateString('en-US',{weekday:'short'});const dateStr=_ad.toLocaleDateString('en-US',{month:'short',day:'numeric'});const isAdhToday=dayKey===todayKey();const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0"><button class="btn sm" id="adhPrev">&lsaquo;</button><input type="date" id="adhDateInput" value="${dayKey}" style="font-size:16px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:6px 8px"><button class="btn sm" id="adhNext">&rsaquo;</button><div style="font-size:12px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px">${dayName}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} &mdash; Adherence</h2></div><div style="display:flex;align-items:center;gap:8px;margin-left:auto"><button class="btn sm${isAdhToday?'':' pri'}" id="adhToday"${isAdhToday?' disabled style="opacity:.4"':''}>Today</button><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",()=>openDayEditor(adhDate));}const ap=document.getElementById("adhPrev");if(ap)ap.addEventListener("click",()=>adhGoto(shiftDateKey(dayKey,-1)));const an=document.getElementById("adhNext");if(an)an.addEventListener("click",()=>adhGoto(shiftDateKey(dayKey,1)));const ai=document.getElementById("adhDateInput");if(ai)ai.addEventListener("change",()=>{if(ai.value)adhGoto(ai.value);});const at=document.getElementById("adhToday");if(at)at.addEventListener("click",()=>adhGoto(todayKey()));const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));/* The grid must match this day's own hours, not whatever the Plan page last drew. */applyPlanWindow(dayRec);renderAdheranceComparison(plan,today,sessions);}/* ===== daily scoring =====
