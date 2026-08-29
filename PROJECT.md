@@ -1100,6 +1100,56 @@ syntax error was reported hundreds of lines away at `dedupChannels`. Match on
 something anchored - `const plannerStart=` - and always re-run the parse check
 in the browser after a scripted edit.
 
+### Time format and Button size were dead controls, still in v24
+
+Both Settings rows changed the visible `<select>`'s value and nothing else.
+Cause: `initializeEventListeners()` runs once on `DOMContentLoaded`, and at
+that moment it attached the `hourFmt`/`btnSize` change listeners to elements
+inside a **dead, never-opened `#settingsScrim` block** that sat in the static
+HTML. `openSettings()` builds the real, visible Settings page from scratch
+every time via `stage.innerHTML=...`, producing brand-new `<select>` elements
+with the same ids but *no listeners at all* - so selecting a new value updated
+nothing. `checkDeletedDaysCount()`-style bugs from earlier in this session were
+the same shape: a handler wired to the wrong copy of an element.
+
+Fixed by wiring both selects for real inside `openSettings()`, next to the
+other Data Management buttons that already lived there, and deleting the dead
+`#settingsScrim` markup along with the two orphaned listeners.
+
+**Removing that block cost a real regression, caught before it shipped:** the
+first pass deleted only the block's *opening* `<div class="scrim" ...>` line,
+not its full body. The remaining rows were left unwrapped from the scrim's
+`display:none`, so "Export CSV" and a stray "Signed in as" row rendered as
+plain, permanently-visible page content on every screen. A multi-line HTML
+block must be deleted start-to-matching-end, never by matching its first line
+alone - the fix here was to find the true closing `</div></div></div>` and
+delete the whole span. Re-screenshotted every affected page afterward to
+confirm nothing was left dangling.
+
+Verified end-to-end, driven through the real UI (select a value, dispatch
+`change`, close Settings, reload the whole app from IndexedDB): `hourFmt` and
+`btnSize` both persist and take visible effect - dashboard tile height moved
+172px -> 220px, and `fmtClock` output changed with the saved value, not just
+the one passed manually.
+
+### Plan-grid and Tracker labels now respect Time format
+
+The Plan page's hour list and the Tracker's `renderAdheranceComparison()` both
+built their row labels with hardcoded `h%12||12` / `"AM"/"PM"` math, ignoring
+`state.profile.hourFmt` entirely - the actual cause of "I don't see military
+time on the Plan page." A shared `fmtHourMin(h,m,fmt)` replaces both call
+sites (and the Day window hour `<select>` options), mirroring `fmtClock`'s
+12/24 rule without needing a `Date` - the grid's hour can be `24`, meaning the
+far edge of the last slot, which a real Date object cannot represent cleanly.
+`renderPlanSlots()` was left untouched: dead code, never called, same as the
+duplicate `renderPlanSelect` noted below.
+
+### Day window moved above the time grid, v24
+
+It used to render after the grid, at the bottom of the page. It now sits
+directly under "Editing template" / "Apply", before "Time blocks" - the
+setting is chosen before it is used to draw anything below it.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*

@@ -384,22 +384,6 @@
   </div>
 </div>
 
-<!-- SETTINGS -->
-<div class="scrim" id="settingsScrim"><div class="sheet"><div class="sheet-h"><h2>Settings</h2><button class="x" data-close>×</button></div>
-  <div class="sheet-b">
-    <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div class="sect-title" style="margin:0">Channels</div><button class="btn pri sm" id="addChannelBtn">+ Add channel</button></div>
-    <div class="hint" style="margin:8px 0 14px">Rename, recolor, reorder or archive any button. Names and colors can change anytime — history stays tied to a permanent internal ID, so nothing is ever lost.</div>
-    <div id="channelList"></div>
-    <div class="sect-title">Archived channels</div><div id="archivedList"><div class="hint">None archived.</div></div>
-    <div id="dangerZone"></div>
-    <div class="sect-title">Preferences</div>
-    <div class="row"><div class="grow">Time format</div><select id="hourFmt"><option value="12">12-hour</option><option value="24">24-hour</option></select></div>
-    <div class="row"><div class="grow">Button size</div><select id="btnSize"><option value="normal" selected>Normal</option><option value="compact">Compact</option><option value="spacious">Spacious</option></select></div>
-    <div class="sect-title">Data</div>
-    <div class="row"><div class="grow"><b>Export CSV</b><div class="hint">Download every session for this profile as a spreadsheet.</div></div><button class="btn sm" id="exportCsvBtn">Export</button></div>
-    <div class="sect-title">Account</div>
-    <div class="row"><div class="grow"><b>Signed in as</b><div class="hint" id="acctEmail"></div></div></div>
-  </div></div></div>
 
 <!-- CHANNEL EDITOR -->
 <div class="scrim" id="chanScrim"><div class="sheet" style="max-width:520px"><div class="sheet-h"><h2 id="chanTitle">Edit channel</h2><button class="x" data-close>×</button></div>
@@ -699,6 +683,15 @@ function dateKey(ts){const d=new Date(ts);return d.getFullYear()+"-"+pad(d.getMo
 function todayKey(){return dateKey(now());}
 function fmtDateKey(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());}
 function fmtClock(ts,fmt){const d=new Date(ts);let h=d.getHours();const m=pad(d.getMinutes());if(fmt==="24")return pad(h)+":"+m;const ap=h>=12?"PM":"AM";h=h%12||12;return h+":"+m+" "+ap;}
+/* Plan-grid labels are built from raw hour/minute pairs, not timestamps -
+   h can be 24 to mean the far edge of the last slot - so fmtClock's Date-
+   based approach does not fit. Same 12/24 rule, no Date object. */
+function fmtHourMin(h,m,fmt){
+  const hh=((h%24)+24)%24;
+  if(fmt==="24") return pad(h===24?24:hh)+":"+pad(m);
+  const hr=hh%12||12, ap=hh<12?"AM":"PM";
+  return hr+":"+pad(m)+" "+ap;
+}
 function contrastInk(hex){const c=hex.replace("#","");const r=parseInt(c.substr(0,2),16),g=parseInt(c.substr(2,2),16),b=parseInt(c.substr(4,2),16);return (0.299*r+0.587*g+0.114*b)/255>0.6?"#0b1220":"#ffffff";}
 function tint(hex,a){const c=hex.replace("#","");let r=parseInt(c.substr(0,2),16),g=parseInt(c.substr(2,2),16),b=parseInt(c.substr(4,2),16);r=Math.round(r+(255-r)*a);g=Math.round(g+(255-g)*a);b=Math.round(b+(255-b)*a);return"#"+pad(r.toString(16))+pad(g.toString(16))+pad(b.toString(16));}
 function shade(hex,a){const c=hex.replace("#","");let r=parseInt(c.substr(0,2),16),g=parseInt(c.substr(2,2),16),b=parseInt(c.substr(4,2),16);r=Math.round(r*(1-a));g=Math.round(g*(1-a));b=Math.round(b*(1-a));return"#"+pad(r.toString(16))+pad(g.toString(16))+pad(b.toString(16));}
@@ -2985,8 +2978,6 @@ function initializeEventListeners(){
   // Settings
   const btnPause=document.getElementById("btnPause");if(btnPause)btnPause.addEventListener("click",async()=>{if(!running)return;const st=await stopRunning(now());undoStack.push({type:"pause",prev:st});toast("Paused");renderAll();});
   const statusPill=document.getElementById("topStatus");if(statusPill)statusPill.addEventListener("click",async()=>{if(!running)return;const st=await stopRunning(now());undoStack.push({type:"pause",prev:st});toast("Paused");renderAll();});
-  const hourFmt=document.getElementById("hourFmt");if(hourFmt)hourFmt.addEventListener("change",async e=>{state.profile.hourFmt=e.target.value;await saveLocal("profiles",state.profile);});
-  const btnSize=document.getElementById("btnSize");if(btnSize)btnSize.addEventListener("change",async e=>{state.profile.btnSize=e.target.value;await saveLocal("profiles",state.profile);applyButtonSize(e.target.value);});
 
   // Planner settings
 
@@ -3143,6 +3134,18 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
     </div>
   </div>
 `;window.closeSettings=()=>{stage.innerHTML=origStage;renderGrid();};document.getElementById("hourFmt").value=state.profile.hourFmt||"12";document.getElementById("btnSize").value=state.profile.btnSize||"normal";document.getElementById("closeSettingsBtn").addEventListener("click",()=>{window.closeSettings();});
+  const hourFmtSel=document.getElementById("hourFmt");
+  if(hourFmtSel) hourFmtSel.addEventListener("change",async e=>{
+    state.profile.hourFmt=e.target.value; await saveLocal("profiles",state.profile);
+  });
+  const btnSizeSel=document.getElementById("btnSize");
+  if(btnSizeSel) btnSizeSel.addEventListener("change",async e=>{
+    state.profile.btnSize=e.target.value; await saveLocal("profiles",state.profile);
+    /* The dashboard grid is not on screen while Settings is open - #grid does
+       not exist, so applyButtonSize() has nothing to resize yet. renderGrid()
+       re-applies it from state.profile.btnSize when Settings closes. */
+    applyButtonSize(e.target.value);
+  });
   const restoreDeletedBtn=document.getElementById("restoreDeletedBtn");
   if(restoreDeletedBtn)restoreDeletedBtn.addEventListener("click",restoreDeletedDays);
   const deleteDateRangeBtn=document.getElementById("deleteDateRangeBtn");
@@ -4168,10 +4171,10 @@ async function renderPlanPageUI(){
   const pw=applyPlanWindow(winRec);
   const startHour=pw.startHour, endHour=pw.endHour, increment=pw.increment;
   const hours=[];
+  const pFmt=state.profile&&state.profile.hourFmt;
   for(let h=startHour;h<endHour;h++){
     for(let m=0;m<60;m+=increment){
-      const startHr=h%12||12, ampm=h<12?"AM":"PM";
-      hours.push({h:h,m:m,display:startHr+":"+(m===0?"00":m)+" "+ampm});
+      hours.push({h:h,m:m,display:fmtHourMin(h,m,pFmt)});
     }
   }
   const sched=activeSchedule();
@@ -4217,6 +4220,25 @@ async function renderPlanPageUI(){
     </div>`;
   }
 
+  const hourOpt=(sel,from,to)=>{let o="";for(let h=from;h<=to;h++){
+    const lbl=fmtHourMin(h,0,pFmt);
+    o+='<option value="'+h+'"'+(h===sel?" selected":"")+'>'+lbl+'</option>';}return o;};
+  const incrOpt=sel=>[15,30,60].map(v=>'<option value="'+v+'"'+(v===sel?" selected":"")+'>'+v+' min</option>').join("");
+  const winSelCss="width:100%;margin-top:4px;padding:8px;background:var(--field);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:16px";
+  html+='<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px">'+
+    '<label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Day window</label>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Starts'+
+        '<select id="planWinStart" style="'+winSelCss+'">'+hourOpt(startHour,0,23)+'</select></label>'+
+      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Ends'+
+        '<select id="planWinEnd" style="'+winSelCss+'">'+hourOpt(endHour,1,24)+'</select></label>'+
+      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Slot'+
+        '<select id="planWinIncr" style="'+winSelCss+'">'+incrOpt(increment)+'</select></label>'+
+    '</div>'+
+    '<div class="hint" style="margin-top:8px">'+
+      (isToday?"Applies to today only.":"Saved on this template, so each day can run to its own hours.")+
+    '</div></div>';
+
   const slotAttrs=slot=>`ondragover="event.preventDefault();event.dataTransfer.dropEffect='copy';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='1px'" ondragleave="this.style.outline=''" ondrop="this.style.outline='';planDrop(event,'${slot}')" onclick="openPlanSlotModal('${slot}')"`;
 
   if(isMobile){
@@ -4244,24 +4266,6 @@ async function renderPlanPageUI(){
     html+=`</div></div>`;
   }
 
-  const hourOpt=(sel,from,to)=>{let o="";for(let h=from;h<=to;h++){
-    const hr=h%12||12, ap=h<12?"AM":"PM", lbl=(h===24?"12 AM":hr+" "+ap);
-    o+='<option value="'+h+'"'+(h===sel?" selected":"")+'>'+lbl+'</option>';}return o;};
-  const incrOpt=sel=>[15,30,60].map(v=>'<option value="'+v+'"'+(v===sel?" selected":"")+'>'+v+' min</option>').join("");
-  const winSelCss="width:100%;margin-top:4px;padding:8px;background:var(--field);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:16px";
-  html+='<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px">'+
-    '<label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Day window</label>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Starts'+
-        '<select id="planWinStart" style="'+winSelCss+'">'+hourOpt(startHour,0,23)+'</select></label>'+
-      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Ends'+
-        '<select id="planWinEnd" style="'+winSelCss+'">'+hourOpt(endHour,1,24)+'</select></label>'+
-      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Slot'+
-        '<select id="planWinIncr" style="'+winSelCss+'">'+incrOpt(increment)+'</select></label>'+
-    '</div>'+
-    '<div class="hint" style="margin-top:8px">'+
-      (isToday?"Applies to today only.":"Saved on this template, so each day can run to its own hours.")+
-    '</div></div>';
 
   html+=`<div><label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Channels &mdash; drag onto a slot, or tap a slot</label>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px">`;
@@ -4483,7 +4487,7 @@ async function refreshDayScores(dk){
 }
 async function refreshTodayScores(){ return refreshDayScores(todayKey()); }
 
-async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const startHr=h%12||12;const startMin=String(m).padStart(2,'0');const endHr=(m+increment>=60?h+1:h)%12||12;const endMin=String((m+increment)%60).padStart(2,'0');const timeStr=startHr+':'+startMin+'−'+endHr+':'+endMin;timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden;flex-wrap:nowrap;min-width:0;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;height:36px;overflow:hidden;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
+async function renderAdheranceComparison(plan,today,sessions){let timeHtml='';let planHtml='';let actualHtml='';let matchHtml='';const startHour=planState.startHour;const endHour=planState.endHour;const increment=planState.increment;const allSessions=sessions||[];const todaySessions=allSessions.filter(s=>s.date===today);const nowMs=now();const [yyyy,mm,dd]=today.split('-');const todayStartMs=new Date(parseInt(yyyy),parseInt(mm)-1,parseInt(dd)).getTime();for(let h=startHour;h<endHour;h++){for(let m=0;m<60;m+=increment){const slot=h+':'+String(m).padStart(2,'0');const pFmt=state.profile&&state.profile.hourFmt;const endH=(m+increment>=60?h+1:h);const endM=(m+increment)%60;const timeStr=fmtHourMin(h,m,pFmt)+'−'+fmtHourMin(endH,endM,pFmt);timeHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden;font-weight:600;color:var(--ink2)">${timeStr}</div>`;const plannedChId=plan&&plan.schedule?plan.schedule[slot]:null;const plannedCh=plannedChId&&state.channels?state.channels.find(x=>x.id===plannedChId):null;const blockStartMs=todayStartMs+(h*60+m)*60000;const blockEndMs=todayStartMs+(h*60+m+increment)*60000;const slotSessions=todaySessions.filter(s=>{const st=parseInt(s.startTs||0);const et=parseInt(s.endTs||s.startTs||0);return st<blockEndMs&&et>blockStartMs;});const planBg=plannedCh?plannedCh.color+'22':'transparent';const planBorder=plannedCh?plannedCh.color:'var(--line)';planHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden;flex-wrap:nowrap;min-width:0;background:${planBg};border-left:3px solid ${planBorder}">${plannedCh?'<span style="color:'+plannedCh.color+';font-weight:600">'+plannedCh.label+'</span>':'−'}</div>`;const channelsList=[];if(slotSessions.length>0){slotSessions.forEach(s=>{const ch=state.channels?state.channels.find(x=>x.id===s.channelId):null;if(ch){channelsList.push(ch);}});}let actualDisplay='';if(channelsList.length===0){actualDisplay='−';}else if(channelsList.length<=2){actualDisplay=channelsList.map(ch=>`<span style="display:inline-flex;align-items:center;gap:2px;padding:2px 4px;background:${ch.color}22;border:1px solid ${ch.color}66;border-radius:3px;font-size:9px;color:${ch.color};font-weight:600;margin:1px;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ch.label)}</span>`).join('');}else{actualDisplay=`<span style="font-size:10px;color:var(--accent);font-weight:600">${channelsList.length} activities</span>`;}const tooltipText=channelsList.map(ch=>ch.label).join(', ');actualHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;height:36px;overflow:hidden" title="${escapeHtml(tooltipText)}">${actualDisplay}</div>`;let matchDisplay='';if(!plan||!plannedChId){matchDisplay='';}else if(blockEndMs>nowMs){matchDisplay='';}else{const match=slotSessions.some(s=>s.channelId===plannedCh.id);matchDisplay=match?'✓':'✗';}matchHtml+=`<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;height:36px;overflow:hidden;color:${matchDisplay==='✓'?'var(--good)':matchDisplay==='✗'?'var(--warn)':'transparent'}"><b>${matchDisplay}</b></div>`;}}document.getElementById("adhTime").innerHTML=timeHtml;document.getElementById("adhPlan").innerHTML=planHtml;document.getElementById("adhActual").innerHTML=actualHtml;document.getElementById("adhMatch").innerHTML=matchHtml;
   
   (async ()=>{
     const S=computeDayScores(plan,today,todaySessions);
