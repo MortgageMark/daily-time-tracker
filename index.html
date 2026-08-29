@@ -1874,11 +1874,22 @@ async function zoomTimeline(z){
 
 function buildTimeline(dk,sess,fmt){
   tlRangeCur=tlRange(dk,sess); tlSessions=sess.slice(); tlFmt=fmt; tlDk=dk;
+  const totalH=Math.round((tlRangeCur.endTs-tlRangeCur.startTs)/60000*TL_PX_PER_MIN+2*TL_PAD);
+
+  /* Two columns sharing one clock: the timeline on the left is untouched, a
+     note column on the right uses the same tlY() math so a row lines up with
+     its block exactly. Editing lives here now, not just behind a tap into
+     the block sheet - the sheet still works, this is just faster. */
+  const outer=document.createElement("div");
+  outer.style.cssText="display:grid;grid-template-columns:1.5fr 1fr;gap:8px;align-items:start";
+
   const wrap=document.createElement("div");
   wrap.id="tlWrap";
-  wrap.style.cssText="position:relative;margin:4px 0 6px;height:"+
-    Math.round((tlRangeCur.endTs-tlRangeCur.startTs)/60000*TL_PX_PER_MIN+2*TL_PAD)+"px;"+
+  wrap.style.cssText="position:relative;margin:4px 0 6px;height:"+totalH+"px;"+
     "user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent";
+
+  const notesCol=document.createElement("div");
+  notesCol.style.cssText="position:relative;margin:4px 0 6px;height:"+totalH+"px;min-width:0";
 
   for(let h=tlRangeCur.startHour;h<=tlRangeCur.endHour;h++){
     const t=dayStartTs(dk)+h*3600000, top=tlY(t);
@@ -1910,6 +1921,28 @@ function buildTimeline(dk,sess,fmt){
     /* Below this the text would be clipped to a meaningless sliver; the colour
        bar still says which channel it is, and zooming in reveals the rest. */
     if(h>=24) b.appendChild(nm);
+    /* Same threshold as the label above: below it there is no sane way to fit
+       a 16px input (iOS zooms the page on focus under that size) without it
+       swallowing the next row. Zoom in for a note on a crowded block. */
+    if(h>=24){
+      const ni=document.createElement("input");
+      ni.type="text"; ni.maxLength=60; ni.value=sn.note||"";
+      ni.placeholder="Add a note…";
+      ni.style.cssText="position:absolute;left:0;right:0;top:"+top+"px;height:"+Math.max(30,h)+"px;"+
+        "font-size:16px;padding:5px 9px;background:var(--panel2);border:1px solid var(--line);"+
+        "border-radius:8px;color:var(--ink);box-sizing:border-box";
+      ni.addEventListener("click",e=>e.stopPropagation());
+      ni.addEventListener("pointerdown",e=>e.stopPropagation());
+      ni.addEventListener("change",async()=>{
+        const rec=await idbGet("sessions",sn.id);
+        if(!rec) return;
+        const v=ni.value.trim();
+        rec.note=v||null;
+        await saveLocal("sessions",rec);
+        await afterDayEdit(dk);
+      });
+      notesCol.appendChild(ni);
+    }
     if(sn.note){
       /* A dot is already the app's "status" glyph elsewhere (Running), so a
          note gets its own small mark instead - two lines, read as a note at
@@ -2001,7 +2034,8 @@ function buildTimeline(dk,sess,fmt){
     "border-radius:8px;background:var(--panel);border:1px solid var(--accent);font-size:12px;"+
     "font-weight:800;color:var(--ink);pointer-events:none;white-space:nowrap";
   wrap.appendChild(badge);
-  return wrap;
+  outer.appendChild(wrap); outer.appendChild(notesCol);
+  return outer;
 }
 
 function tlHandle(dk,sid,edge,y,color){
