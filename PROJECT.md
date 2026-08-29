@@ -1150,6 +1150,26 @@ It used to render after the grid, at the bottom of the page. It now sits
 directly under "Editing template" / "Apply", before "Time blocks" - the
 setting is chosen before it is used to draw anything below it.
 
+### The top-left date now opens today's Day Editor, still v24
+
+`#topDateBtn` was already a real button - it just reset the stage back to the
+dashboard grid, which is nearly always where you already are. Repurposed as
+the fast path into the Day Editor, now that it is used daily rather than
+occasionally: one tap, from anywhere in the app, straight to today.
+
+The date text itself is untouched - still `8/29` on a phone, the long ordinal
+form on desktop - Mark asked to keep it exactly as it is. A small pencil-in-a-
+square SVG sits beside it, matching the outline-icon style the bottom nav
+already uses, so the button reads as a button rather than a label. The avatar
+menu's "Edit a day" is unchanged and still works, as a second route to the
+same screen.
+
+**The desktop date string still reads "August 29rd."** The ordinal-suffix
+logic (`['st','nd','rd'][((d.getDate()%10)-1)%3]||'th'`) mishandles every date
+ending in 9 - 9th, 19th, 29th all come out wrong. Spotted, not fixed: Mark did
+not confirm he wanted it touched, and he was explicit about not changing the
+date's format in this pass.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
