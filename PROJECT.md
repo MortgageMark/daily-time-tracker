@@ -1265,6 +1265,72 @@ data tied to any one week. Unset, the grid still auto-fits the week's own
 data exactly as before; the first change to any of the three selects switches
 it to an explicit, persisted window from then on.
 
+### Summary consolidated into a Stats page, and Priorities folded in, still v24
+
+Mark's own framing: "have it all in one place." Three surfaces that had
+grown up separately - Summary, the standalone Priorities page, and a
+Dashboard modal that turned out to be **fully dead code** - are now one page.
+
+- **The Dashboard modal (`openDashboard`/`renderDashboard`/`dashScrim`) had
+  zero callers anywhere in the app.** Not hidden, not hard to find - genuinely
+  unreachable. Its Plan vs Actual card also read `dayplans.blocks`, a shape
+  the data model has not used all session (`dayplans.schedule` everywhere
+  else) - reviving it as-is would have shipped something broken. Its Insights,
+  Time-by-channel and two chart functions (`dailyTrendChart`, `hourChart`)
+  were sound, though, and are what the new Stats page's day/week/month/year/
+  all-tabbed content is built from.
+- **Priorities** (`openPriorities`/`renderPriorities`, its own avatar menu
+  item) is retired as a standalone destination. `attrTotals()`, `QUADRANTS`
+  and the CHANNEL_ATTRS-driven cards are folded into the same page, reading
+  the *same* range tabs as the channel-time stats above them - one tab row
+  drives everything now, instead of Priorities keeping its own.
+- **New: an Adherence card**, matched blocks and budget credited/planned,
+  aggregated across whichever range is selected. This is what Summary's old
+  ad-hoc "Time Lookback" section (This Week/This Month/Last Quarter/Custom,
+  with its own adherence total) was reaching for; that section and its bespoke
+  preset buttons are gone, superseded by reusing the one shared tab row.
+- **Retired**: the "Today's Summary" rate-today card (redundant with the Day
+  Editor's own rating UI) and the Week Overview cards / Day-by-Day Breakdown
+  table (redundant with the Week view's new per-day journal strip, below).
+- **Kept, at the very bottom, per explicit instruction**: Complete History
+  Log. "I don't know if we need it... let's put it at the bottom and reassess
+  once we have the new information in front of us."
+- **Export CSV lost its only entry point** when `dashScrim` was removed - it
+  was reachable exclusively through the dead Dashboard modal, so in practice
+  it was unreachable too. Moved to the avatar menu, beside Export backup.
+- Bottom-nav label and page header: **Summary -> Stats**.
+
+**A near-miss worth remembering.** The first deletion pass assumed
+`openDashboard()`/`renderDashboard()` were the entire span between two
+anchors and deleted everything in between. `saveDayRatingAndNotes()`,
+`starCellHtml()`, `dayTypeSelectHtml()` and `window.setDayTypeFromSummary`
+were sitting interleaved in that span, unrelated to the dead modal, and got
+swallowed with it. `saveDayRatingAndNotes()` is load-bearing everywhere a
+star or a note gets saved - the Day Editor's own rating UI included - so this
+would have broken rating a day anywhere in the app, not just on this page.
+Caught by the same sweep-every-screen verification this project leans on
+throughout, restored verbatim from git history, then the sweep re-run clean.
+**Deleting "from function A to function B" is only safe once every top-level
+declaration in that span has been listed and confirmed unrelated - never
+assumed from the two endpoints alone.**
+
+### Week view: a day-by-day journal strip, still v24
+
+Below the grid and totals, one card per day - day type, star rating, Timing/
+Budget adherence, and notes - the same fields the Stats page's History Log
+shows, but scoped to the seven days already on screen and reusing the exact
+same `starCellHtml()`/`dayTypeSelectHtml()`/`adhCellHtml()`/
+`saveDayRatingAndNotes()` as everywhere else. Editable in place: rate a day,
+change its type, or click into its notes, right from the week grid.
+
+`dayTypeSelectHtml()`'s `<select>` always wires its `onchange` to
+`window.setDayTypeFromSummary`, which unconditionally re-renders the Stats
+page - correct there, wrong here. `openWeekEditor()`/`renderWeekEditor()`
+**overwrite that global with a week-scoped version** while the page is open,
+so a day-type change on the Week view re-renders the Week view instead of
+silently doing nothing, or rendering the wrong screen underneath this one.
+Any future page reusing `dayTypeSelectHtml()` needs the same override.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
