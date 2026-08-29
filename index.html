@@ -378,14 +378,14 @@
   <div class="stage"><div class="grid" id="grid"></div></div>
   <div class="bottombar">
     <button class="ctl" id="btnDashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1Z"/><path d="M17 13a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1Z"/><path d="M10 21a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1Z"/></svg>Dashboard</button>
-    <button class="ctl" id="btnEditDay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Edit a day</button>
-    <button class="ctl" id="btnWeek"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Week</button>
+    <button class="ctl" id="btnPlan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9h12M6 13h12M6 17h6M3 21h18a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2Z"/></svg>Plan</button>
+    <button class="ctl" id="btnAdhere"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3v6M15 3v6M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="M6 15h3M15 15h3"/></svg>Tracker</button>
     <button class="ctl" id="btnMore"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>More</button>
   </div>
-  <!-- Plan/Tracker/Stats moved here from direct bottombar slots: Edit a day
-       and Week are now used daily and earned the direct spot; these three
-       are reached one tap further, through More, rather than losing the
-       four-button bottombar Mark wanted kept. -->
+  <!-- Edit a day dropped entirely - the top-left date/pencil already opens
+       today's Day Editor in one tap, so the bottombar slot was redundant.
+       Week/Stats/Channels live in More: Plan and Tracker earned direct
+       slots as the two used every day beyond the date shortcut itself. -->
   <div id="moreMenu" style="display:none;position:fixed;right:16px;bottom:88px;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-width:170px;z-index:1000;box-shadow:var(--shadow)"></div>
 </div>
 
@@ -2709,9 +2709,9 @@ function renderMoreMenu(){
   const m=document.getElementById("moreMenu");
   if(!m) return;
   m.innerHTML="";
-  m.appendChild(moreMenuItem("📋","Plan",()=>openDayPlanner()));
-  m.appendChild(moreMenuItem("📈","Tracker",async()=>await openPlanAdherence()));
+  m.appendChild(moreMenuItem("📆","Week",()=>openWeekEditor(todayKey())));
   m.appendChild(moreMenuItem("📊","Stats",()=>openCombinedSummary()));
+  m.appendChild(moreMenuItem("🎨","Channels",()=>openChannels()));
 }
 
 
@@ -2726,9 +2726,8 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
      the feature back means restoring a switcher here plus a way to rename;
      the rename never existed, which is half of why this was hidden. */
   const sep=document.createElement("div");sep.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep);
-  // Edit a day / Week moved to direct bottombar buttons (btnEditDay/btnWeek) -
-  // used daily, so they no longer live behind the avatar menu.
-  m.appendChild(avatarMenuItem("🎨","Channels",()=>openChannels()));
+  // Edit a day, Week, and Channels all moved to bottombar/More - the avatar
+  // menu is account/utility only now (theme, export, settings, sign out).
   m.appendChild(avatarMenuItem(
     currentTheme()==="light"?"🌙":"☀️",
     currentTheme()==="light"?"Dark mode":"Light mode",
@@ -2991,8 +2990,8 @@ function initializeEventListeners(){
 
   // Navigation buttons
   const btnDashboard=document.getElementById("btnDashboard");if(btnDashboard)btnDashboard.addEventListener("click",async()=>{const stage=document.querySelector('.stage');stage.innerHTML='<div class="grid" id="grid"></div>';if(!state.profileId && state.profiles && state.profiles.length>0){state.profileId=state.profiles[0].id;}await reloadFromLocal();});
-  const btnEditDay=document.getElementById("btnEditDay");if(btnEditDay)btnEditDay.addEventListener("click",()=>openDayEditor(todayKey()));
-  const btnWeek=document.getElementById("btnWeek");if(btnWeek)btnWeek.addEventListener("click",()=>openWeekEditor(todayKey()));
+  const btnPlan=document.getElementById("btnPlan");if(btnPlan)btnPlan.addEventListener("click",openDayPlanner);
+  const btnAdhere=document.getElementById("btnAdhere");if(btnAdhere)btnAdhere.addEventListener("click",async()=>await openPlanAdherence());
   const btnMore=document.getElementById("btnMore");
   if(btnMore){
     btnMore.addEventListener("click",e=>{
@@ -3049,8 +3048,13 @@ function initializeEventListeners(){
     const dayKey=todayKey();await saveLocal("day_notes",{date:dayKey,profileId:state.profileId,rating,notes});
     toast("Summary saved");closeScrim("notesScrim");});
 
-  // Plan controls
-  document.addEventListener("click",async e=>{if(e.target.id==="setForTodayBtn"){await setForTodayPlan();return;}if(e.target.id==="btnAdhere"){await openPlanAdherence();return;}if(e.target.id==="addPlanBtn"){addPlan();return;}if(e.target.classList.contains("deletePlanBtn")){const idx=parseInt(e.target.dataset.idx);deletePlan(idx);return;}});
+  // Plan controls - dynamic buttons only (recreated on every renderPlanPageUI()
+  // innerHTML write, so a direct listener would not survive a re-render).
+  // btnAdhere is NOT one of these: it is the permanent bottombar button and
+  // already has its own direct listener - a delegated clause for it here
+  // duplicated that listener and double-fired openPlanAdherence() the moment
+  // btnAdhere came back as a real element id in the bottombar again.
+  document.addEventListener("click",async e=>{if(e.target.id==="setForTodayBtn"){await setForTodayPlan();return;}if(e.target.id==="addPlanBtn"){addPlan();return;}if(e.target.classList.contains("deletePlanBtn")){const idx=parseInt(e.target.dataset.idx);deletePlan(idx);return;}});
 
   // Top controls
   const topPauseBtn=document.getElementById("topPauseBtn");if(topPauseBtn)topPauseBtn.addEventListener("click",masterPause);

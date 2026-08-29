@@ -1411,6 +1411,38 @@ record Today/Templates mode currently has active, so threading a target
 through the shared functions risked the single-day editor over a feature
 that did not need to touch it.
 
+### Bottombar, second pass: Dashboard / Plan / Tracker / More, still v24
+
+Mark's follow-up once Edit a day and Week had been living in the bar for a
+bit: Edit a day was redundant with the top-left date/pencil shortcut (which
+already opens today's Day Editor in one tap), and Plan/Tracker turned out
+to be the two reached for daily beyond that shortcut - not Week.
+
+- Bottombar: **Dashboard, Plan, Tracker, More** - Edit a day dropped
+  entirely, not even into More; the top-left shortcut already covers it.
+- More: **Week, Stats, Channels**. Channels moved out of the avatar menu -
+  it is a page you navigate to and edit (your category list), the same
+  kind of thing Week/Stats/Plan/Tracker are, not an account-level action.
+  The avatar menu is now account/utility only: theme toggle, Export
+  backup, Export CSV, Settings, Sign out, sync status.
+
+**Regression caught and fixed in the same pass:** a leftover delegated
+`document` click listener from before Edit a day/Week/More existed still
+matched `e.target.id==="btnAdhere"` and called `openPlanAdherence()` - dead
+code the moment the very first bottombar refactor removed that id from the
+bar, silently reactivated the moment this pass put `id="btnAdhere"` back.
+Tracker was firing `openPlanAdherence()` twice per tap. Fixed by dropping
+that one clause; the delegated listener still handles `setForTodayBtn`/
+`addPlanBtn`/`deletePlanBtn`, which are genuinely dynamic (recreated by
+every `renderPlanPageUI()` innerHTML write, so a direct listener would not
+survive a re-render) - unlike `btnAdhere`, which is a permanent bottombar
+element and needs exactly one, direct listener. Caught by the same
+scripted click-count sweep this session has used throughout, not by eye -
+a second/third view of the same double-fire would have looked identical
+on screen; only counting the calls exposed it. Worth remembering next time
+an old id gets reintroduced into a live element: grep for every reference
+to that id before assuming a fresh `addEventListener` is the only wiring.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
