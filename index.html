@@ -719,14 +719,14 @@ function toRow(store,r){
   if(store==="profiles")return {id:r.id,name:r.name,hour_fmt:r.hourFmt||"12",confirm_end:(r.confirmEnd!=="0")};
   if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived,parent_channel_id:r.parentChannelId||null,tier:r.tier||null,drip:r.drip||null,urgency:r.urgency||null,importance:r.importance||null,joy:r.joy||null,drain:r.drain||null};
   if(store==="sessions")return {id:r.id,profile_id:r.profileId,channel_id:r.channelId,start_ts:new Date(r.startTs).toISOString(),end_ts:r.endTs?new Date(r.endTs).toISOString():null,duration_seconds:r.endTs?Math.round((r.endTs-r.startTs)/1000):null,business_date:r.date,voided:!!r.voided,revision:r.revision||0,note:r.note||null};
-  if(store==="plans")return {id:r.id,profile_id:r.profileId,name:r.name,schedule:r.schedule||{},sort_order:r.order||0,start_hour:r.startHour==null?null:r.startHour,end_hour:r.endHour==null?null:r.endHour,increment_minutes:r.increment==null?null:r.increment};
+  if(store==="plans")return {id:r.id,profile_id:r.profileId,name:r.name,schedule:r.schedule||{},sort_order:r.order||0,start_hour:r.startHour==null?null:r.startHour,end_hour:r.endHour==null?null:r.endHour,increment_minutes:r.increment==null?null:r.increment,assigned_weekday:r.assignedWeekday==null?null:r.assignedWeekday};
   if(store==="dayplans")return {id:r.id,profile_id:r.profileId,date:r.date,plan_id:r.planId||null,plan_name:r.planName||null,schedule:r.schedule||{},edited:!!r.edited,day_type:r.dayType||null,start_hour:r.startHour==null?null:r.startHour,end_hour:r.endHour==null?null:r.endHour,increment_minutes:r.increment==null?null:r.increment};
 }
 function fromRow(store,row){
   const u=row.updated_at?Date.parse(row.updated_at):now();
   if(store==="profiles")return {id:row.id,name:row.name,hourFmt:row.hour_fmt||"12",confirmEnd:row.confirm_end?"1":"0",_u:u,_dirty:false};
   if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,parentChannelId:row.parent_channel_id||null,tier:row.tier||null,drip:row.drip||null,urgency:row.urgency||null,importance:row.importance||null,joy:row.joy||null,drain:row.drain||null,_u:u,_dirty:false};
-  if(store==="plans")return {id:row.id,profileId:row.profile_id,name:row.name,schedule:row.schedule||{},order:row.sort_order||0,startHour:row.start_hour==null?null:row.start_hour,endHour:row.end_hour==null?null:row.end_hour,increment:row.increment_minutes==null?null:row.increment_minutes,_u:u,_dirty:false};
+  if(store==="plans")return {id:row.id,profileId:row.profile_id,name:row.name,schedule:row.schedule||{},order:row.sort_order||0,startHour:row.start_hour==null?null:row.start_hour,endHour:row.end_hour==null?null:row.end_hour,increment:row.increment_minutes==null?null:row.increment_minutes,assignedWeekday:row.assigned_weekday==null?null:row.assigned_weekday,_u:u,_dirty:false};
   if(store==="dayplans")return {id:row.id,profileId:row.profile_id,date:row.date,planId:row.plan_id||null,planName:row.plan_name||null,schedule:row.schedule||{},edited:!!row.edited,dayType:row.day_type||null,startHour:row.start_hour==null?null:row.start_hour,endHour:row.end_hour==null?null:row.end_hour,increment:row.increment_minutes==null?null:row.increment_minutes,_u:u,_dirty:false};
   if(store==="sessions")return {id:row.id,profileId:row.profile_id,channelId:row.channel_id,startTs:Date.parse(row.start_ts),endTs:row.end_ts?Date.parse(row.end_ts):null,durMs:row.end_ts?(Date.parse(row.end_ts)-Date.parse(row.start_ts)):0,date:row.business_date,voided:!!row.voided,revision:row.revision||0,note:row.note||null,_u:u,_dirty:false};
 }
@@ -767,7 +767,7 @@ function noteMissingTable(store,error){
    new fields. So on that error the new columns are stripped and the push is
    retried, and the full set is retried periodically in case the migration
    lands later. Same shape as the missing-table handling above. */
-const OPTIONAL_COLUMNS={channels:["tier","drip","urgency","importance","joy","drain"],dayplans:["day_type","start_hour","end_hour","increment_minutes"],plans:["start_hour","end_hour","increment_minutes"],sessions:["note"]};
+const OPTIONAL_COLUMNS={channels:["tier","drip","urgency","importance","joy","drain"],dayplans:["day_type","start_hour","end_hour","increment_minutes"],plans:["start_hour","end_hour","increment_minutes","assigned_weekday"],sessions:["note"]};
 const missingRemoteColumns=new Map();
 const MISSING_COLUMN_RETRY_MS=10*60*1000;
 function columnsSkipped(store){
@@ -3716,7 +3716,30 @@ let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selected
   stage.innerHTML='<div style="display:flex;flex-direction:column;height:100%;background:var(--bg)"></div>';
   window.closeDayPlanner=()=>{stage.innerHTML=origStage;renderGrid();};
   await initializePlanPage();
-}async function initializePlanPage(){await loadPlans();try{ planState.today=await ensureDayPlan(todayKey()); }catch(e){ console.warn("ensureDayPlan failed",e); }await renderPlanPageUI();}async function loadPlans(){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));if(!plans||plans.length===0){const defaultPlans=["Monday","Tuesday","Wednesday","Thursday","Friday","Custom"].map((name,idx)=>({id:uid(),profileId:state.profileId,name,schedule:{},order:idx}));for(const p of defaultPlans)await saveLocal("plans",p);planState.plans=defaultPlans;}else{planState.plans=plans.sort((a,b)=>a.order-b.order);}}/* ===== plans: templates vs. days =====
+}async function initializePlanPage(){await loadPlans();try{ planState.today=await ensureDayPlan(todayKey()); }catch(e){ console.warn("ensureDayPlan failed",e); }await renderPlanPageUI();}/* One weekday per plan is enforced here, not in Supabase (see the migration
+   file) - a device mid-sync could otherwise trip a DB-level unique
+   constraint before the "clear the old holder first" write lands. Runs on
+   every loadPlans() call, but only writes when something actually needs to
+   change, so it is cheap after the first pass. Covers two cases: a plan
+   from before assignedWeekday existed whose name happens to match a
+   weekday (the old convention this field replaces), and - defensively - any
+   state where more than one plan claims the same day, keeping only the
+   first and clearing the rest. */
+async function backfillAssignedWeekdays(plans){
+  const claimed=new Set();
+  for(const p of plans){
+    if(p.assignedWeekday==null) continue;
+    if(claimed.has(p.assignedWeekday)){ p.assignedWeekday=null; await saveLocal("plans",p); }
+    else claimed.add(p.assignedWeekday);
+  }
+  for(let d=0;d<7;d++){
+    if(claimed.has(d)) continue;
+    const nm=WEEKDAY_NAMES[d].toLowerCase();
+    const match=plans.find(p=>p.assignedWeekday==null&&String(p.name).toLowerCase()===nm);
+    if(match){ match.assignedWeekday=d; await saveLocal("plans",match); claimed.add(d); }
+  }
+}
+async function loadPlans(){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));if(!plans||plans.length===0){const defaultPlans=["Monday","Tuesday","Wednesday","Thursday","Friday","Custom"].map((name,idx)=>({id:uid(),profileId:state.profileId,name,schedule:{},order:idx,assignedWeekday:idx<5?idx+1:null}));for(const p of defaultPlans)await saveLocal("plans",p);planState.plans=defaultPlans;}else{planState.plans=plans.sort((a,b)=>a.order-b.order);await backfillAssignedWeekdays(planState.plans);}}/* ===== plans: templates vs. days =====
    plans    = reusable templates (Monday, Heavy Pipeline Day, ...)
    dayplans = one materialised schedule per profile per date, copied from a
               template when applied. Editing a day never touches the template;
@@ -3727,10 +3750,22 @@ function fmtDayLabel(date){
   const parts=String(date).split("-").map(Number);
   return new Date(parts[0],parts[1]-1,parts[2]).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
 }
+const WEEKDAY_NAMES=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+/* Monday-first display order; the stored field and Date.getDay() both stay
+   Sunday-first (0-6) so no remapping happens anywhere else. */
+const WEEK_DISPLAY_ORDER=[1,2,3,4,5,6,0];
+function planForWeekday(dayIdx){
+  return (planState.plans||[]).find(p=>p.assignedWeekday===dayIdx)||null;
+}
 function weekdayTemplate(date){
-  const names=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const parts=String(date).split("-").map(Number);
-  const nm=names[new Date(parts[0],parts[1]-1,parts[2]).getDay()].toLowerCase();
+  const dayIdx=new Date(parts[0],parts[1]-1,parts[2]).getDay();
+  /* assignedWeekday is the real, rename-proof link (Perfect Week). The name
+     match below only still fires for a plan that predates that field and
+     has not been through the one-time backfill in loadPlans() yet. */
+  const byField=planForWeekday(dayIdx);
+  if(byField) return byField;
+  const nm=WEEKDAY_NAMES[dayIdx].toLowerCase();
   return (planState.plans||[]).find(p=>String(p.name).toLowerCase()===nm)||null;
 }
 /* A dayplan that carries neither a source template nor any blocks was never
@@ -3845,6 +3880,56 @@ async function setPlanMode(mode){
   if(mode==="today") planState.today=await ensureDayPlan(todayKey());
   await renderPlanPageUI();
 }
+/* dayIdx null/"" unassigns. Enforces one plan per weekday by clearing
+   whoever already held it (and, since a plan can only hold one weekday
+   itself, clearing the target's own prior day too) before writing the new
+   link - so there is never a moment two plans claim the same day. */
+async function assignWeekdayToPlan(dayIdx,planId){
+  const target=(planState.plans||[]).find(p=>p.id===planId);
+  if(!target) return;
+  const already=target.assignedWeekday;
+  if(dayIdx===""||dayIdx==null){
+    if(already==null) return;
+    target.assignedWeekday=null;
+    await saveLocal("plans",target);
+    await renderPlanPageUI();
+    return;
+  }
+  dayIdx=parseInt(dayIdx,10);
+  if(already===dayIdx) return;
+  const holder=planForWeekday(dayIdx);
+  if(holder&&holder.id!==target.id){ holder.assignedWeekday=null; await saveLocal("plans",holder); }
+  target.assignedWeekday=dayIdx;
+  await saveLocal("plans",target);
+  await renderPlanPageUI();
+  toast(WEEKDAY_NAMES[dayIdx]+" → "+target.name);
+}
+async function createWeekdayPlan(dayIdx){
+  const holder=planForWeekday(dayIdx);
+  if(holder) return holder;
+  const p={id:uid(),profileId:state.profileId,name:WEEKDAY_NAMES[dayIdx],schedule:{},order:(planState.plans||[]).length,assignedWeekday:dayIdx};
+  await saveLocal("plans",p);
+  planState.plans.push(p);
+  return p;
+}
+/* Perfect Week draws all 7 days on one shared time axis so the columns line
+   up - each plan keeps its own startHour/endHour/increment for its normal
+   single-day editor, this is a view-only setting layered on top, persisted
+   on the profile so it does not fight per-plan windows. Recomputed from the
+   union of whatever the assigned plans actually use, then widened to a
+   6a-10p floor so an all-empty week still reads as a full day, not a sliver. */
+function weekViewWindow(){
+  const saved=state.profile&&state.profile.weekViewWindow;
+  if(saved&&saved.startHour!=null) return saved;
+  let lo=null,hi=null;
+  WEEK_DISPLAY_ORDER.forEach(d=>{
+    const p=planForWeekday(d); if(!p) return;
+    const w=planWindow(p);
+    lo=lo==null?w.startHour:Math.min(lo,w.startHour);
+    hi=hi==null?w.endHour:Math.max(hi,w.endHour);
+  });
+  return {startHour:Math.min(lo==null?6:lo,6),endHour:Math.max(hi==null?22:hi,22),increment:30};
+}
 async function renamePlan(idx){
   const plan=(planState.plans||[])[idx]; if(!plan) return;
   const name=await uiPrompt("Template name:",plan.name);
@@ -3887,11 +3972,19 @@ async function renderPlanPageUI(){
 
   let html=`<div style="display:flex;flex-direction:column;gap:16px;padding:16px;max-width:800px;margin:0 auto">`;
 
+  const isWeek=planState.mode==="week";
   const tabStyle=on=>`flex:1;padding:10px 12px;border-radius:8px;border:1px solid ${on?"var(--accent)":"var(--line)"};background:${on?"var(--accent)":"var(--panel)"};color:${on?"#fff":"var(--ink2)"};font-weight:700;font-size:13px;cursor:pointer;transition:all .15s`;
-  html+=`<div style="display:flex;gap:8px">
+  html+=`<div style="display:flex;gap:8px;flex-wrap:wrap">
     <button onclick="setPlanMode('today')" style="${tabStyle(isToday)}">Today &middot; ${fmtDayLabel(todayKey())}</button>
-    <button onclick="setPlanMode('templates')" style="${tabStyle(!isToday)}">Templates</button>
+    <button onclick="setPlanMode('templates')" style="${tabStyle(!isToday&&!isWeek)}">Templates</button>
+    <button onclick="setPlanMode('week')" style="${tabStyle(isWeek)}">Perfect Week</button>
   </div>`;
+
+  if(isWeek){
+    stage.innerHTML=html+renderPerfectWeekBody();
+    wirePerfectWeek();
+    return;
+  }
 
   if(isToday){
     const linked=(today&&today.planId)?(planState.plans.find(p=>p.id===today.planId)||null):null;
@@ -4011,6 +4104,154 @@ async function renderPlanPageUI(){
       renderPlanPageUI();
     });
   }
+}
+
+/* ===== Perfect Week: all 7 weekday templates, side by side =====
+   Same underlying plans/schedule records the Templates tab edits - this is
+   just another view onto them, aligned to one shared time axis (see
+   weekViewWindow()) so the columns line up. Editing a slot here writes
+   straight to that weekday's plan, same as editing it in Templates mode. */
+function renderPerfectWeekBody(){
+  const win=weekViewWindow();
+  const pFmt=state.profile&&state.profile.hourFmt;
+  const hours=[];
+  for(let h=win.startHour;h<win.endHour;h++){
+    for(let m=0;m<60;m+=win.increment){ hours.push({h,m,display:fmtHourMin(h,m,pFmt)}); }
+  }
+  const hourOpt=(sel,from,to)=>{let o="";for(let h=from;h<=to;h++){o+='<option value="'+h+'"'+(h===sel?" selected":"")+'>'+fmtHourMin(h,0,pFmt)+'</option>';}return o;};
+  const incrOpt=sel=>[15,30,60].map(v=>'<option value="'+v+'"'+(v===sel?" selected":"")+'>'+v+' min</option>').join("");
+  const winSelCss="width:100%;margin-top:4px;padding:8px;background:var(--field);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:16px";
+
+  let html='<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px">'+
+    '<label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Day window</label>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Starts'+
+        '<select id="weekWinStart" style="'+winSelCss+'">'+hourOpt(win.startHour,0,23)+'</select></label>'+
+      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Ends'+
+        '<select id="weekWinEnd" style="'+winSelCss+'">'+hourOpt(win.endHour,1,24)+'</select></label>'+
+      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Slot'+
+        '<select id="weekWinIncr" style="'+winSelCss+'">'+incrOpt(win.increment)+'</select></label>'+
+    '</div>'+
+    '<div class="hint" style="margin-top:8px">Shared across all 7 columns so they line up. Each template keeps its own window when edited alone under Templates.</div></div>';
+
+  html+='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="display:flex;gap:10px;min-width:'+(WEEK_DISPLAY_ORDER.length*136)+'px">';
+  WEEK_DISPLAY_ORDER.forEach(d=>{
+    const plan=planForWeekday(d);
+    const sched=(plan&&plan.schedule)||{};
+    html+='<div style="flex:0 0 128px;display:flex;flex-direction:column;gap:6px">';
+    html+='<div style="font-size:11px;font-weight:800;color:var(--ink2);text-transform:uppercase;text-align:center">'+WEEKDAY_NAMES[d].slice(0,3)+'</div>';
+    html+='<select onchange="handleWeekDaySelect('+d+',this.value)" style="width:100%;padding:6px 4px;background:var(--field);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:11px;font-weight:600">';
+    if(!plan) html+='<option value="">&mdash; none &mdash;</option>';
+    html+='<option value="__new__">+ New template</option>';
+    (planState.plans||[]).forEach(p=>{
+      const elsewhere=p.assignedWeekday!=null&&p.assignedWeekday!==d?" (on "+WEEKDAY_NAMES[p.assignedWeekday].slice(0,3)+")":"";
+      html+='<option value="'+p.id+'"'+(plan&&plan.id===p.id?" selected":"")+'>'+escapeHtml(p.name)+elsewhere+'</option>';
+    });
+    if(plan) html+='<option value="">&mdash; unassign &mdash;</option>';
+    html+='</select>';
+    if(!plan){
+      html+='<div class="hint" style="text-align:center;padding:8px 2px">No template yet</div>';
+    }else{
+      hours.forEach(o=>{
+        const slot=o.h+":"+(o.m===0?"00":o.m);
+        const ch=sched[slot]?(state.channels||[]).find(x=>x.id===sched[slot]):null;
+        html+='<button '+weekSlotAttrs(d,slot)+' style="padding:8px 6px;background:'+(ch?ch.color+"33":"var(--panel2)")+';border:1px solid '+(ch?ch.color:"var(--line)")+';color:'+(ch?ch.color:"var(--ink2)")+';border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s">'+
+          '<div style="opacity:.75;font-size:9px">'+o.display+'</div>'+
+          '<div style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ch?escapeHtml(ch.label):"&mdash;")+'</div></button>';
+      });
+    }
+    html+='</div>';
+  });
+  html+='</div></div>';
+
+  html+='<div style="margin-top:14px"><label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Channels &mdash; drag onto a slot, or tap a slot</label>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px">';
+  (state.channels||[]).filter(c=>!c.archived&&!c.parentChannelId).forEach(ch=>{
+    html+='<div draggable="true" data-ch-id="'+ch.id+'" style="padding:10px;background:'+ch.color+'33;border:1px solid '+ch.color+';color:'+ch.color+';border-radius:6px;font-weight:600;font-size:11px;text-align:center;cursor:grab;user-select:none;transition:all .15s" ondragstart="event.dataTransfer.effectAllowed=\'copy\';event.dataTransfer.setData(\'text/plain\',this.dataset.chId)">'+escapeHtml(ch.label)+'</div>';
+  });
+  html+='</div></div>';
+  return html;
+}
+function weekSlotAttrs(dayIdx,slot){
+  return `ondragover="event.preventDefault();event.dataTransfer.dropEffect='copy';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='1px'" ondragleave="this.style.outline=''" ondrop="this.style.outline='';planWeekDrop(event,${dayIdx},'${slot}')" onclick="openWeekSlotModal(${dayIdx},'${slot}')"`;
+}
+function wirePerfectWeek(){
+  const win=weekViewWindow();
+  const winTargets={weekWinStart:"startHour",weekWinEnd:"endHour",weekWinIncr:"increment"};
+  Object.keys(winTargets).forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.addEventListener("change",async e=>{
+      const w={...win}; w[winTargets[id]]=parseInt(e.target.value,10);
+      if(w.endHour<=w.startHour) w.endHour=Math.min(24,w.startHour+1);
+      state.profile.weekViewWindow=w;
+      await saveLocal("profiles",state.profile);
+      await renderPlanPageUI();
+    });
+  });
+}
+async function handleWeekDaySelect(dayIdx,value){
+  if(value==="__new__"){ await createWeekdayPlan(dayIdx); await renderPlanPageUI(); toast("Created a new "+WEEKDAY_NAMES[dayIdx]+" template"); return; }
+  if(value===""){
+    const holder=planForWeekday(dayIdx);
+    if(holder){ holder.assignedWeekday=null; await saveLocal("plans",holder); await renderPlanPageUI(); }
+    return;
+  }
+  await assignWeekdayToPlan(dayIdx,value);
+}
+async function setWeekSlot(dayIdx,slot,chId){
+  const plan=planForWeekday(dayIdx); if(!plan) return;
+  if(!plan.schedule) plan.schedule={};
+  if(chId) plan.schedule[slot]=chId; else delete plan.schedule[slot];
+  await saveLocal("plans",plan);
+  await renderPlanPageUI();
+}
+async function planWeekDrop(e,dayIdx,slot){
+  e.preventDefault();
+  const chId=e.dataTransfer.getData("text/plain");
+  if(!chId) return;
+  await setWeekSlot(dayIdx,slot,chId);
+  const ch=(state.channels||[]).find(c=>c.id===chId);
+  toast(ch?("Planned "+ch.label):"Planned");
+}
+/* Twin of openPlanSlotModal() targeting a specific weekday's plan instead of
+   whichever record Templates/Today mode currently has active - Perfect Week
+   can have any number of different plans open on screen at once. */
+function openWeekSlotModal(dayIdx,slot){
+  const plan=planForWeekday(dayIdx); if(!plan) return;
+  const modal=document.createElement("div");
+  modal.className="scrim";
+  modal.style.cssText="position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px";
+  const card=document.createElement("div");
+  card.style.cssText="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:320px;width:100%;max-height:80vh;overflow-y:auto";
+  const header=document.createElement("div");
+  header.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px";
+  header.innerHTML=`<h3 style="margin:0;font-size:16px">${WEEKDAY_NAMES[dayIdx]} &middot; ${slot}</h3><button class="planModalX" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">&#10005;</button>`;
+  card.appendChild(header);
+  const sub=document.createElement("div");
+  sub.className="hint"; sub.style.margin="0 0 14px";
+  sub.textContent="Applies to "+plan.name;
+  card.appendChild(sub);
+  const options=document.createElement("div");
+  options.style.cssText="display:flex;flex-direction:column;gap:8px;margin-bottom:16px";
+  (state.channels||[]).filter(c=>!c.archived&&!c.parentChannelId).forEach(ch=>{
+    const btn=document.createElement("button");
+    btn.style.cssText="padding:12px;background:"+ch.color+"33;border:1px solid "+ch.color+";color:"+ch.color+";border-radius:6px;font-weight:600;cursor:pointer;transition:all .15s";
+    btn.textContent=ch.label;
+    btn.onclick=async()=>{ modal.remove(); await setWeekSlot(dayIdx,slot,ch.id); };
+    options.appendChild(btn);
+  });
+  card.appendChild(options);
+  const clearBtn=document.createElement("button");
+  clearBtn.style.cssText="width:100%;padding:10px;background:rgba(240,68,68,.15);border:1px solid rgba(240,68,68,.5);color:var(--bad-ink);border-radius:6px;font-weight:600;cursor:pointer";
+  clearBtn.textContent="Clear slot";
+  clearBtn.onclick=async()=>{ modal.remove(); await setWeekSlot(dayIdx,slot,null); };
+  card.appendChild(clearBtn);
+  modal.appendChild(card);
+  const x=header.querySelector(".planModalX");
+  if(x) x.onclick=()=>modal.remove();
+  modal.onclick=e=>{ if(e.target===modal) modal.remove(); };
+  document.body.appendChild(modal);
 }
 
 async function planDrop(e,slot){

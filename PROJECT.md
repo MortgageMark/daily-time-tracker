@@ -48,6 +48,8 @@ supabase-plan-window-migration.sql
                                 NOT YET RUN - per-plan day window.
 supabase-sessions-note-migration.sql
                                 NOT YET RUN - adds sessions.note.
+supabase-plans-assigned-weekday-migration.sql
+                                NOT YET RUN - Perfect Week weekday link.
 apple-touch-icon.png            180px, iOS home screen
 icon-192.png / icon-512.png     manifest icons (512 doubles as maskable)
 favicon-32.png                  browser tab
@@ -1358,6 +1360,56 @@ so the avatar menu (used everywhere else) stays untouched.
 This split is explicitly a first pass ("let's try your way until we come up
 with [something better]") - expect the Plan/Tracker/Stats vs. direct-button
 grouping to get revisited once real usage is in.
+
+### Perfect Week: all 7 weekday templates side by side, still v24
+
+Mark wanted to see Monday through Sunday's templates next to each other and
+edit them in place, rather than one at a time through the Templates
+dropdown. New third tab on the Plan page, next to Today and Templates.
+
+**The weekday-plan link is now a real field, not a name match.**
+`weekdayTemplate()` (used to decide what a real future day materialises
+from) has matched a plan named e.g. "monday" to Mondays since before this
+feature existed - convenient, but renaming that plan silently detached it
+with no error. `plans` gets a new nullable `assignedWeekday` (0-6,
+`Date.getDay()` convention) instead. `loadPlans()` runs a one-time,
+idempotent backfill (`backfillAssignedWeekdays()`) that sets the field from
+the old name match wherever nothing already claims that day, so every
+existing user's Monday-Friday templates come out assigned with no action
+needed. `weekdayTemplate()` still falls back to the name match after that,
+for the narrow window before a given profile has been through the backfill.
+
+**One plan per weekday, one weekday per plan** - `assignWeekdayToPlan()`
+clears whichever plan currently holds a day before handing it to the new
+one, so two plans never claim the same day. Not a DB constraint (a unique
+index would fight the app mid-sync across devices) - enforced entirely in
+app code, documented in `supabase-plans-assigned-weekday-migration.sql`.
+
+**Shared time axis, not seven independent grids.** Each plan still keeps
+its own start/end/increment for the Templates tab. Perfect Week draws all
+7 columns on one common window instead - `weekViewWindow()` - so a click
+lands on the same clock time in every column. That window is a view
+setting on the profile (`state.profile.weekViewWindow`), not written onto
+any plan, and does not sync to Supabase (profiles' `toRow`/`fromRow` were
+not extended for it) - a deliberate simplification, since it is a per-
+device display preference, not data. If asked "why doesn't my Plan-page
+window follow me to my phone," this is why.
+
+Editing a column writes straight to that weekday's `plan.schedule` - same
+data the Templates tab shows, so a change here is visible there and vice
+versa. Column header is a `<select>`: pick an existing template (reassigning
+it here, away from wherever it was), "+ New template" (creates one named
+after the day, already assigned), or "— unassign —". An unassigned day
+renders no grid, just a prompt, rather than a blank set of slots that would
+look editable but silently do nothing.
+
+`openWeekSlotModal()`/`setWeekSlot()`/`planWeekDrop()`/`weekSlotAttrs()` are
+small twins of the existing `openPlanSlotModal()`/`setPlanSlot()`/
+`planDrop()`/`slotAttrs()` - Perfect Week can have several different plans
+open on screen at once, where the originals always target whichever single
+record Today/Templates mode currently has active, so threading a target
+through the shared functions risked the single-day editor over a feature
+that did not need to touch it.
 
 ---
 
