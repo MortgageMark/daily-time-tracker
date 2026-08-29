@@ -1526,6 +1526,20 @@ function with the right arguments - zero errors either width. No
 duplicate top-level function declarations beyond the pre-existing
 documented one.
 
+### Bottombar buttons, unequal widths on tablet/desktop, still v24
+
+Dashboard was visibly wider than its neighbors once the bar went to six
+buttons. `.ctl`'s base rule sized each button to its own content
+(`min-width:76px`, no stretch) - fine at one word each, but "Dashboard" is
+longer than "Plan"/"Week"/"Stats", so it stretched wider while the shorter
+labels stayed at their minimum. The phone media query already fixed this
+with `flex:1 1 0`, which is exactly why it was never noticed there - that
+override just never existed above 640px. Moved `flex:1 1 0` into the base
+`.bottombar .ctl` rule so every width gets equal buttons; `min-width:76px`
+stays as the floor. Verified: all three script blocks parse; all six
+buttons measure identically at desktop width, all four measure identically
+at phone width.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
