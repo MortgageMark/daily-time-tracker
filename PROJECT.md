@@ -1331,6 +1331,34 @@ so a day-type change on the Week view re-renders the Week view instead of
 silently doing nothing, or rendering the wrong screen underneath this one.
 Any future page reusing `dayTypeSelectHtml()` needs the same override.
 
+### Bottom nav: Edit a day and Week promoted out of the avatar menu, still v24
+
+Mark's read: with Edit a day and Week now used daily, burying them one tap
+deeper in the avatar menu didn't match how often they're reached for. The
+bottombar stays at exactly four buttons - the fourth is no longer a fourth
+destination but a **More** overflow (`•••`) opening a small popup anchored
+above the bar, holding the three lower-frequency destinations.
+
+- Direct: **Dashboard, Edit a day, Week**
+- Behind **More**: **Plan, Tracker, Stats**
+
+`btnEditDay` calls `openDayEditor(todayKey())`, `btnWeek` calls
+`openWeekEditor(todayKey())` - same destinations the avatar menu used to
+open, so no new code path, just a shorter one. The avatar menu's "Edit a
+day"/"Week" rows were removed since they'd now just duplicate the bottombar.
+
+The More popup is a `#moreMenu` div (`position:fixed`, anchored bottom-right
+above the bar) toggled the same way `#avatarMenu` is - `stopPropagation` on
+the button, a document-level click closes it, each row closes it before
+running its action. Its rows are built by `moreMenuItem()`, a small twin of
+`avatarMenuItem()` that closes `#moreMenu` instead of `#avatarMenu` -
+kept separate rather than parameterizing the existing helper's container,
+so the avatar menu (used everywhere else) stays untouched.
+
+This split is explicitly a first pass ("let's try your way until we come up
+with [something better]") - expect the Plan/Tracker/Stats vs. direct-button
+grouping to get revisited once real usage is in.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
