@@ -4518,7 +4518,8 @@ async function renderWeekEditor(){
   const rangeLabel=d0.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+
     d6.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   const dayLabels=days.map(dk=>{ const d=new Date(dayStartTs(dk));
-    return {short:d.toLocaleDateString('en-US',{weekday:'short'}), num:d.getDate(), isToday:dk===todayKey()}; });
+    return {dk, short:d.toLocaleDateString('en-US',{weekday:'short'}),
+      num:(d.getMonth()+1)+'/'+d.getDate(), isToday:dk===todayKey()}; });
 
   let timeHtml='', dayHtml=days.map(()=>'');
   for(let h=startHour;h<endHour;h++){
@@ -4601,7 +4602,7 @@ async function renderWeekEditor(){
         <div style="min-width:${railW+7*dayColMin}px">
           <div style="display:grid;grid-template-columns:${railW}px ${dayColsCss};gap:0;background:var(--bg);border:1px solid var(--line);border-radius:8px 8px 0 0;overflow:hidden">
             <div style="padding:7px 4px;background:var(--panel2);font-weight:700;font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--line);border-right:1px solid var(--line);display:flex;align-items:center;justify-content:center">Time</div>
-            ${dayLabels.map(d=>`<div style="padding:7px 4px;background:${d.isToday?'var(--accent)22':'var(--panel2)'};font-weight:700;font-size:13px;border-bottom:1px solid var(--line);text-align:center;color:${d.isToday?'var(--accent)':'var(--ink)'}">${d.short}<div style="font-size:11px;font-weight:600;color:var(--ink2)">${d.num}</div></div>`).join('')}
+            ${dayLabels.map(d=>`<div data-wk-day="${d.dk}" title="Edit ${d.dk}" style="padding:7px 4px;background:${d.isToday?'var(--accent)22':'var(--panel2)'};font-weight:700;font-size:13px;border-bottom:1px solid var(--line);text-align:center;color:${d.isToday?'var(--accent)':'var(--ink)'};cursor:pointer">${d.short}<div style="font-size:11px;font-weight:600;color:var(--ink2)">${d.num}</div></div>`).join('')}
           </div>
           <div id="wkGrid" style="display:grid;grid-template-columns:${railW}px ${dayColsCss};gap:0;background:var(--bg);border:1px solid var(--line);border-top:none">
             <div style="border-right:1px solid var(--line)">${timeHtml}</div>
@@ -4621,6 +4622,11 @@ async function renderWeekEditor(){
   document.getElementById("wkNext").addEventListener("click",()=>weekGoto(shiftDateKey(monKey,7)));
   const twb=document.getElementById("wkThisWeek");
   if(twb) twb.addEventListener("click",()=>weekGoto(todayKey()));
+  /* Read-only page, but a day header is a natural jump-off point: tap the
+     date, land in the Day Editor already on it. */
+  document.querySelectorAll("[data-wk-day]").forEach(el=>{
+    el.addEventListener("click",()=>openDayEditor(el.dataset.wkDay));
+  });
   ["wkWinStart","wkWinEnd","wkWinIncr"].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
