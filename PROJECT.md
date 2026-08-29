@@ -5,8 +5,8 @@ It replaces the older `PROJECT_DOCUMENTATION.md`, which contained stale paths
 and leaked credentials. Do not trust that file.
 
 - **Live:** https://dailytimetracker.com
-- **Current release:** v23
-- **Last deployed:** v23, 2026-08-27
+- **Current release:** v24
+- **Last deployed:** v24, 2026-08-27
 - **Status:** stable, in daily use
 
 > **Verify before believing any release claim in this file.** It has been
@@ -44,6 +44,8 @@ supabase-dayplans-daytype-migration.sql
                                 RUN 2026-08-27. Adds dayplans.day_type.
 supabase-channels-joy-drain-migration.sql
                                 RUN 2026-08-27. Adds channels.joy/.drain.
+supabase-plan-window-migration.sql
+                                NOT YET RUN - per-plan day window.
 apple-touch-icon.png            180px, iOS home screen
 icon-192.png / icon-512.png     manifest icons (512 doubles as maskable)
 favicon-32.png                  browser tab
@@ -1059,6 +1061,44 @@ negative durations, a single open session left untouched, and the load path.
 recurs in another form: a device can only ever end sessions it knows about, so
 any state that must be globally exclusive has this shape. Backlog 7.7 made the
 same point about the merge rule.
+
+### The day window belongs to the plan, v24
+
+Start hour, end hour and slot size used to live in Settings, where they **did
+nothing**: the handlers wrote to `planState` in memory, never persisted, never
+re-rendered. Reloading reset them to the hardcoded 8/18/30. The markup also
+existed twice with the same ids, so only the first copy was ever addressed.
+
+They are now a property of a plan. `plans` and `dayplans` each carry
+`startHour`, `endHour`, `increment`; a template holds its own window, a
+materialised day inherits a copy, and "Save to template" carries it back.
+Defaults are 8am-6pm in 30-minute slots, expressed as NULL in the database so
+"unset" and "8" stay distinguishable.
+
+`planWindow(rec)` resolves a record's window with defaults and guarantees
+`endHour > startHour` so a grid can never come out empty.
+`applyPlanWindow(rec)` writes it into `planState` - kept deliberately, because
+every existing grid reader already reads `planState`, so each render just sets
+it from the record it is about to draw and nothing downstream changed.
+
+The controls sit on the Plan page and edit whatever is on screen: the selected
+template, or today's materialised day. The Tracker calls
+`applyPlanWindow(dayRec)` before drawing, so paging to a past day draws that
+day's hours rather than whatever the Plan page last showed.
+
+Verified: 8-18/30 gives 20 rows and 6-20/15 gives 56 on the same template; a
+second template stays at the default; a day set to 7-11 hourly gives the
+Tracker exactly four rows from 7:00 to 11:00.
+
+`supabase-plan-window-migration.sql` **has not been run.** Until it does the
+window works on-device but does not sync.
+
+**A warning for anyone scripting edits to this file.** The long settings line
+both closes a template literal and contains `getElementById("plannerStart")`.
+A filter matching that substring deleted the whole line, and the resulting
+syntax error was reported hundreds of lines away at `dedupChannels`. Match on
+something anchored - `const plannerStart=` - and always re-run the parse check
+in the browser after a scripted edit.
 
 ---
 
