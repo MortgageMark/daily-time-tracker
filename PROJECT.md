@@ -1226,6 +1226,31 @@ the next row, and 16px is non-negotiable on iOS (Landmines: text inputs zoom
 the page below that). Zoom in for notes on a crowded block, same answer as
 everywhere else on this screen.
 
+### Week view, first attempt, still v24
+
+New avatar menu item, "Week", under "Edit a day". `openWeekEditor(dk)` /
+`renderWeekEditor()` follow the same entry/re-render split as the Tracker,
+with the same re-entry guard (recapturing the stage on every week change
+would make Home close this page back into itself).
+
+Modelled on the Tracker's grid, widened to seven days: a time rail plus one
+column per weekday (Monday start, matching the Summary's existing Week
+Overview), Actual only - there is no plan to compare a week against, so
+Planned/Match do not apply. The hour range is derived from what the week
+actually held (min/max across all its sessions), same idea as the Day
+Editor's own rail, not a fixed clock. A cell with a note shows the channel
+chip and the note **stacked underneath it**, not beside it - side by side in
+an 84px column left room for neither; first draft, caught in a screenshot
+before committing.
+
+`openWeekView()`/`closeWeekView()` above are unrelated, older, unreferenced
+dead code (a card layout, not a grid). Named this feature differently on
+purpose so nothing here can shadow or be shadowed by it.
+
+Not yet done: no editing on this page (read-only, matching "let's see how it
+looks" framing) and increment is a fixed 30 minutes, not the per-plan window
+work from earlier this session.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
