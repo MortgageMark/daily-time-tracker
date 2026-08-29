@@ -46,6 +46,8 @@ supabase-channels-joy-drain-migration.sql
                                 RUN 2026-08-27. Adds channels.joy/.drain.
 supabase-plan-window-migration.sql
                                 NOT YET RUN - per-plan day window.
+supabase-sessions-note-migration.sql
+                                NOT YET RUN - adds sessions.note.
 apple-touch-icon.png            180px, iOS home screen
 icon-192.png / icon-512.png     manifest icons (512 doubles as maskable)
 favicon-32.png                  browser tab
@@ -1169,6 +1171,45 @@ logic (`['st','nd','rd'][((d.getDate()%10)-1)%3]||'th'`) mishandles every date
 ending in 9 - 9th, 19th, 29th all come out wrong. Spotted, not fixed: Mark did
 not confirm he wanted it touched, and he was explicit about not changing the
 date's format in this pass.
+
+### Per-session notes, still v24
+
+A quick tag on one block - a name, a topic - not the whole-day reflection
+`day_notes` already holds. Deliberately not on the Plan page: a plan slot is a
+recurring template, and a note like "who was that with" belongs to one actual
+instance of it, which is a session, not a slot. Deliberately not on the
+Summary page either, on request - written where it is reviewed, not
+duplicated where it would just add clutter.
+
+- **Lives on the session record** (`sessions.note`), synced like every other
+  session field. `OPTIONAL_COLUMNS.sessions=["note"]` so the app degrades
+  gracefully before the migration runs, same pattern as every other optional
+  column this session added.
+- **A single-line input, `maxlength=60`, in the block sheet** - opened by
+  tapping any block in the Day Editor timeline. Deliberately not a textarea:
+  the field itself should read as "quick tag," not "journal entry," before
+  anyone starts typing. Saves on `change` (blur), matching the existing
+  `day_notes` textarea convention.
+- **The sheet stays open after saving.** Only closes on an actual decision -
+  reassigning a channel, splitting, deleting. `blockScrim` lives outside
+  `#dayEditorBody`, so calling `afterDayEdit()` to refresh the timeline
+  underneath does not touch or close what is still open on top of it.
+- **A small two-line "note" mark** appears on a timeline block that carries
+  one, distinct from the dot already used for "Running" elsewhere so the two
+  cannot be confused. Verified it appears the moment a note saves and
+  disappears the moment one is cleared.
+
+`supabase-sessions-note-migration.sql` **has not been run.** Until it does,
+notes are stored and shown on the device but do not sync. The column is
+capped at 60 characters server-side too, matching the input, rather than left
+unbounded.
+
+### The top-date edit icon gets a border, still v24
+
+A plain pencil read as decoration more than as a button. A small bordered
+square around just the icon - not the date text, which Mark asked to leave
+alone - reads as an icon button on its own, the way the rest of the app's
+controls do.
 
 ---
 

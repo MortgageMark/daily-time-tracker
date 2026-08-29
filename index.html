@@ -364,7 +364,7 @@
 
 <div class="app" id="appRoot" style="display:none">
   <div class="topbar">
-    <div class="kv" style="margin-right:auto;cursor:pointer;display:flex;align-items:center;gap:5px" id="topDateBtn" title="Edit today"><span class="v" id="topDate" style="font-size:14px;font-weight:600">—</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex:none;opacity:.6"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></div>
+    <div class="kv" style="margin-right:auto;cursor:pointer;display:flex;align-items:center;gap:6px" id="topDateBtn" title="Edit today"><span class="v" id="topDate" style="font-size:14px;font-weight:600">—</span><span style="display:flex;align-items:center;justify-content:center;width:20px;height:20px;flex:none;border:1px solid var(--line);border-radius:6px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;opacity:.7"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></div>
     <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px">
       <span style="font-size:20px;font-weight:800;color:var(--accent)" id="topTotal">0:00:00</span>
       <div id="topStatus" class="status-pill idle" style="cursor:pointer"><span class="d"></span><span id="topStatusTxt">Idle</span></div>
@@ -716,7 +716,7 @@ async function updatePendingCount(){ const cnt=document.getElementById("pendingC
 function toRow(store,r){
   if(store==="profiles")return {id:r.id,name:r.name,hour_fmt:r.hourFmt||"12",confirm_end:(r.confirmEnd!=="0")};
   if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived,parent_channel_id:r.parentChannelId||null,tier:r.tier||null,drip:r.drip||null,urgency:r.urgency||null,importance:r.importance||null,joy:r.joy||null,drain:r.drain||null};
-  if(store==="sessions")return {id:r.id,profile_id:r.profileId,channel_id:r.channelId,start_ts:new Date(r.startTs).toISOString(),end_ts:r.endTs?new Date(r.endTs).toISOString():null,duration_seconds:r.endTs?Math.round((r.endTs-r.startTs)/1000):null,business_date:r.date,voided:!!r.voided,revision:r.revision||0};
+  if(store==="sessions")return {id:r.id,profile_id:r.profileId,channel_id:r.channelId,start_ts:new Date(r.startTs).toISOString(),end_ts:r.endTs?new Date(r.endTs).toISOString():null,duration_seconds:r.endTs?Math.round((r.endTs-r.startTs)/1000):null,business_date:r.date,voided:!!r.voided,revision:r.revision||0,note:r.note||null};
   if(store==="plans")return {id:r.id,profile_id:r.profileId,name:r.name,schedule:r.schedule||{},sort_order:r.order||0,start_hour:r.startHour==null?null:r.startHour,end_hour:r.endHour==null?null:r.endHour,increment_minutes:r.increment==null?null:r.increment};
   if(store==="dayplans")return {id:r.id,profile_id:r.profileId,date:r.date,plan_id:r.planId||null,plan_name:r.planName||null,schedule:r.schedule||{},edited:!!r.edited,day_type:r.dayType||null,start_hour:r.startHour==null?null:r.startHour,end_hour:r.endHour==null?null:r.endHour,increment_minutes:r.increment==null?null:r.increment};
 }
@@ -726,7 +726,7 @@ function fromRow(store,row){
   if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,parentChannelId:row.parent_channel_id||null,tier:row.tier||null,drip:row.drip||null,urgency:row.urgency||null,importance:row.importance||null,joy:row.joy||null,drain:row.drain||null,_u:u,_dirty:false};
   if(store==="plans")return {id:row.id,profileId:row.profile_id,name:row.name,schedule:row.schedule||{},order:row.sort_order||0,startHour:row.start_hour==null?null:row.start_hour,endHour:row.end_hour==null?null:row.end_hour,increment:row.increment_minutes==null?null:row.increment_minutes,_u:u,_dirty:false};
   if(store==="dayplans")return {id:row.id,profileId:row.profile_id,date:row.date,planId:row.plan_id||null,planName:row.plan_name||null,schedule:row.schedule||{},edited:!!row.edited,dayType:row.day_type||null,startHour:row.start_hour==null?null:row.start_hour,endHour:row.end_hour==null?null:row.end_hour,increment:row.increment_minutes==null?null:row.increment_minutes,_u:u,_dirty:false};
-  if(store==="sessions")return {id:row.id,profileId:row.profile_id,channelId:row.channel_id,startTs:Date.parse(row.start_ts),endTs:row.end_ts?Date.parse(row.end_ts):null,durMs:row.end_ts?(Date.parse(row.end_ts)-Date.parse(row.start_ts)):0,date:row.business_date,voided:!!row.voided,revision:row.revision||0,_u:u,_dirty:false};
+  if(store==="sessions")return {id:row.id,profileId:row.profile_id,channelId:row.channel_id,startTs:Date.parse(row.start_ts),endTs:row.end_ts?Date.parse(row.end_ts):null,durMs:row.end_ts?(Date.parse(row.end_ts)-Date.parse(row.start_ts)):0,date:row.business_date,voided:!!row.voided,revision:row.revision||0,note:row.note||null,_u:u,_dirty:false};
 }
 /* Stores that round-trip to Supabase. plans/dayplans need the tables from
    supabase-plans-migration.sql; until that runs they are skipped after the
@@ -765,7 +765,7 @@ function noteMissingTable(store,error){
    new fields. So on that error the new columns are stripped and the push is
    retried, and the full set is retried periodically in case the migration
    lands later. Same shape as the missing-table handling above. */
-const OPTIONAL_COLUMNS={channels:["tier","drip","urgency","importance","joy","drain"],dayplans:["day_type","start_hour","end_hour","increment_minutes"],plans:["start_hour","end_hour","increment_minutes"]};
+const OPTIONAL_COLUMNS={channels:["tier","drip","urgency","importance","joy","drain"],dayplans:["day_type","start_hour","end_hour","increment_minutes"],plans:["start_hour","end_hour","increment_minutes"],sessions:["note"]};
 const missingRemoteColumns=new Map();
 const MISSING_COLUMN_RETRY_MS=10*60*1000;
 function columnsSkipped(store){
@@ -1910,6 +1910,17 @@ function buildTimeline(dk,sess,fmt){
     /* Below this the text would be clipped to a meaningless sliver; the colour
        bar still says which channel it is, and zooming in reveals the rest. */
     if(h>=24) b.appendChild(nm);
+    if(sn.note){
+      /* A dot is already the app's "status" glyph elsewhere (Running), so a
+         note gets its own small mark instead - two lines, read as a note at
+         a glance without implying anything is live or in progress. */
+      const nd=document.createElement("div");
+      nd.title=sn.note;
+      nd.style.cssText="position:absolute;top:5px;right:7px;width:11px;height:11px;opacity:.7";
+      nd.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="'+ch.color+'" stroke-width="2.5" '+
+        'stroke-linecap="round"><path d="M6 8h12M6 13h8"/></svg>';
+      b.appendChild(nd);
+    }
     if(h>=42){
       const tm=document.createElement("div");
       tm.dataset.times="1";
@@ -2243,6 +2254,34 @@ async function openBlockSheet(dk,sn){
     await afterDayEdit(dk);
     toast("Moved to "+c.label);
   }));
+
+  const noteTitle=document.createElement("div"); noteTitle.className="sect-title"; noteTitle.style.margin="18px 0 6px";
+  noteTitle.textContent="Note";
+  body.appendChild(noteTitle);
+  /* Deliberately a single-line input, not the paragraph textarea day_notes
+     uses for the whole-day reflection. This is a quick tag on one block - a
+     name, a topic - not a journal entry, and the field itself should make
+     that obvious before anyone starts typing. */
+  const noteInput=document.createElement("input");
+  noteInput.type="text"; noteInput.maxLength=60;
+  noteInput.value=fresh.note||"";
+  noteInput.placeholder="Who was this with, or what was it about?";
+  noteInput.style.cssText="width:100%;font-size:16px;background:var(--field);border:1px solid var(--line);"+
+    "border-radius:10px;color:var(--ink);padding:10px";
+  noteInput.addEventListener("change",async()=>{
+    const rec=await idbGet("sessions",fresh.id);
+    if(!rec) return;
+    const v=noteInput.value.trim();
+    rec.note=v||null;
+    await saveLocal("sessions",rec);
+    fresh.note=rec.note;
+    /* Refreshes the timeline underneath (so the note dot appears) without
+       touching this sheet - blockScrim sits outside #dayEditorBody, so
+       re-rendering the day does not close what is still open on top of it. */
+    await afterDayEdit(dk);
+    toast(v?"Note saved":"Note cleared");
+  });
+  body.appendChild(noteInput);
 
   const acts=document.createElement("div");
   acts.style.cssText="display:flex;gap:6px;flex-wrap:wrap;margin-top:18px";
