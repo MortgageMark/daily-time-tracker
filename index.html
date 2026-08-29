@@ -380,7 +380,7 @@
     <button class="ctl" id="btnDashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1Z"/><path d="M17 13a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1Z"/><path d="M10 21a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1Z"/></svg>Dashboard</button>
     <button class="ctl" id="btnPlan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9h12M6 13h12M6 17h6M3 21h18a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2Z"/></svg>Plan</button>
     <button class="ctl" id="btnAdhere"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3v6M15 3v6M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="M6 15h3M15 15h3"/></svg>Tracker</button>
-    <button class="ctl" id="btnSummary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 9h8M8 15h8"/></svg>Summary</button>
+    <button class="ctl" id="btnSummary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 9h8M8 15h8"/></svg>Stats</button>
   </div>
 </div>
 
@@ -459,9 +459,6 @@
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-adj="-15">-15 min</button><button class="btn sm" data-adj="-10">-10 min</button><button class="btn sm" data-adj="-5">-5 min</button><button class="btn sm" data-adj="+5">+5 min</button><button class="btn sm" data-adj="+10">+10 min</button><button class="btn sm" data-adj="+15">+15 min</button></div></div>
   </div></div></div>
 <!-- DASHBOARD -->
-<div class="scrim" id="dashScrim"><div class="sheet wide"><div class="sheet-h"><h2>Dashboard</h2>
-  <button class="btn sm" id="dashExport" style="margin-left:auto">Export CSV</button><button class="x" data-close style="margin-left:10px">×</button></div>
-  <div class="sheet-b"><div class="dash" id="dashBody"></div></div></div></div>
 
 <!-- NEW PROFILE -->
 
@@ -2366,7 +2363,6 @@ async function openBlockSheet(dk,sn){
    importance as the four Eisenhower quadrants. Every section is generated
    from CHANNEL_ATTRS, so it grows automatically with that table.
    ===================================================================== */
-let prioRange="week";
 const QUADRANTS=[
   {k:"do",       label:"Do",        hint:"Urgent + important",         color:"#ef4444"},
   {k:"schedule", label:"Schedule",  hint:"Important, not urgent",      color:"#22c55e"},
@@ -2399,153 +2395,6 @@ async function attrTotals(rangeKey){
     else res.quad.eliminate+=dur;
   });
   return res;
-}
-
-async function openPriorities(){
-  const stage=document.querySelector(".app .stage");
-  stage.innerHTML='<div id="prioRoot" style="display:flex;flex-direction:column;height:100%;overflow:hidden"></div>';
-  await renderPriorities();
-}
-function closePriorities(){
-  const stage=document.querySelector(".app .stage");
-  stage.innerHTML='<div class="grid" id="grid"></div>';
-  renderAll();
-}
-
-function prioBarRow(label,color,ms,total){
-  const pct=total>0?Math.round(ms/total*100):0;
-  const row=document.createElement("div"); row.style.cssText="margin-bottom:9px";
-  const top=document.createElement("div");
-  top.style.cssText="display:flex;align-items:baseline;gap:8px;font-size:13px;margin-bottom:4px";
-  const nm=document.createElement("span"); nm.style.cssText="font-weight:700;flex:1;min-width:0"; nm.textContent=label;
-  const val=document.createElement("span"); val.style.cssText="color:var(--ink2);font-variant-numeric:tabular-nums";
-  val.textContent=fmtDurShort(ms)+"  \u00b7  "+pct+"%";
-  top.appendChild(nm); top.appendChild(val);
-  const track=document.createElement("div");
-  track.style.cssText="height:9px;border-radius:6px;background:var(--panel2);overflow:hidden";
-  const fill=document.createElement("div");
-  fill.style.cssText="height:100%;border-radius:6px;width:"+pct+"%;background:"+color;
-  track.appendChild(fill);
-  row.appendChild(top); row.appendChild(track);
-  return row;
-}
-
-async function renderPriorities(){
-  const root=document.getElementById("prioRoot");
-  if(!root) return;
-  const data=await attrTotals(prioRange);
-  root.innerHTML="";
-
-  const head=document.createElement("div");
-  head.style.cssText="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--glass);flex-wrap:wrap";
-  const h=document.createElement("h2"); h.style.cssText="margin:0;font-size:14px;font-weight:700"; h.textContent="Priorities";
-  const sp=document.createElement("div"); sp.style.flex="1";
-  const home=document.createElement("button"); home.className="btn sm"; home.textContent="Home";
-  home.addEventListener("click",closePriorities);
-  head.appendChild(h); head.appendChild(sp); head.appendChild(home);
-  root.appendChild(head);
-
-  const tabs=document.createElement("div");
-  tabs.style.cssText="display:flex;gap:6px;padding:10px 12px 0;flex-wrap:wrap";
-  [["day","Today"],["week","Week"],["month","Month"],["year","Year"],["all","All"]].forEach(r=>{
-    const b=document.createElement("button");
-    b.className="btn sm"+(prioRange===r[0]?" pri":"");
-    b.textContent=r[1];
-    b.addEventListener("click",()=>{ prioRange=r[0]; renderPriorities(); });
-    tabs.appendChild(b);
-  });
-  root.appendChild(tabs);
-
-  const body=document.createElement("div");
-  body.style.cssText="flex:1;overflow-y:auto;padding:14px 12px max(14px, env(safe-area-inset-bottom))";
-
-  /* This whole page is opt-in, and the tags it reports on are edited
-     somewhere else entirely. Saying both up front stops it reading as a
-     thing you are failing to fill in. */
-  const intro=document.createElement("div");
-  intro.style.cssText="margin:0 0 16px;padding:12px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)";
-  const introTxt=document.createElement("div");
-  introTxt.className="hint"; introTxt.style.margin="0";
-  introTxt.textContent="Completely optional. Your time is tracked whether or not you use this. It is here for when you want to know not just where the time went, but what kind of time it was — tag channels as Must/Will/Want, DRIP, or urgent/important, and this page reports against those tags. Anything untagged is shown separately rather than quietly dropped.";
-  intro.appendChild(introTxt);
-  const introGo=document.createElement("button");
-  introGo.className="btn sm"; introGo.style.marginTop="11px";
-  introGo.textContent="Edit tags in Channels";
-  introGo.addEventListener("click",()=>openChannels());
-  intro.appendChild(introGo);
-  body.appendChild(intro);
-
-  if(!data.total){
-    const e=document.createElement("div"); e.className="hint"; e.style.padding="18px 4px";
-    e.textContent="No tracked time in this range yet.";
-    body.appendChild(e); root.appendChild(body); return;
-  }
-
-  const totalLine=document.createElement("div");
-  totalLine.style.cssText="font-size:13px;color:var(--ink2);margin-bottom:16px";
-  totalLine.textContent="Total tracked: "+fmtDurShort(data.total);
-  body.appendChild(totalLine);
-
-  /* One bordered card per scheme. As a flat stack of bars these read as a
-     single long list, and it was hard to see where Commitment ended and DRIP
-     began. */
-  CHANNEL_ATTRS.forEach(def=>{
-    const sect=document.createElement("div");
-    sect.style.cssText="margin-bottom:12px;padding:13px 14px 10px;border:1px solid var(--line);"+
-      "border-radius:12px;background:var(--panel2)";
-    const t=document.createElement("div"); t.className="sect-title"; t.style.marginTop="0";
-    t.style.marginBottom="4px"; t.textContent=def.label;
-    sect.appendChild(t);
-    const dh=document.createElement("div"); dh.className="hint"; dh.style.margin="0 0 11px";
-    dh.textContent=def.hint||"";
-    sect.appendChild(dh);
-    const buckets=def.scale?["1","2","3","4","5"]:def.options.map(o=>o.v);
-    let shown=0;
-    buckets.concat([""]).forEach(v=>{
-      const ms=data.by[def.key][v]||0;
-      if(!ms) return;
-      shown++;
-      sect.appendChild(prioBarRow(attrLabel(def.key,v),attrColor(def.key,v),ms,data.total));
-    });
-    if(!shown){
-      const e=document.createElement("div"); e.className="hint"; e.style.margin="0";
-      e.textContent="No channels tagged yet.";
-      sect.appendChild(e);
-    }
-    body.appendChild(sect);
-  });
-
-  /* Eisenhower quadrant - same card as every section above it. */
-  const qcard=document.createElement("div");
-  qcard.style.cssText="margin-bottom:12px;padding:13px 14px;border:1px solid var(--line);"+
-    "border-radius:12px;background:var(--panel2)";
-  const qt=document.createElement("div"); qt.className="sect-title"; qt.style.marginTop="0";
-  qt.style.marginBottom="4px"; qt.textContent="Eisenhower quadrant";
-  qcard.appendChild(qt);
-  const qh=document.createElement("div"); qh.className="hint"; qh.style.margin="0 0 11px";
-  qh.textContent="Urgent and Important both mean a rating of "+HIGH_SCALE+" or 5.";
-  qcard.appendChild(qh);
-  const grid=document.createElement("div");
-  grid.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:8px";
-  QUADRANTS.forEach(q=>{
-    const ms=data.quad[q.k]||0;
-    const pct=data.total>0?Math.round(ms/data.total*100):0;
-    const cell=document.createElement("div");
-    cell.style.cssText="border:1px solid var(--line);border-left:4px solid "+q.color+";border-radius:12px;padding:11px;background:var(--panel2)";
-    cell.innerHTML='<div style="font-weight:800;font-size:13px">'+escapeHtml(q.label)+'</div>'+
-      '<div class="hint" style="margin:2px 0 7px">'+escapeHtml(q.hint)+'</div>'+
-      '<div style="font-size:17px;font-weight:800;font-variant-numeric:tabular-nums">'+escapeHtml(fmtDurShort(ms))+'</div>'+
-      '<div class="hint" style="margin:2px 0 0">'+pct+'% of tracked time</div>';
-    grid.appendChild(cell);
-  });
-  qcard.appendChild(grid);
-  if(data.quad.untagged){
-    const u=document.createElement("div"); u.className="hint"; u.style.margin="10px 0 0";
-    u.textContent=fmtDurShort(data.quad.untagged)+" is not on the grid because those channels have no urgency or importance rating yet.";
-    qcard.appendChild(u);
-  }
-  body.appendChild(qcard);
-  root.appendChild(body);
 }
 
 function openSessionEditor(dk,sn){
@@ -2848,12 +2697,12 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
   m.appendChild(avatarMenuItem("📅","Edit a day",()=>openDayEditor(todayKey())));
   m.appendChild(avatarMenuItem("📆","Week",()=>openWeekEditor(todayKey())));
   m.appendChild(avatarMenuItem("🎨","Channels",()=>openChannels()));
-  m.appendChild(avatarMenuItem("🎯","Priorities",()=>openPriorities()));
   m.appendChild(avatarMenuItem(
     currentTheme()==="light"?"🌙":"☀️",
     currentTheme()==="light"?"Dark mode":"Light mode",
     ()=>toggleTheme(),null,true));
   m.appendChild(avatarMenuItem("💾","Export backup",()=>exportDataBackup()));
+  m.appendChild(avatarMenuItem("📄","Export CSV",()=>exportCsv()));
   m.appendChild(avatarMenuItem("⚙️","Settings",()=>openSettings()));
 
   const sep2=document.createElement("div");sep2.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep2);
@@ -3167,7 +3016,6 @@ function initializeEventListeners(){
 
   // CSV export
   const exportCsvBtn=document.getElementById("exportCsvBtn");if(exportCsvBtn)exportCsvBtn.addEventListener("click",exportCsv);
-  const dashExport=document.getElementById("dashExport");if(dashExport)dashExport.addEventListener("click",exportCsv);
 }
 
 /* ===== settings ===== */
@@ -3568,486 +3416,222 @@ function restoreSummaryScroll(){
 async function openCombinedSummary(){
   const prevContent=document.getElementById("summaryContent");
   summaryScroll=prevContent?prevContent.scrollTop:0;
-  await refreshTodayScores();
-  try{
-    console.log("openCombinedSummary: Starting, db=",db,"profileId=",state.profileId);
-    const app=document.querySelector('.app');
-    const stage=app.querySelector('.stage');
-    /* Re-entering would otherwise capture the summary itself, and Home
-       would then 'close' the summary back into the summary. */
-    const origStage=(prevContent&&summaryOrigStage!==null)?summaryOrigStage:stage.innerHTML;
-    summaryOrigStage=origStage;
-    let html='<div style="display:flex;flex-direction:column;height:100%">';
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)">';
-    html+='<h2 style="margin:0;font-size:14px;font-weight:700">Summary</h2>';
-    html+='</div>';
-    html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:16px" id="summaryContent">Loading...</div>';
-    html+='</div>';
-    stage.innerHTML=html;
-    window.closeCombinedSummary=()=>{stage.innerHTML=origStage;renderGrid();};
-
-    // Ensure database is ready
-    if(!db){
-      console.log("openCombinedSummary: db not ready, calling openDB()");
-      await openDB();
-      await new Promise(r=>setTimeout(r,100)); // brief delay to ensure stores are created
-    }
-
-    // Verify profileId exists
-    if(!state.profileId){
-      console.warn("openCombinedSummary: profileId not set, checking meta");
-      const lastMeta=await idbGet("meta","lastProfile");
-      if(lastMeta){state.profileId=lastMeta.v;}
-      else{const profs=await idbAll("profiles");if(profs.length>0)state.profileId=profs[0].id;}
-      if(!state.profileId)throw new Error("No profile available");
-    }
-
-    console.log("openCombinedSummary: Using profileId=",state.profileId);
-
-    const dayKey=todayKey();
-    let dayNotes;
-    try{
-      dayNotes=await idbGet("day_notes",dayKey);
-      console.log("openCombinedSummary: day_notes=",dayNotes);
-    }catch(e){
-      console.warn("openCombinedSummary: Failed to get day_notes:",e);
-      dayNotes=null;
-    }
-
-    const today=new Date();
-    const dayName=today.toLocaleDateString('en-US',{weekday:'short'});
-    const dateStr=today.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    let content='';
-    const rating=dayNotes?.rating||0;
-    const notes=dayNotes?.notes||"";
-    content+='<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px"><div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Today\'s Summary</div>';
-    content+='<div style="font-size:13px;color:var(--ink);margin-bottom:12px"><strong>'+dayName+' '+dateStr+'</strong></div>';
-    content+='<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:600;margin-bottom:8px">Rate Today</div><div id="todayStars" style="font-size:28px;letter-spacing:4px"></div></div>';
-    content+='<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600">Notes</label><textarea id="todayNotes" placeholder="Add notes about today..." style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);color:var(--ink);font-family:inherit;font-size:12px;resize:vertical;min-height:60px;box-sizing:border-box;margin-top:6px"></textarea></div>';
-    content+='</div>';
-
-    const weekStart=new Date(today);
-    weekStart.setDate(today.getDate()-today.getDay()+(today.getDay()===0?-6:1));
-
-    let allSessions=[];
-    try{
-      allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
-      console.log("openCombinedSummary: Found",allSessions.length,"sessions");
-    }catch(e){
-      console.warn("openCombinedSummary: Failed to get sessions:",e);
-      allSessions=[];
-    }
-
-    const weekData={};
-    for(let i=0;i<7;i++){
-      const d=new Date(weekStart);
-      d.setDate(d.getDate()+i);
-      const key=fmtDateKey(d);
-      weekData[key]={date:d,total:0,channels:{}};
-    }
-
-    allSessions.forEach(s=>{
-      if(weekData[s.date]){
-        const dur=parseInt(s.endTs||s.startTs)-parseInt(s.startTs);
-        weekData[s.date].total+=dur;
-        const chId=s.channelId;
-        if(!weekData[s.date].channels[chId]){weekData[s.date].channels[chId]=0;}
-        weekData[s.date].channels[chId]+=dur;
-      }
-    });
-
-    content+='<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Week Overview</div>';
-    content+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">';
-    let weekTotal=0;
-    for(const day of Object.values(weekData).slice(0,7)){
-      const dKey=fmtDateKey(day.date);
-      const dayNote=await idbGet("day_notes",dKey)||{};
-      const dRating=dayNote.rating||0;
-      const dNotes=dayNote.notes||"";
-      const dName=day.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-      /* Saturday and Sunday are tagged so they do not read as ordinary
-         working days that happened to go badly. */
-      const wkDay=day.date.getDay();
-      const wkndTag=(wkDay===0||wkDay===6)
-        ? '<span style="margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--muted);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px">Weekend</span>' : '';
-      const chRows=Object.entries(day.channels).map(([chId,dur])=>{
-        const ch=state.channels.find(x=>x.id===chId)||{label:"(deleted)",color:"#64748b"};
-        return`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:10px"><div style="width:6px;height:6px;border-radius:50%;background:${ch.color}"></div><div style="flex:1;min-width:0;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ch.label)}</div><div style="font-weight:600;color:var(--ink2);min-width:40px;text-align:right">${fmtDur(dur)}</div></div>`
-      }).join('');
-      /* The wrapper carries the data-* attributes because editWeekNotes()
-         reads the current rating back off [data-edit-star][data-week-date]. */
-      const starHtml='<span data-edit-star data-week-date="'+dKey+'" data-rating="'+dRating+'">'+
-                     starCellHtml(dKey,dRating,"editWeekStar",24)+'</span>';
-      const dTypeSelCard=dayTypeSelectHtml(dKey,await getDayType(dKey));
-      
-      const notesDisplay=dNotes?`<div style="font-size:10px;color:var(--ink2);margin:6px 0;font-style:italic;cursor:pointer" onclick="window.editWeekNotes('${dKey}')" data-edit-notes data-week-date="${dKey}" data-rating="${dRating}" title="Click to edit notes">"${escapeHtml(dNotes)}"</div>`:`<div style='font-size:10px;color:var(--muted);cursor:pointer' onclick="window.editWeekNotes('${dKey}')" data-edit-notes data-week-date="${dKey}" data-rating="${dRating}" title="Click to add notes">No notes</div>`;
-      
-      const adhStr=adhCellHtml(dayNote.matchScore,dayNote.budgetScore?dayNote.budgetScore.pct:undefined);
-      
-      weekTotal+=day.total;
-      content+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)">${dName}${wkndTag}</div><div style="margin-bottom:6px">${dTypeSelCard}</div><div style="font-size:14px;font-weight:800;margin-bottom:4px">${fmtDur(day.total)}</div><div style="font-size:11px;color:var(--ink2);margin-bottom:6px">${adhStr}</div><div style="margin:8px 0">${starHtml}</div>${notesDisplay}<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:9px">${chRows||'<div style="color:var(--muted)">No sessions</div>'}</div></div>`;
-    }
-    content+='</div>';
-    content+=`<div style="margin-top:14px;padding:12px;background:linear-gradient(180deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.3);border-radius:12px"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Total</div><div style="font-size:22px;font-weight:800;color:var(--good)">${fmtDur(weekTotal)}</div></div>`;
-    
-    // NEW SECTION: Day by Day Breakdown Table
-    content+='<div style="margin-top:24px;padding-top:20px;border-top:2px solid var(--line)"><div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Day by Day Breakdown</div>';
-    content+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day type</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody>';
-    for(const day of Object.values(weekData).slice(0,7)){
-      const dKey=fmtDateKey(day.date);
-      const dayNote=await idbGet("day_notes",dKey)||{};
-      if(dayNote.deleted)continue;
-      const dRating=dayNote.rating||0;
-      const dNotes=dayNote.notes||"";
-      const dName=day.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-      const dayOfWeek=day.date.getDay();
-      const isWeekend=dayOfWeek===0||dayOfWeek===6;
-      const rowBg=isWeekend?'rgba(100,116,139,.15)':'transparent';
-      
-      const starHtml=starCellHtml(dKey,dRating,"editWeekStar");
-      const dTypeSel=dayTypeSelectHtml(dKey,await getDayType(dKey),true);
-      
-      const adhData=await idbGet("day_notes",dKey);
-      const adhStr=adhCellHtml(adhData&&adhData.matchScore,adhData&&adhData.budgetScore?adhData.budgetScore.pct:undefined);
-      
-      weekTotal+=day.total;
-      content+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink);white-space:nowrap">${dName}</td><td style="padding:12px">${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editWeekNotes('${dKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
-    }
-    content+='</tbody></table></div></div>';
-    
-    // Add date range lookback section
-    content+='<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line)">';
-    content+='<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:12px">Time Lookback</div>';
-    
-    // Preset buttons
-    content+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
-    const presets=[
-      {label:"This Week",value:"thisWeek"},
-      {label:"This Month",value:"thisMonth"},
-      {label:"Last Month",value:"lastMonth"},
-      {label:"Last Quarter",value:"lastQuarter"},
-      {label:"This Year",value:"thisYear"},
-      {label:"Custom",value:"custom"}
-    ];
-    presets.forEach(p=>{
-      content+=`<button class="btn sm" data-preset="${p.value}" style="cursor:pointer;border:2px solid var(--line);transition:all .2s" data-active="${p.value==='thisWeek'?'true':'false'}">${p.label}</button>`;
-    });
-    content+='</div>';
-    
-    // Custom date picker (hidden by default)
-    content+='<div id="customDatePicker" style="display:none;gap:8px;margin-bottom:12px;padding:12px;background:var(--panel2);border-radius:8px">';
-    content+='<input type="date" id="startDate" max="'+todayKey()+'" style="padding:6px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:16px">';
-    content+='<span style="color:var(--ink2)">to</span>';
-    content+='<input type="date" id="endDate" max="'+todayKey()+'" style="padding:6px;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:16px">';
-    content+='<button class="btn pri sm" id="applyDateRange" style="cursor:pointer">Apply</button>';
-    content+='</div>';
-    
-    // Results container
-    content+='<div id="lookbackResults" style="margin-top:12px"></div>';
-    content+='</div>';
-    
-    // FULL HISTORY LOG SECTION - Very Bottom
-    content+='<div style="margin-top:32px;padding-top:24px;border-top:2px solid var(--line)"><div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:14px">Complete History Log</div>';
-    content+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Date</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day type</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody id="historyTableBody"></tbody></table></div></div>';
-
-    document.getElementById("summaryContent").innerHTML=content;
-    restoreSummaryScroll();
-    
-    // Build and populate history log
-    setTimeout(async()=>{
-      const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
-      const allDates={};
-      
-      allSessions.forEach(s=>{
-        const dateKey=fmtDateKey(new Date(parseInt(s.startTs)));
-        if(!allDates[dateKey]){
-          allDates[dateKey]={date:new Date(parseInt(s.startTs))};
-        }
-      });
-      
-      const sortedDates=Object.keys(allDates).sort().reverse();
-      let historyHtml='';
-      
-      for(const dateKey of sortedDates){
-        const dayNote=await idbGet("day_notes",dateKey)||{};
-        if(dayNote.deleted)continue;
-        const dRating=dayNote.rating||0;
-        const dNotes=dayNote.notes||"";
-        const adhStr=adhCellHtml(dayNote.matchScore,dayNote.budgetScore?dayNote.budgetScore.pct:undefined);
-        const dayDate=allDates[dateKey].date;
-        const dayOfWeek=dayDate.getDay();
-        const isWeekend=dayOfWeek===0||dayOfWeek===6;
-        const rowBg=isWeekend?'rgba(100,116,139,.15)':'transparent';
-        const dName=dayDate.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
-        
-        const starHtml=starCellHtml(dateKey,dRating,"editHistoryStar");
-        const dTypeSel=dayTypeSelectHtml(dateKey,await getDayType(dateKey),true);
-        
-        historyHtml+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink);white-space:nowrap">${dName}</td><td style="padding:12px">${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editHistoryNotes('${dateKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
-      }
-      
-      const historyBody=document.getElementById("historyTableBody");
-      if(historyBody){
-        historyBody.innerHTML=historyHtml;
-      }
-      /* The container only reaches its full height now, so a scrollTop that
-         was clamped a moment ago can finally be honoured. */
-      restoreSummaryScroll();
-    },0);
-    
-    window.editHistoryStar=async(dateKey,rating)=>{
-      const notesCell=document.querySelector(`[data-history-notes="${dateKey}"]`);
-      const notes=notesCell?notesCell.textContent:"";
-      await saveDayRatingAndNotes(dateKey,rating,notes);
-      await openCombinedSummary();
-    };
-    
-    window.editHistoryNotes=async(dateKey)=>{
-      const currentNotes=document.querySelector(`[data-history-notes="${dateKey}"]`)?.textContent||"";
-      const newNotes=await uiPrompt("Edit notes:",currentNotes);
-      if(newNotes!==null){
-        const ratingSpan=document.querySelector(`[data-history-star="${dateKey}"]`);
-        const rating=parseInt(ratingSpan?.dataset.rating||0);
-        await saveDayRatingAndNotes(dateKey,rating,newNotes);
-        await openCombinedSummary();
-      }
-    };
-    
-    // Initialize interactive stars and notes for today
-    setTimeout(()=>{
-      const todayStarsDiv=document.getElementById("todayStars");
-      if(todayStarsDiv){
-        todayStarsDiv.innerHTML=starCellHtml(dayKey,rating,"todayRateStar",28);
-      }
-      const todayNotesArea=document.getElementById("todayNotes");
-      if(todayNotesArea){
-        todayNotesArea.value=notes;
-        todayNotesArea.addEventListener("blur",()=>{saveDayRatingAndNotes(dayKey,rating,todayNotesArea.value);});
-      }
-      
-      // Make week overview stars and notes editable
-      const weekStarSpans=document.querySelectorAll('[data-edit-star]');
-      weekStarSpans.forEach(span=>{
-        span.style.cursor='pointer';
-        span.style.transition='all .1s';
-      });
-      
-      const weekNoteAreas=document.querySelectorAll('[data-edit-notes]');
-      weekNoteAreas.forEach(area=>{
-        area.style.cursor='pointer';
-      });
-    },0);
-    
-    /* Takes (date,rating) now so it matches the shared starCellHtml contract. */
-    window.todayRateStar=async(d,r)=>{
-      const todayNotesArea=document.getElementById("todayNotes");
-      const n=todayNotesArea?todayNotesArea.value:"";
-      if(await saveDayRatingAndNotes(d||dayKey,r,n)) await openCombinedSummary();
-    };
-    
-    window.editWeekStar=async(date,rating)=>{
-      const notesArea=document.querySelector('[data-edit-notes][data-week-date="'+date+'"]');
-      const notes=notesArea?notesArea.textContent:"";
-      await saveDayRatingAndNotes(date,rating,notes);
-      await openCombinedSummary();
-    };
-    
-    window.editWeekNotes=async(date)=>{
-      const notesArea=document.querySelector('[data-edit-notes][data-week-date="'+date+'"]');
-      if(notesArea){
-        const currentNotes=notesArea.textContent;
-        const newNotes=await uiPrompt("Edit notes:",currentNotes);
-        if(newNotes!==null){
-          const ratingSpan=document.querySelector('[data-edit-star][data-week-date="'+date+'"]');
-          const rating=parseInt(ratingSpan?.dataset.rating||0);
-          await saveDayRatingAndNotes(date,rating,newNotes);
-          await openCombinedSummary();
-        }
-      }
-    };
-    
-    // Handle date range lookback
-    window.renderLookback=async(preset)=>{
-      let startDate,endDate;
-      const today=new Date();
-      
-      if(preset==="thisWeek"){
-        startDate=new Date(today);
-        startDate.setDate(today.getDate()-today.getDay()+(today.getDay()===0?-6:1));
-        endDate=new Date(today);
-      }else if(preset==="thisMonth"){
-        startDate=new Date(today.getFullYear(),today.getMonth(),1);
-        endDate=new Date(today);
-      }else if(preset==="lastMonth"){
-        startDate=new Date(today.getFullYear(),today.getMonth()-1,1);
-        endDate=new Date(today.getFullYear(),today.getMonth(),0);
-      } else if(preset==="lastQuarter"){
-        const lastQ=Math.floor((today.getMonth())/3)-1;
-        const quarterStart=lastQ<0?3:lastQ*3;
-        const quarterYear=lastQ<0?today.getFullYear()-1:today.getFullYear();
-        startDate=new Date(quarterYear,quarterStart,1);
-        endDate=new Date(today.getFullYear(),today.getMonth(),today.getDate());
-      }else if(preset==="thisYear"){
-        startDate=new Date(today.getFullYear(),0,1);
-        endDate=new Date(today);
-      }else if(preset==="custom"){
-        const sd=document.getElementById("startDate").value;
-        const ed=document.getElementById("endDate").value;
-        if(!sd||!ed)return;
-        startDate=new Date(sd+"T00:00:00");
-        endDate=new Date(ed+"T23:59:59");
-      }
-      
-      startDate.setHours(0,0,0,0);
-      endDate.setHours(23,59,59,999);
-      
-      // Calculate totals
-      let channelTotals={};
-      let totalMs=0;
-      
-      allSessions.forEach(s=>{
-        const sDate=new Date(s.date+"T00:00:00");
-        if(sDate>=startDate && sDate<=endDate){
-          const dur=parseInt(s.endTs||s.startTs)-parseInt(s.startTs);
-          totalMs+=dur;
-          if(!channelTotals[s.channelId])channelTotals[s.channelId]=0;
-          channelTotals[s.channelId]+=dur;
-        }
-      });
-      
-      // Display results
-      let html=``;
-      
-      // Add adherence totals FIRST
-      let adhHtml='<div style="margin-bottom:16px">';
-      adhHtml+='<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Adherence</div>';
-      
-      let allDayNotes=[];
-      try{allDayNotes=await idbAll("day_notes");}catch(e){}
-      let totalMatches=0,totalTrackedSlots=0,daysWithTrackerData=0,totalBudgetCredited=0,totalBudgetPlanned=0;
-      
-      // Count days in range for adherence
-      const dayInRange=new Date(startDate);
-      while(dayInRange<=endDate){
-        const key=fmtDateKey(dayInRange);
-        const dayNote=allDayNotes.find(dn=>dn.date===key && dn.profileId===state.profileId);
-        if(dayNote&&dayNote.matchScore){
-          totalMatches+=dayNote.matchScore.matches||0;
-          totalTrackedSlots+=dayNote.matchScore.total||0;
-          if(dayNote.budgetScore){ totalBudgetCredited+=dayNote.budgetScore.credited||0; totalBudgetPlanned+=dayNote.budgetScore.planned||0; }
-          daysWithTrackerData++;
-        }
-        dayInRange.setDate(dayInRange.getDate()+1);
-      }
-      
-      if(daysWithTrackerData===0){
-        adhHtml+='<div style="padding:10px;text-align:center;color:var(--ink2);background:var(--panel2);border:1px solid var(--line);border-radius:10px;font-size:12px">No adherence data</div>';
-      }else{
-        const adhPct=Math.round((totalMatches/totalTrackedSlots)*100);
-        const adhColor=adhPct>=80?'var(--good)':adhPct>=50?'var(--warn)':'var(--bad)';
-        adhHtml+=`<div style="background:linear-gradient(180deg,rgba(79,140,255,.1),transparent);border:1px solid ${adhColor};border-radius:10px;padding:12px">`;
-        adhHtml+=`<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">`;
-        adhHtml+=`<div style="font-size:20px;font-weight:800;color:${adhColor}">${totalMatches}</div>`;
-        adhHtml+=`<div style="font-size:12px;color:var(--ink2)">/&nbsp;${totalTrackedSlots}</div>`;
-        adhHtml+=`<div style="font-size:11px;color:var(--muted);margin-left:auto">${adhPct}%</div>`;
-        adhHtml+=`</div>`;
-        adhHtml+=`<div style="font-size:10px;color:var(--muted);margin-bottom:6px">blocks hit at the planned time</div>`;
-        if(totalBudgetPlanned>0){
-          const bPct=Math.round(totalBudgetCredited/totalBudgetPlanned*100);
-          const bColor=bPct>=80?'var(--good)':bPct>=50?'var(--warn)':'var(--bad)';
-          adhHtml+=`<div style="display:flex;align-items:baseline;gap:8px;padding-top:8px;border-top:1px solid var(--line)">`;
-          adhHtml+=`<div style="font-size:20px;font-weight:800;color:${bColor}">${bPct}%</div>`;
-          adhHtml+=`<div style="font-size:12px;color:var(--ink2)">${fmtDurShort(totalBudgetCredited)}&nbsp;/&nbsp;${fmtDurShort(totalBudgetPlanned)}</div>`;
-          adhHtml+=`<div style="font-size:11px;color:var(--muted);margin-left:auto">budget</div>`;
-          adhHtml+=`</div>`;
-          adhHtml+=`<div style="font-size:10px;color:var(--muted)">planned amount met, any time</div>`;
-        }
-        adhHtml+=`<div style="font-size:11px;color:var(--ink2)">Matched ${daysWithTrackerData} day${daysWithTrackerData>1?'s':''}</div>`;
-        adhHtml+=`</div>`;
-      }
-      adhHtml+='</div>';
-      html+=adhHtml;
-      
-      // Then add time breakdown
-      html+=`<div style="background:linear-gradient(180deg,rgba(34,197,94,.15),rgba(34,197,94,.05));border:1px solid rgba(34,197,94,.4);border-radius:12px;padding:14px;margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:var(--good);text-transform:uppercase;margin-bottom:6px">Total</div><div style="font-size:26px;font-weight:800;color:var(--good)">${fmtDur(totalMs)}</div></div>`
-
-      if(totalMs===0){
-        html+=`<div style="padding:14px;text-align:center;color:var(--ink2);background:var(--panel2);border:1px solid var(--line);border-radius:12px">No sessions in this period</div>`;
-      }else{
-        html+=`<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">By Channel</div>`;
-        html+=`<div style="display:grid;gap:8px">`;
-        const sorted=Object.entries(channelTotals).sort((a,b)=>b[1]-a[1]);
-        sorted.forEach(([chId,dur])=>{
-          const ch=state.channels.find(x=>x.id===chId)||{label:"(deleted)",color:"#64748b"};
-          const pct=Math.round((dur/totalMs)*1000)/10;
-          const barWidth=Math.round((dur/totalMs)*100);
-          html+=`<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;overflow:hidden">`;
-          html+=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">`;
-          html+=`<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">`;
-          html+=`<div style="width:10px;height:10px;border-radius:50%;background:${ch.color};flex-shrink:0"></div>`;
-          html+=`<div style="font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(ch.label)}</div>`;
-          html+=`</div>`;
-          html+=`<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">`;
-          html+=`<div style="font-size:11px;font-weight:700;color:var(--ink2);text-align:right;min-width:50px">${fmtDur(dur)}</div>`;
-          html+=`<div style="font-size:11px;font-weight:700;color:${ch.color};min-width:40px;text-align:right">${pct}%</div>`;
-          html+=`</div></div>`;
-          html+=`<div style="width:100%;height:6px;background:var(--line);border-radius:3px;overflow:hidden">`;
-          html+=`<div style="height:100%;background:${ch.color};width:${barWidth}%;transition:width .3s ease"></div>`;
-          html+=`</div></div>`;
-        });
-        html+=`</div>`;
-      }
-      
-      document.getElementById("lookbackResults").innerHTML=html;
-    };
-    
-    // Function to update button styles - make active button bright blue
-    const updateButtonStyles=(activePreset)=>{
-      document.querySelectorAll('[data-preset]').forEach(btn=>{
-        if(btn.dataset.preset===activePreset){
-          btn.style.background='var(--accent)';
-          btn.style.borderColor='var(--accent)';
-          btn.style.color='white';
-          btn.style.fontWeight='700';
-        }else{
-          btn.style.background='var(--panel)';
-          btn.style.borderColor='var(--line)';
-          btn.style.color='var(--ink)';
-          btn.style.fontWeight='400';
-        }
-      });
-    };
-    
-    // Add button event listeners
-    setTimeout(()=>{
-      document.querySelectorAll('[data-preset]').forEach(btn=>{
-        btn.addEventListener('click',()=>{
-          const preset=btn.dataset.preset;
-          if(preset==='custom'){
-            document.getElementById('customDatePicker').style.display='flex';
-          }else{
-            document.getElementById('customDatePicker').style.display='none';
-            updateButtonStyles(preset);
-            window.renderLookback(preset);
-          }
-        });
-      });
-      document.getElementById('applyDateRange').addEventListener('click',()=>{
-        updateButtonStyles('custom');
-        window.renderLookback('custom');
-      });
-      
-      // DEFAULT: Summary page loads with "This Week" selected
-      updateButtonStyles('thisWeek');
-      window.renderLookback('thisWeek');
-    },0);
-
-  }catch(e){
-    console.error("Error in openCombinedSummary:",e);
-    const stage=document.querySelector('.stage');
-    if(stage)stage.innerHTML='<div style="padding:20px"><div class="hint">Error loading summary: '+escapeHtml(e.message)+'</div></div>';
-  }
+  const app=document.querySelector('.app');
+  const stage=app.querySelector('.stage');
+  /* Re-entering would otherwise capture the page itself, and Home would then
+     "close" it back into itself. */
+  const origStage=(prevContent&&summaryOrigStage!==null)?summaryOrigStage:stage.innerHTML;
+  summaryOrigStage=origStage;
+  stage.innerHTML='<div style="display:flex;flex-direction:column;height:100%">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;'+
+    'border-bottom:1px solid var(--line);background:var(--glass)">'+
+    '<h2 style="margin:0;font-size:14px;font-weight:700">Stats</h2></div>'+
+    '<div style="flex:1;overflow-y:auto;background:var(--bg);padding:16px" id="summaryContent">Loading…</div></div>';
+  window.closeCombinedSummary=()=>{stage.innerHTML=origStage;renderGrid();};
+  await renderStatsBody();
+  restoreSummaryScroll();
 }
+
+/* One range (day/week/month/year/all) drives every section on the page -
+   channel-time stats, adherence, and the Priorities breakdown all read the
+   same tabs, which is the point of folding them together. */
+async function renderStatsBody(){
+  const body=document.getElementById("summaryContent");
+  if(!body) return;
+  const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
+  const chMap={}; state.channels.forEach(c=>chMap[c.id]=c);
+  const nowTs=now();
+  const closed=all.map(s=>({...s,dur:s.endTs?s.durMs:(nowTs-s.startTs),end:s.endTs||nowTs}));
+  const start=rangeStart(dashRange);
+  const inRange=closed.filter(s=>s.startTs>=start);
+  const total=inRange.reduce((a,s)=>a+s.dur,0);
+  const byCh={}; inRange.forEach(s=>{byCh[s.channelId]=(byCh[s.channelId]||0)+s.dur;});
+  const chSorted=Object.entries(byCh).sort((a,b)=>b[1]-a[1]);
+  const days=new Set(inRange.map(s=>s.date)); const nDays=Math.max(1,days.size);
+  const byHour=new Array(24).fill(0); inRange.forEach(s=>{byHour[new Date(s.startTs).getHours()]+=s.dur;});
+  const peakHour=byHour.indexOf(Math.max(...byHour));
+  const byDay={}; inRange.forEach(s=>{byDay[s.date]=(byDay[s.date]||0)+s.dur;});
+  const dayKeys=Object.keys(byDay).sort();
+  const longest=inRange.reduce((m,s)=>s.dur>m.dur?s:m,{dur:0});
+  const firstS=inRange.slice().sort((a,b)=>a.startTs-b.startTs)[0];
+  const lastS=inRange.slice().sort((a,b)=>b.end-a.end)[0];
+  const RL={day:"Today",week:"This Week",month:"This Month",year:"This Year",all:"All Time"};
+  const topCh=chSorted[0]?chMap[chSorted[0][0]]:null;
+
+  let html=`<div class="tabs">${["day","week","month","year","all"].map(r=>`<button class="tab ${r===dashRange?"on":""}" data-r="${r}">${RL[r]}</button>`).join("")}</div>`;
+
+  html+=`<div class="stat-row">
+    <div class="stat"><div class="l">Total tracked</div><div class="v">${fmtDur(total)}</div><div class="s">${RL[dashRange].toLowerCase()}</div></div>
+    <div class="stat"><div class="l">Avg / active day</div><div class="v">${fmtDurShort(total/nDays)}</div><div class="s">${nDays} day${nDays>1?"s":""} tracked</div></div>
+    <div class="stat"><div class="l">Top channel</div><div class="v" style="font-size:20px">${topCh?escapeHtml(topCh.label):"—"}</div><div class="s">${chSorted[0]?fmtDurShort(chSorted[0][1]):""}</div></div>
+    <div class="stat"><div class="l">Most productive hour</div><div class="v" style="font-size:20px">${total>0?hourLabel(peakHour):"—"}</div><div class="s">${total>0?fmtDurShort(byHour[peakHour])+" tracked":""}</div></div>
+  </div>`;
+
+  /* Adherence across the range: how much of the plan actually got hit, and
+     how much of the planned budget got worked, regardless of when. Reads
+     day_notes.matchScore/budgetScore, which every day already carries once
+     scored - the same numbers the Day Editor and Tracker show one day at a
+     time, rolled up here. */
+  html+=await adherenceCardHtml(dashRange,start);
+
+  html+=`<div class="card"><h3>Insights</h3><div class="sub">Auto-generated from your data — this list grows as we add metrics you care about.</div>`;
+  if(total===0)html+=`<div class="insight"><span class="ic">🟦</span><div>No sessions in this range yet. Tap some buttons, then come back.</div></div>`;
+  else{html+=insight("⏰",`Your most productive time is around <b>${hourLabel(peakHour)}</b> — that hour holds <b>${fmtDurShort(byHour[peakHour])}</b> of tracked work.`);
+    if(topCh)html+=insight("🏆",`<b>${escapeHtml(topCh.label)}</b> is your biggest category ${dashRange==="day"?"today":"in this range"}, at <b>${fmtDurShort(chSorted[0][1])}</b> (${Math.round(chSorted[0][1]/total*100)}% of tracked time).`);
+    html+=insight("📊",`You've averaged <b>${fmtDurShort(total/nDays)}</b> of tracked time per active day across ${nDays} day${nDays>1?"s":""}.`);
+    if(longest.dur>0){const lc=chMap[longest.channelId];html+=insight("🎯",`Your longest single session was <b>${fmtDurShort(longest.dur)}</b> on <b>${lc?escapeHtml(lc.label):"—"}</b>.`);}
+    if(firstS&&lastS){const fc=chMap[firstS.channelId];html+=insight("🌅",`First tracked activity started at <b>${fmtClock(firstS.startTs,state.profile.hourFmt)}</b>${dashRange==="day"?` on ${fc?escapeHtml(fc.label):""}`:""}; last ran to <b>${fmtClock(lastS.end,state.profile.hourFmt)}</b>.`);}}
+  html+=`</div><div class="card"><h3>Time by channel</h3><div class="sub">${RL[dashRange]}</div>`;
+  if(!chSorted.length)html+=`<div class="hint">No data yet.</div>`;else{const max=chSorted[0][1];chSorted.forEach(([cid,ms])=>{const c=chMap[cid]||{label:"(deleted)",color:"#64748b"};html+=`<div class="barrow"><div class="nm" title="${escapeHtml(c.label)}">${escapeHtml(c.label)}</div><div class="track"><div class="fill" style="width:${Math.max(2,ms/max*100)}%;background:${c.color}"></div></div><div class="val">${fmtDurShort(ms)}</div></div>`;});}
+  html+=`</div>`;
+
+  if(dashRange!=="day"&&dayKeys.length>1){
+    const dayAdherence={}, dayRatings={}, dayNotes={};
+    for(const k of dayKeys){const n=await idbGet("day_notes",k);if(n&&n.matchScore){dayAdherence[k]=Object.assign({},n.matchScore,{budgetPct:n.budgetScore?n.budgetScore.pct:undefined});}if(n&&n.rating){dayRatings[k]=n.rating;}if(n&&n.notes){dayNotes[k]=n.notes;}}
+    const totalAdherence=Object.values(dayAdherence).reduce((a,x)=>({matches:(a.matches||0)+x.matches,total:(a.total||0)+x.total}),{matches:0,total:0});
+    const weekAdhScore=totalAdherence.total>0?Math.round(totalAdherence.matches/totalAdherence.total*100):0;
+    html+=`<div class="card"><h3>Daily trend & Adherence</h3><div class="sub">Tracked time per day with daily adherence scores and ratings</div>${dailyTrendChart(dayKeys,byDay,dayAdherence,dayRatings,dayNotes)}<div style="margin-top:12px;padding:12px;background:var(--panel);border-radius:6px;border-left:3px solid var(--accent)"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Adherence, matched blocks</div><div style="font-size:24px;font-weight:800;color:${weekAdhScore>=80?"var(--good)":weekAdhScore>=50?"var(--warn)":"var(--bad)"}">${totalAdherence.matches}/${totalAdherence.total} matched (${weekAdhScore}%)</div></div></div>`;
+  }
+  if(total>0)html+=`<div class="card"><h3>When you work</h3><div class="sub">Tracked time by hour of day</div>${hourChart(byHour)}</div>`;
+
+  html+=await priorityAttrsHtml(dashRange);
+  html+=await historyLogHtml();
+
+  body.innerHTML=html;
+  body.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{dashRange=t.getAttribute("data-r");renderStatsBody();}));
+  wireHistoryLogHandlers();
+}
+
+/* Total matched / total planned blocks, and budget credited / planned,
+   across every scored day in the range. "all" reads every day_notes record
+   rather than walking the calendar day by day from the epoch. */
+async function adherenceCardHtml(rangeKey,startTs){
+  let notes;
+  if(rangeKey==="all"){
+    notes=(await idbAll("day_notes")).filter(n=>n.profileId===state.profileId&&n.matchScore);
+  }else{
+    const startD=new Date(startTs), endD=new Date(); endD.setHours(23,59,59,999);
+    notes=[]; const cur=new Date(startD);
+    while(cur<=endD){
+      const n=await idbGet("day_notes",fmtDateKey(cur));
+      if(n&&n.matchScore) notes.push(n);
+      cur.setDate(cur.getDate()+1);
+    }
+  }
+  if(!notes.length) return '';
+  let matches=0,totalSlots=0,credited=0,planned=0;
+  notes.forEach(n=>{ matches+=n.matchScore.matches||0; totalSlots+=n.matchScore.total||0;
+    if(n.budgetScore){ credited+=n.budgetScore.credited||0; planned+=n.budgetScore.planned||0; } });
+  const pct=totalSlots>0?Math.round(matches/totalSlots*100):0;
+  const color=pct>=80?'var(--good)':pct>=50?'var(--warn)':'var(--bad)';
+  let h='<div class="card"><h3>Adherence</h3><div class="sub">Planned blocks that actually happened, and budget worked regardless of when</div>';
+  h+='<div class="barrow" style="margin-bottom:'+(planned>0?'11px':'0')+'"><div class="nm">Timing</div><div class="track"><div class="fill" style="width:'+Math.min(100,pct)+'%;background:'+color+'"></div></div><div class="val">'+matches+'/'+totalSlots+' · '+pct+'%</div></div>';
+  if(planned>0){
+    const bPct=Math.round(credited/planned*100), bColor=bPct>=80?'var(--good)':bPct>=50?'var(--warn)':'var(--bad)';
+    h+='<div class="barrow"><div class="nm">Budget</div><div class="track"><div class="fill" style="width:'+Math.min(100,bPct)+'%;background:'+bColor+'"></div></div><div class="val">'+fmtDurShort(credited)+'/'+fmtDurShort(planned)+' · '+bPct+'%</div></div>';
+  }
+  h+='<div class="hint" style="margin-top:6px">'+notes.length+' scored day'+(notes.length>1?'s':'')+' in this range.</div></div>';
+  return h;
+}
+
+/* Folded in from the old standalone Priorities page, driven by the same
+   range tabs as everything else on this page rather than its own. */
+async function priorityAttrsHtml(rangeKey){
+  const data=await attrTotals(rangeKey);
+  let h='<div class="card"><h3>Priorities</h3>'+
+    '<div class="sub">Completely optional — tag channels as Must/Will/Want, DRIP, or urgent/important in Channels, and this reports against those tags.</div>';
+  if(!data.total){
+    h+='<div class="hint" style="margin-top:8px">No tracked time in this range yet.</div></div>';
+    return h;
+  }
+  CHANNEL_ATTRS.forEach(def=>{
+    const buckets=(def.scale?["1","2","3","4","5"]:def.options.map(o=>o.v)).concat(['']);
+    let rows='', shown=0;
+    buckets.forEach(v=>{
+      const ms=data.by[def.key][v]||0;
+      if(!ms) return;
+      shown++;
+      rows+=prioBarRowHtml(attrLabel(def.key,v),attrColor(def.key,v),ms,data.total);
+    });
+    h+='<div style="margin-top:16px"><div class="sect-title" style="margin-top:0">'+escapeHtml(def.label)+'</div>'+
+      (shown?rows:'<div class="hint">No channels tagged yet.</div>')+'</div>';
+  });
+  h+='<div style="margin-top:16px"><div class="sect-title" style="margin-top:0">Eisenhower quadrant</div>'+
+    '<div class="hint" style="margin-bottom:8px">Urgent and Important both mean a rating of '+HIGH_SCALE+' or 5.</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  QUADRANTS.forEach(q=>{
+    const ms=data.quad[q.k]||0, pct=data.total>0?Math.round(ms/data.total*100):0;
+    h+='<div style="border:1px solid var(--line);border-left:4px solid '+q.color+';border-radius:12px;padding:11px;background:var(--panel)">'+
+      '<div style="font-weight:800;font-size:13px">'+escapeHtml(q.label)+'</div>'+
+      '<div class="hint" style="margin:2px 0 7px">'+escapeHtml(q.hint)+'</div>'+
+      '<div style="font-size:17px;font-weight:800;font-variant-numeric:tabular-nums">'+escapeHtml(fmtDurShort(ms))+'</div>'+
+      '<div class="hint" style="margin:2px 0 0">'+pct+'% of tracked time</div></div>';
+  });
+  h+='</div>';
+  if(data.quad.untagged) h+='<div class="hint" style="margin-top:8px">'+fmtDurShort(data.quad.untagged)+' is not on the grid because those channels have no urgency or importance rating yet.</div>';
+  h+='</div></div>';
+  return h;
+}
+function prioBarRowHtml(label,color,ms,total){
+  const pct=total>0?Math.round(ms/total*100):0;
+  return '<div style="margin-bottom:9px"><div style="display:flex;align-items:baseline;gap:8px;font-size:13px;margin-bottom:4px">'+
+    '<span style="font-weight:700;flex:1;min-width:0">'+escapeHtml(label)+'</span>'+
+    '<span style="color:var(--ink2);font-variant-numeric:tabular-nums">'+fmtDurShort(ms)+'  ·  '+pct+'%</span></div>'+
+    '<div style="height:9px;border-radius:6px;background:var(--panel);overflow:hidden">'+
+    '<div style="height:100%;border-radius:6px;width:'+pct+'%;background:'+color+'"></div></div></div>';
+}
+
+/* Kept per Mark's request, at the very bottom - "let's just put it at the
+   bottom and reassess once we have the new stuff in front of us." */
+async function historyLogHtml(){
+  let h='<div style="margin-top:24px;padding-top:20px;border-top:2px solid var(--line)"><div class="sect-title" style="margin-top:0">Complete History Log</div>';
+  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--panel);border-bottom:2px solid var(--line)"><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Date</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Day type</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Rating</th><th style="padding:12px;text-align:center;font-weight:700;color:var(--ink)">Adherence</th><th style="padding:12px;text-align:left;font-weight:700;color:var(--ink)">Notes</th></tr></thead><tbody id="historyTableBody"></tbody></table></div></div>';
+  return h;
+}
+function wireHistoryLogHandlers(){
+  setTimeout(async()=>{
+    const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
+    const allDates={};
+    allSessions.forEach(s=>{ const dk=fmtDateKey(new Date(parseInt(s.startTs))); if(!allDates[dk]) allDates[dk]={date:new Date(parseInt(s.startTs))}; });
+    const sortedDates=Object.keys(allDates).sort().reverse();
+    let historyHtml='';
+    for(const dateKey of sortedDates){
+      const dayNote=await idbGet("day_notes",dateKey)||{};
+      if(dayNote.deleted) continue;
+      const dRating=dayNote.rating||0, dNotes=dayNote.notes||"";
+      const adhStr=adhCellHtml(dayNote.matchScore,dayNote.budgetScore?dayNote.budgetScore.pct:undefined);
+      const dayDate=allDates[dateKey].date, isWeekend=dayDate.getDay()===0||dayDate.getDay()===6;
+      const rowBg=isWeekend?'rgba(100,116,139,.15)':'transparent';
+      const dName=dayDate.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+      const starHtml=starCellHtml(dateKey,dRating,"editHistoryStar");
+      const dTypeSel=dayTypeSelectHtml(dateKey,await getDayType(dateKey),true);
+      historyHtml+=`<tr style="background:${rowBg};border-bottom:1px solid var(--line)"><td style="padding:12px;color:var(--ink);white-space:nowrap">${dName}</td><td style="padding:12px">${dTypeSel}</td><td style="padding:12px;text-align:center">${starHtml}</td><td style="padding:12px;text-align:center;color:var(--ink2);font-weight:600">${adhStr}</td><td style="padding:12px;color:var(--ink2);cursor:pointer" onclick="window.editHistoryNotes('${dateKey}')" title="Click to edit">${dNotes?`"${escapeHtml(dNotes)}"`:'<span style="color:var(--muted)">—</span>'}</td></tr>`;
+    }
+    const historyBody=document.getElementById("historyTableBody");
+    if(historyBody) historyBody.innerHTML=historyHtml;
+    /* The container only reaches its full height now, so a scrollTop that
+       was clamped a moment ago can finally be honoured. */
+    restoreSummaryScroll();
+  },0);
+  window.editHistoryStar=async(dateKey,rating)=>{
+    const notesCell=document.querySelector(`[data-history-notes="${dateKey}"]`);
+    const notes=notesCell?notesCell.textContent:"";
+    await saveDayRatingAndNotes(dateKey,rating,notes);
+    await renderStatsBody();
+  };
+  window.editHistoryNotes=async(dateKey)=>{
+    const currentNotes=document.querySelector(`[data-history-notes="${dateKey}"]`)?.textContent||"";
+    const newNotes=await uiPrompt("Edit notes:",currentNotes);
+    if(newNotes!==null){
+      const ratingSpan=document.querySelector(`[data-history-star="${dateKey}"]`);
+      const rating=parseInt(ratingSpan?.dataset.rating||0);
+      await saveDayRatingAndNotes(dateKey,rating,newNotes);
+      await renderStatsBody();
+    }
+  };
+}
+
+
 async function openWeekView(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=stage.innerHTML;let html='<div style="display:flex;flex-direction:column;height:100%">';html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)">';html+='<h2 style="margin:0;font-size:14px;font-weight:700">Week View</h2>';html+='<button class="btn sm" onclick="closeWeekView()">Home</button>';html+='</div>';html+='<div style="flex:1;overflow-y:auto;background:var(--bg);padding:16px" id="weekContent"></div>';html+='</div>';stage.innerHTML=html;window.closeWeekView=()=>{stage.innerHTML=origStage;renderGrid();};const today=new Date();const weekStart=new Date(today);weekStart.setDate(today.getDate()-today.getDay()+(today.getDay()===0?-6:1));const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const weekData={};for(let i=0;i<7;i++){const d=new Date(weekStart);d.setDate(d.getDate()+i);const key=fmtDateKey(d);weekData[key]={date:d,total:0,channels:{}};}allSessions.forEach(s=>{if(weekData[s.date]){const dur=parseInt(s.endTs||s.startTs)-parseInt(s.startTs);weekData[s.date].total+=dur;const chId=s.channelId;if(!weekData[s.date].channels[chId]){weekData[s.date].channels[chId]=0;}weekData[s.date].channels[chId]+=dur;}});let content='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">';let weekTotal=0;Object.values(weekData).slice(0,5).forEach(day=>{const dName=day.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});const chRows=Object.entries(day.channels).map(([chId,dur])=>{const ch=state.channels.find(x=>x.id===chId)||{label:"(deleted)",color:"#64748b"};return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0"><div style="width:8px;height:8px;border-radius:50%;background:${ch.color}"></div><div style="flex:1;font-size:11px">${escapeHtml(ch.label)}</div><div style="font-size:11px;font-weight:600;color:var(--ink2);min-width:50px;text-align:right">${fmtDur(dur)}</div></div>`}).join('');weekTotal+=day.total;content+=`<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px"><div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--accent)">${dName}</div><div style="font-size:16px;font-weight:800;margin-bottom:8px">${fmtDur(day.total)}</div><div style="font-size:10px;color:var(--ink2)">${Object.keys(day.channels).length} channels</div><div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">${chRows||'<div style="color:var(--muted);font-size:11px">No sessions</div>'}</div></div>`;});content+='</div>';content+=`<div style="margin-top:20px;padding:12px;background:linear-gradient(180deg,rgba(34,197,94,.1),transparent);border:1px solid rgba(34,197,94,.3);border-radius:12px"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Total</div><div style="font-size:24px;font-weight:800;color:var(--good)">${fmtDur(weekTotal)}</div></div>`;document.getElementById("weekContent").innerHTML=content;}
 
 
@@ -4554,6 +4138,32 @@ async function renderWeekEditor(){
     }
   }
 
+  /* Day by day journal strip: the same rating/day-type/adherence/notes the
+     Summary/Stats history log shows, but for this one week, at a glance,
+     next to the grid that already lines up with these same seven days. */
+  let dayJournalHtml='';
+  for(const dk2 of days){
+    const dn=await idbGet("day_notes",dk2)||{};
+    const dType=await getDayType(dk2);
+    const d=new Date(dayStartTs(dk2));
+    const dName=d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    const isFuture=dk2>todayKey();
+    const adhStr=isFuture?'':adhCellHtml(dn.matchScore,dn.budgetScore?dn.budgetScore.pct:undefined);
+    const starHtml='<span data-wk-journal-star data-wk-journal-date="'+dk2+'" data-rating="'+(dn.rating||0)+'">'+
+      starCellHtml(dk2,dn.rating||0,"editWeekJournalStar",18)+'</span>';
+    const notesHtml=dn.notes
+      ? '<div data-wk-journal-notes data-wk-journal-date="'+dk2+'" style="font-size:11px;color:var(--ink2);margin-top:6px;font-style:italic;cursor:pointer" title="Click to edit">"'+escapeHtml(dn.notes)+'"</div>'
+      : (isFuture?'':'<div data-wk-journal-notes data-wk-journal-date="'+dk2+'" style="font-size:11px;color:var(--muted);margin-top:6px;cursor:pointer" title="Click to add">No notes</div>');
+    dayJournalHtml+='<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">'+dName+'</div>'+
+      '<div style="margin-bottom:6px">'+dayTypeSelectHtml(dk2,dType,true)+'</div>'+
+      (isFuture?'<div class="hint" style="margin:0">Upcoming</div>':
+        '<div style="margin:6px 0">'+starHtml+'</div>'+
+        (adhStr?'<div style="font-size:11px;color:var(--ink2);margin-bottom:4px">'+adhStr+'</div>':'')+
+        notesHtml);
+    dayJournalHtml+='</div>';
+  }
+
   /* Channel totals across the week - the closest thing to Tracker's own
      Timing/Budget footer, but there is no plan here to score against, so it
      is simply what the week actually held, ranked by time. */
@@ -4610,6 +4220,10 @@ async function renderWeekEditor(){
           </div>
         </div>
       </div>
+      <div class="sect-title" style="margin-top:22px">This week, day by day</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:8px">
+        ${dayJournalHtml}
+      </div>
       <div class="sect-title" style="margin-top:20px">This week's totals</div>
       <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
         ${totalRows}
@@ -4627,6 +4241,36 @@ async function renderWeekEditor(){
   document.querySelectorAll("[data-wk-day]").forEach(el=>{
     el.addEventListener("click",()=>openDayEditor(el.dataset.wkDay));
   });
+  /* The day-type selects render from dayTypeSelectHtml(), which always wires
+     onchange to window.setDayTypeFromSummary - it re-renders the Summary/Stats
+     page unconditionally. Redirected here so a change on THIS page refreshes
+     THIS page instead of silently doing nothing (or worse, rendering the
+     wrong screen underneath this one). */
+  window.setDayTypeFromSummary=async(date,value)=>{
+    await setDayType(date,value||null);
+    toast(value?dayTypeLabel(value):"Marked as a working day");
+    await renderWeekEditor();
+  };
+  document.querySelectorAll("[data-wk-journal-notes]").forEach(el=>{
+    el.addEventListener("click",()=>editWeekJournalNotes(el.dataset.wkJournalDate));
+  });
+  window.editWeekJournalStar=async(date,rating)=>{
+    /* undefined, not the current text: saveDayRatingAndNotes() leaves notes
+       alone when notes is undefined, and this click only ever changes the
+       rating. */
+    await saveDayRatingAndNotes(date,rating,undefined);
+    await renderWeekEditor();
+  };
+  window.editWeekJournalNotes=async(date)=>{
+    const el=document.querySelector('[data-wk-journal-notes][data-wk-journal-date="'+date+'"]');
+    const current=el?el.textContent.replace(/^"|"$/g,''):"";
+    const val=await uiPrompt("Edit notes:",current==="No notes"?"":current);
+    if(val===null) return;
+    const ratingEl=document.querySelector('[data-wk-journal-star][data-wk-journal-date="'+date+'"]');
+    const rating=parseInt(ratingEl?ratingEl.dataset.rating:0,10)||0;
+    await saveDayRatingAndNotes(date,rating,val);
+    await renderWeekEditor();
+  };
   ["wkWinStart","wkWinEnd","wkWinIncr"].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
@@ -4984,8 +4628,11 @@ async function showCompleteResetConfirm(){
 
 /* ===== dashboard ===== */
 let dashRange="day";
-async function openDashboard(){await renderDashboard();openScrim("dashScrim");}
 
+/* Restored after an over-broad deletion swallowed these along with the dead
+   Dashboard modal they happened to sit next to - saveDayRatingAndNotes is
+   load-bearing everywhere a star or a note gets saved (Day Editor, History
+   Log), not just there. Verbatim from before. */
 async function saveDayRatingAndNotes(date,rating,notes){
   /* A star rating is a retrospective judgement, so a day that has not happened
      cannot be rated. Guarded HERE rather than at each star renderer - there
@@ -5009,8 +4656,8 @@ function starCellHtml(dateKey,rating,fnName,size){
   const future=String(dateKey)>todayKey();
   const stars=Array.from({length:5}).map((_,i)=>{
     const filled=i<rating;
-    const star=filled?"\u2605":"\u2606";
-    if(future) return '<span style="color:var(--muted);opacity:.4;font-size:'+px+'px;font-weight:800;margin:0 2px" title="This day hasn\u2019t happened yet">'+star+'</span>';
+    const star=filled?"★":"☆";
+    if(future) return '<span style="color:var(--muted);opacity:.4;font-size:'+px+'px;font-weight:800;margin:0 2px" title="This day hasn’t happened yet">'+star+'</span>';
     return '<span style="cursor:pointer;color:'+(filled?"#fbbf24":"#9ca3af")+';transition:all .1s;font-size:'+px+'px;font-weight:800;margin:0 2px" onclick="window.'+fnName+'(\''+dateKey+'\','+(i+1)+')" title="Rate '+(i+1)+'/5">'+star+'</span>';
   }).join("");
   if(future) return stars+'<div style="font-size:10px;color:var(--muted);margin-top:2px">upcoming</div>';
@@ -5018,10 +4665,10 @@ function starCellHtml(dateKey,rating,fnName,size){
   return stars+'<span style="cursor:pointer;color:var(--muted);font-size:11px;margin-left:8px;text-decoration:underline" onclick="window.'+fnName+'(\''+dateKey+'\',0)" title="Clear this rating">clear</span>';
 }
 
-/* Compact day-type picker for the Summary rows. Deliberately placed inside the
-   existing date cell rather than as a new column: the Summary tables are read
-   on a phone, and a fifth column would push them into horizontal scrolling.
-   It also avoids the header/body column-count trap documented in Landmines. */
+/* Compact day-type picker. Deliberately placed inside the existing date cell
+   rather than as a new column: these tables are read on a phone, and a fifth
+   column would push them into horizontal scrolling. Also avoids the
+   header/body column-count trap documented in Landmines. */
 function dayTypeSelectHtml(dateKey,current,inline){
   const opts=[{v:"",label:"Working"}].concat(DAY_TYPES.map(d=>({v:d.v,label:d.label})));
   const cur=current||"";
@@ -5036,100 +4683,7 @@ window.setDayTypeFromSummary=async(date,value)=>{
   toast(value?dayTypeLabel(value):"Marked as a working day");
   await openCombinedSummary();
 };
-// Star rating system
-function renderStars(rating){
-  const stars=["☆","☆","☆","☆","☆"];
-  if(rating) for(let i=0;i<rating;i++) stars[i]="★";
-  return stars.join("");
-}
-function renderInteractiveStars(rating,onRate){
-  let html='<div style="display:flex;gap:4px;cursor:pointer;font-size:24px;user-select:none">';
-  for(let i=1;i<=5;i++){
-    const star=i<=rating?"★":"☆";
-    html+=`<span style="cursor:pointer" onclick="(${onRate})(${i})">${star}</span>`;
-  }
-  html+='</div>';
-  return html;
-}
-async function saveDayRating(date,rating){
-  const existing=await idbGet("day_notes",date)||{date,profileId:state.profileId};
-  existing.rating=rating;
-  await saveLocal("day_notes",existing);
-}
-async function getDayRating(date){
-  const notes=await idbGet("day_notes",date);
-  return notes?.rating||0;
-}
 
-/* (date,rating) to match the shared starCellHtml contract. */
-window.rateToday=async(d,rating)=>{const tk=d||todayKey();const notesArea=document.getElementById("dayNotes");const notes=notesArea?notesArea.value:"";if(await saveDayRatingAndNotes(tk,rating,notes))await renderTodaySummary();};
-
-async function renderTodaySummary(){
-  const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
-  const chMap={};state.channels.forEach(c=>chMap[c.id]=c);
-  const tk=todayKey();
-  const today=all.filter(s=>s.date===tk);
-  const nowTs=now();
-  const total=today.reduce((a,s)=>a+(s.endTs?s.durMs:(nowTs-s.startTs)),0);
-  const byCh={};today.forEach(s=>{byCh[s.channelId]=(byCh[s.channelId]||0)+(s.endTs?s.durMs:(nowTs-s.startTs));});
-  const chSorted=Object.entries(byCh).sort((a,b)=>b[1]-a[1]);
-  const dayNote=await idbGet("day_notes",tk)||{};
-  const rating=dayNote.rating||0;
-  const notes=dayNote.notes||"";
-  let html='<div style="margin-bottom:16px"><div class="sect-title">Today Summary</div>';
-  html+='<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:16px"><div style="font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent)">'+fmtDur(total)+'</div></div>';
-  html+='<div style="margin-bottom:16px"><div class="sect-title" style="margin-bottom:12px">Rate Today</div><div id="starRating" style="font-size:28px;letter-spacing:4px;margin-bottom:12px"></div><textarea id="dayNotes" placeholder="Add notes about today..." style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font-family:inherit;font-size:13px;resize:vertical;min-height:60px;box-sizing:border-box;margin-bottom:8px"></textarea></div>';
-  if(chSorted.length>0){html+='<div class="sect-title" style="margin-top:12px;margin-bottom:8px">By Category</div>';chSorted.forEach(([chId,dur])=>{const ch=chMap[chId]||{label:"(deleted)",color:"#64748b"};const pct=total>0?Math.round(dur/total*100):0;html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><div style="width:12px;height:12px;border-radius:50%;background:'+ch.color+';flex-shrink:0"></div><div style="flex:1">'+escapeHtml(ch.label)+'</div><div style="text-align:right"><div style="font-weight:700;font-size:13px">'+fmtDur(dur)+'</div><div style="font-size:10px;color:var(--ink2)">'+pct+'%</div></div></div>';});}
-  html+='</div>';
-  document.getElementById("summaryStats").innerHTML=html;
-  setTimeout(()=>{
-    const sr=document.getElementById("starRating");
-    if(sr){
-      sr.innerHTML=starCellHtml(tk,rating,"rateToday",28);
-    }
-    const notesArea=document.getElementById("dayNotes");
-    if(notesArea){
-      notesArea.value=notes;
-      notesArea.addEventListener("blur",()=>{saveDayRatingAndNotes(tk,rating,notesArea.value);});
-    }
-  },0);
-}
-
-async function renderDashboard(){const body=document.getElementById("dashBody");const all=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));const chMap={};state.channels.forEach(c=>chMap[c.id]=c);const nowTs=now();
-  const closed=all.map(s=>({...s,dur:s.endTs?s.durMs:(nowTs-s.startTs),end:s.endTs||nowTs}));const start=rangeStart(dashRange);const inRange=closed.filter(s=>s.startTs>=start);const total=inRange.reduce((a,s)=>a+s.dur,0);
-  const byCh={};inRange.forEach(s=>{byCh[s.channelId]=(byCh[s.channelId]||0)+s.dur;});const chSorted=Object.entries(byCh).sort((a,b)=>b[1]-a[1]);
-  const days=new Set(inRange.map(s=>s.date));const nDays=Math.max(1,days.size);const byHour=new Array(24).fill(0);inRange.forEach(s=>{byHour[new Date(s.startTs).getHours()]+=s.dur;});const peakHour=byHour.indexOf(Math.max(...byHour));
-  const byDay={};inRange.forEach(s=>{byDay[s.date]=(byDay[s.date]||0)+s.dur;});const dayKeys=Object.keys(byDay).sort();
-  const longest=inRange.reduce((m,s)=>s.dur>m.dur?s:m,{dur:0});const firstS=inRange.slice().sort((a,b)=>a.startTs-b.startTs)[0];const lastS=inRange.slice().sort((a,b)=>b.end-a.end)[0];
-  const RL={day:"Today",week:"This Week",month:"This Month",year:"This Year",all:"All Time"};const topCh=chSorted[0]?chMap[chSorted[0][0]]:null;
-  let html=`<div class="tabs">${["day","week","month","year","all"].map(r=>`<button class="tab ${r===dashRange?"on":""}" data-r="${r}">${RL[r]}</button>`).join("")}</div>`;
-  if(dashRange==="day"){const plan=await idbGet("dayplans",todayKey());if(plan&&plan.blocks&&Object.keys(plan.blocks).length>0){const plannedMs={};Object.values(plan.blocks).flat().forEach(ch=>{plannedMs[ch.id]=(plannedMs[ch.id]||0)+ch.mins*60000;});const plannedTotal=Object.values(plannedMs).reduce((a,b)=>a+b,0);const actualPlanned=Object.keys(plannedMs).reduce((a,chid)=>a+(byCh[chid]||0),0);const adherence=plannedTotal>0?Math.round(actualPlanned/plannedTotal*100):0;let diffTxt="";if(plannedTotal>actualPlanned)diffTxt=fmtDur(plannedTotal-actualPlanned)+" remaining.";else if(plannedTotal<actualPlanned)diffTxt=fmtDur(actualPlanned-plannedTotal)+" over plan.";html+=`<div class="card" style="border-color:var(--accent);background:rgba(79,140,255,.08)"><h3>Plan vs Actual</h3><div class="barrow" style="margin-bottom:15px"><div class="nm">Adherence</div><div class="track"><div class="fill" style="width:${Math.min(100,adherence)}%;background:${adherence>=80?'var(--good)':adherence>=50?'var(--warn)':'var(--bad)'}"></div></div><div class="val">${adherence}%</div></div><div class="barrow"><div class="nm">Planned</div><div class="track"><div class="fill" style="width:100%;background:var(--accent)"></div></div><div class="val">${fmtDur(plannedTotal)}</div></div><div class="barrow"><div class="nm">Actual</div><div class="track"><div class="fill" style="width:${actualPlanned>0?Math.min(100,actualPlanned/plannedTotal*100):0}%;background:var(--good)"></div></div><div class="val">${fmtDur(actualPlanned)}</div></div><div style="font-size:11px;color:var(--ink2);margin-top:12px;line-height:1.5">Tracking ${Object.keys(plannedMs).length} planned channel${Object.keys(plannedMs).length>1?'s':''}. ${diffTxt}</div></div>`;}}
-  html+=`<div class="stat-row">
-    <div class="stat"><div class="l">Total tracked</div><div class="v">${fmtDur(total)}</div><div class="s">${RL[dashRange].toLowerCase()}</div></div>
-    <div class="stat"><div class="l">Avg / active day</div><div class="v">${fmtDurShort(total/nDays)}</div><div class="s">${nDays} day${nDays>1?"s":""} tracked</div></div>
-    <div class="stat"><div class="l">Top channel</div><div class="v" style="font-size:20px">${topCh?escapeHtml(topCh.label):"—"}</div><div class="s">${chSorted[0]?fmtDurShort(chSorted[0][1]):""}</div></div>
-    <div class="stat"><div class="l">Most productive hour</div><div class="v" style="font-size:20px">${total>0?hourLabel(peakHour):"—"}</div><div class="s">${total>0?fmtDurShort(byHour[peakHour])+" tracked":""}</div></div>
-  </div><div class="card"><h3>Insights</h3><div class="sub">Auto-generated from your data — this list grows as we add metrics you care about.</div>`;
-  if(total===0)html+=`<div class="insight"><span class="ic">🟦</span><div>No sessions in this range yet. Tap some buttons, then come back.</div></div>`;
-  else{html+=insight("⏰",`Your most productive time is around <b>${hourLabel(peakHour)}</b> — that hour holds <b>${fmtDurShort(byHour[peakHour])}</b> of tracked work.`);
-    if(topCh)html+=insight("🏆",`<b>${escapeHtml(topCh.label)}</b> is your biggest category ${dashRange==="day"?"today":"in this range"}, at <b>${fmtDurShort(chSorted[0][1])}</b> (${Math.round(chSorted[0][1]/total*100)}% of tracked time).`);
-    html+=insight("📊",`You've averaged <b>${fmtDurShort(total/nDays)}</b> of tracked time per active day across ${nDays} day${nDays>1?"s":""}.`);
-    if(longest.dur>0){const lc=chMap[longest.channelId];html+=insight("🎯",`Your longest single session was <b>${fmtDurShort(longest.dur)}</b> on <b>${lc?escapeHtml(lc.label):"—"}</b>.`);}
-    if(firstS&&lastS){const fc=chMap[firstS.channelId];html+=insight("🌅",`First tracked activity started at <b>${fmtClock(firstS.startTs,state.profile.hourFmt)}</b>${dashRange==="day"?` on ${fc?escapeHtml(fc.label):""}`:""}; last ran to <b>${fmtClock(lastS.end,state.profile.hourFmt)}</b>.`);}}
-  html+=`</div><div class="card"><h3>Time by channel</h3><div class="sub">${RL[dashRange]}</div>`;
-  if(!chSorted.length)html+=`<div class="hint">No data yet.</div>`;else{const max=chSorted[0][1];chSorted.forEach(([cid,ms])=>{const c=chMap[cid]||{label:"(deleted)",color:"#64748b"};html+=`<div class="barrow"><div class="nm" title="${escapeHtml(c.label)}">${escapeHtml(c.label)}</div><div class="track"><div class="fill" style="width:${Math.max(2,ms/max*100)}%;background:${c.color}"></div></div><div class="val">${fmtDurShort(ms)}</div></div>`;});}
-  html+=`</div>`;
-  if(dashRange!=="day"&&dayKeys.length>1){
-    const dayAdherence={};
-    const dayRatings={};
-    const dayNotes={};
-    for(const k of dayKeys){const n=await idbGet("day_notes",k);if(n&&n.matchScore){dayAdherence[k]=Object.assign({},n.matchScore,{budgetPct:n.budgetScore?n.budgetScore.pct:undefined});}if(n&&n.rating){dayRatings[k]=n.rating;}if(n&&n.notes){dayNotes[k]=n.notes;}}
-    const totalAdherence=Object.values(dayAdherence).reduce((a,x)=>({matches:(a.matches||0)+x.matches,total:(a.total||0)+x.total}),{matches:0,total:0});
-    const weekAdhScore=totalAdherence.total>0?Math.round(totalAdherence.matches/totalAdherence.total*100):0;
-    html+=`<div class="card"><h3>Daily trend & Adherence</h3><div class="sub">Tracked time per day with daily adherence scores and ratings</div>${dailyTrendChart(dayKeys,byDay,dayAdherence,dayRatings,dayNotes)}<div style="margin-top:12px;padding:12px;background:var(--panel);border-radius:6px;border-left:3px solid var(--accent)"><div style="font-size:12px;color:var(--ink2);margin-bottom:4px">Week Adherence Score</div><div style="font-size:24px;font-weight:800;color:${weekAdhScore>=80?"var(--good)":weekAdhScore>=50?"var(--warn)":"var(--bad)"}">${totalAdherence.matches}/${totalAdherence.total} matched (${weekAdhScore}%)</div></div></div>`;
-  }
-  if(total>0)html+=`<div class="card"><h3>When you work</h3><div class="sub">Tracked time by hour of day</div>${hourChart(byHour)}</div>`;
-  body.innerHTML=html;body.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{dashRange=t.getAttribute("data-r");renderDashboard();}));}
 function insight(ic,t){return `<div class="insight"><span class="ic">${ic}</span><div>${t}</div></div>`;}
 function hourLabel(h){const ap=h>=12?"PM":"AM";return (h%12||12)+" "+ap;}
 function shortDay(k){return new Date(k+"T00:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}
