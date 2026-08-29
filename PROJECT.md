@@ -1489,6 +1489,19 @@ file and a validly-shaped-but-wrong JSON file each surfaced the right toast
 and changed nothing; all three new Settings buttons and the trimmed avatar
 menu wired correctly - zero console/window errors throughout.
 
+### "Done" → "Close" on Settings and Channels, still v24
+
+Mark asked whether Settings' "Done" button saved anything - it does not,
+because it never needed to: every control on both screens (hourFmt,
+btnSize, and every channel edit) already calls `saveLocal()` the instant
+you change it, same local-first pattern as the rest of the app. The button
+only restores the previous stage and re-renders the grid - a close, not a
+commit. Renamed both to "Close" rather than "Save": a "Save" button would
+imply changes sit unsaved until pressed, which is not how this app works
+anywhere, and would be a real risk - close the tab before hitting a "Save"
+that was actually decorative and a user would reasonably conclude they'd
+lost their change, when they had not.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
