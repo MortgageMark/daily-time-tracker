@@ -2726,14 +2726,15 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
      the feature back means restoring a switcher here plus a way to rename;
      the rename never existed, which is half of why this was hidden. */
   const sep=document.createElement("div");sep.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep);
-  // Edit a day, Week, and Channels all moved to bottombar/More - the avatar
-  // menu is account/utility only now (theme, export, settings, sign out).
+  // Edit a day, Week, and Channels moved to bottombar/More. Export backup,
+  // Export CSV, and Import backup live under Settings > Data Management now,
+  // next to the other data actions (Restore Deleted Days, Delete Range,
+  // Complete Reset) instead of here - the avatar menu is account/utility
+  // only: theme, settings, sign out.
   m.appendChild(avatarMenuItem(
     currentTheme()==="light"?"🌙":"☀️",
     currentTheme()==="light"?"Dark mode":"Light mode",
     ()=>toggleTheme(),null,true));
-  m.appendChild(avatarMenuItem("💾","Export backup",()=>exportDataBackup()));
-  m.appendChild(avatarMenuItem("📄","Export CSV",()=>exportCsv()));
   m.appendChild(avatarMenuItem("⚙️","Settings",()=>openSettings()));
 
   const sep2=document.createElement("div");sep2.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep2);
@@ -3096,6 +3097,10 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
         <div class="sect-title">Preferences</div>
         <div class="row"><div class="grow">Time format</div><select id="hourFmt"><option value="12">12-hour</option><option value="24">24-hour</option></select></div>
         <div class="row"><div class="grow">Button size</div><select id="btnSize"><option value="normal" selected>Normal</option><option value="compact">Compact</option><option value="spacious">Spacious</option></select></div>
+        <div class="sect-title">Backup</div>
+        <div class="row"><div class="grow"><b>Export CSV</b><div class="hint">A spreadsheet of your logged time - one row per session.</div></div><button class="btn sm" id="settingsExportCsvBtn">Export</button></div>
+        <div class="row"><div class="grow"><b>Export backup</b><div class="hint">Everything - channels, sessions, templates - as one file, for safekeeping.</div></div><button class="btn sm" id="settingsExportBackupBtn">Export</button></div>
+        <div class="row"><div class="grow"><b>Import backup</b><div class="hint">Restores a backup file into a new profile - never overwrites what's already here.</div></div><button class="btn sm" id="settingsImportBackupBtn">Import</button></div>
         <div class="sect-title">Data Management</div>
         <div class="row"><div class="grow"><b>Restore Deleted Days</b><div class="hint" id="deletedDaysCount"></div></div><button class="btn sm" id="restoreDeletedBtn" style="display:none">Restore</button></div>
         <div class="row"><div class="grow"><b>Delete Date Range</b><div class="hint">Remove all data from a specific date range.</div></div><button class="btn sm warn" id="deleteDateRangeBtn">Delete Range</button></div>
@@ -3118,6 +3123,12 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
        re-applies it from state.profile.btnSize when Settings closes. */
     applyButtonSize(e.target.value);
   });
+  const settingsExportCsvBtn=document.getElementById("settingsExportCsvBtn");
+  if(settingsExportCsvBtn)settingsExportCsvBtn.addEventListener("click",exportCsv);
+  const settingsExportBackupBtn=document.getElementById("settingsExportBackupBtn");
+  if(settingsExportBackupBtn)settingsExportBackupBtn.addEventListener("click",exportDataBackup);
+  const settingsImportBackupBtn=document.getElementById("settingsImportBackupBtn");
+  if(settingsImportBackupBtn)settingsImportBackupBtn.addEventListener("click",triggerImportBackup);
   const restoreDeletedBtn=document.getElementById("restoreDeletedBtn");
   if(restoreDeletedBtn)restoreDeletedBtn.addEventListener("click",restoreDeletedDays);
   const deleteDateRangeBtn=document.getElementById("deleteDateRangeBtn");
@@ -4786,19 +4797,38 @@ async function exportCsv(){
   toast("CSV exported successfully");
 }
 
-/* ===== DATA MANAGEMENT ===== */
+/* ===== DATA MANAGEMENT =====
+   Backup format history:
+   v1 (no formatVersion field) - profile, sessions, dayNotes only. Restoring
+   one gave every session a channelId nothing in the new profile actually
+   had - every tile read "(deleted)". importDataBackup() still accepts
+   these, it just cannot rebuild channels/plans that were never captured.
+   v2 (formatVersion:2) - adds channels, plans, and dayplans, so a restore
+   is actually usable instead of a pile of orphaned sessions. */
+const BACKUP_FORMAT_VERSION=2;
 async function exportDataBackup(){
+  const allChannels=await idbAll("channels","profile",IDBKeyRange.only(state.profileId));
   const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
+  const allPlans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));
+  const allDayplans=await idbAll("dayplans","profile",IDBKeyRange.only(state.profileId));
   /* day_notes is keyed by date ALONE and carries no `profile` index - that is
      deliberate, and the documented reason it does not sync. Asking for one
      threw on every call, so all five Data Management actions, Export backup
      included, failed outright. Fetch every note instead; they are not
-     profile-scoped in the first place. */
+     profile-scoped in the first place - on a device with more than one
+     profile this file also carries every OTHER profile's day notes, since
+     there is no way to ask for just this one's. importDataBackup() only
+     ever fills in a note for a date that has none locally, never overwrites,
+     so that spillover cannot clobber anything on the way back in. */
   const allNotes=await idbAll("day_notes");   /* no profile index - see below */
   const backup={
+    formatVersion:BACKUP_FORMAT_VERSION,
     exportDate:new Date().toISOString(),
     profile:state.profile,
+    channels:allChannels,
     sessions:allSessions,
+    plans:allPlans,
+    dayplans:allDayplans,
     dayNotes:allNotes
   };
   const json=JSON.stringify(backup,null,2);
@@ -4811,6 +4841,97 @@ async function exportDataBackup(){
   a.click();
   URL.revokeObjectURL(url);
   toast("Data backup exported successfully");
+}
+
+/* Opens the file picker; the actual restore is importDataBackup() below. A
+   detached <input type=file> is the standard way to trigger a picker from a
+   plain button click - it never gets attached to visible layout. */
+function triggerImportBackup(){
+  const input=document.createElement("input");
+  input.type="file"; input.accept="application/json,.json"; input.style.display="none";
+  input.addEventListener("change",async e=>{
+    const file=e.target.files&&e.target.files[0];
+    input.remove();
+    if(file) await importDataBackup(file);
+  });
+  document.body.appendChild(input);
+  input.click();
+}
+/* Merges into the profile you already have open - it does NOT create a
+   separate restored profile. Profiles are hidden, not removed elsewhere in
+   this app (see renderAvatarMenu()): there is no switcher, so a second
+   profile created here would be reachable by nobody, ever - a restore that
+   cannot be seen is not a restore. Merging is also just as safe: channels
+   are matched by name and reused rather than duplicated, and everything
+   else is ADDED, never replacing or deleting a record already here.
+   Plans/dayplans (templates) are deliberately left out of the merge - your
+   current templates are live and in use, and a backup should never risk
+   quietly changing them. The export still captures them, so the file is a
+   complete historical record even though import only restores your logged
+   history (channels, sessions, day notes) back into it. */
+async function importDataBackup(file){
+  let backup;
+  try{ backup=JSON.parse(await file.text()); }
+  catch(e){ toast("That file isn't readable as a backup"); return; }
+  if(!backup||typeof backup!=="object"||!backup.profile||!Array.isArray(backup.sessions)){
+    toast("That doesn't look like a Daily Time Tracker backup file");
+    return;
+  }
+  const channels=Array.isArray(backup.channels)?backup.channels:[];
+  const dayNotes=Array.isArray(backup.dayNotes)?backup.dayNotes:[];
+  const origName=backup.profile.name||"that backup";
+  const missingChannels=!backup.formatVersion&&backup.sessions.length&&!channels.length;
+
+  let msg='Import '+backup.sessions.length+" session"+(backup.sessions.length===1?"":"s")+' from "'+origName+'" into your current profile ("'+state.profile.name+'")? Channels with a matching name are reused; new ones are added. Nothing already here is changed or removed.';
+  if(missingChannels) msg+=" This file predates channels being included in backups, so sessions can only be matched by their old category name, not restored to a real channel.";
+  if(!await uiConfirm(msg)) return;
+
+  // Reuse an existing (non-archived) channel with the same name; otherwise
+  // create one under the current profile. Sub-channel hierarchy is not
+  // reconstructed - a channel that was a sub-channel in the source file
+  // comes back as a top-level one here, rather than risk attaching it under
+  // the wrong parent by a guessed match.
+  const chanMap=new Map();
+  let addedChannels=0;
+  for(const c of channels){
+    const existing=(state.channels||[]).find(x=>!x.archived&&String(x.label).toLowerCase()===String(c.label||"").toLowerCase());
+    if(existing){ chanMap.set(c.id,existing.id); continue; }
+    const nc={id:uid(),profileId:state.profileId,label:c.label,color:c.color||"#64748b",order:(state.channels||[]).length+addedChannels,archived:false,parentChannelId:null,tier:c.tier||null,drip:c.drip||null,urgency:c.urgency||null,importance:c.importance||null,joy:c.joy||null,drain:c.drain||null};
+    await saveLocal("channels",nc);
+    state.channels.push(nc);
+    chanMap.set(c.id,nc.id);
+    addedChannels++;
+  }
+
+  let addedSessions=0;
+  for(const s of backup.sessions){
+    const ns={...s};
+    delete ns._dirty; delete ns._u;
+    ns.id=uid(); ns.profileId=state.profileId;
+    ns.channelId=chanMap.get(s.channelId)||s.channelId;
+    await saveLocal("sessions",ns);
+    addedSessions++;
+  }
+
+  // day_notes is not profile-scoped (see exportDataBackup) - only fill in a
+  // date nothing local has yet, never overwrite, so a note that belongs to
+  // some OTHER profile on this device cannot silently clobber it.
+  let restoredNotes=0;
+  for(const n of dayNotes){
+    if(!n||!n.date) continue;
+    const existing=await idbGet("day_notes",n.date);
+    if(existing) continue;
+    const nn={...n}; delete nn._dirty; delete nn._u;
+    await saveLocal("day_notes",nn);
+    restoredNotes++;
+  }
+
+  let summary=addedSessions+" session"+(addedSessions===1?"":"s")+" imported";
+  if(addedChannels) summary+=", "+addedChannels+" new channel"+(addedChannels===1?"":"s");
+  if(restoredNotes) summary+=", "+restoredNotes+" day note"+(restoredNotes===1?"":"s");
+  toast(summary);
+  await reloadFromLocal();
+  if(typeof closeSettings==="function") closeSettings();
 }
 
 async function checkDeletedDaysCount(){

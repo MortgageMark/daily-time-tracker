@@ -1423,8 +1423,9 @@ to be the two reached for daily beyond that shortcut - not Week.
 - More: **Week, Stats, Channels**. Channels moved out of the avatar menu -
   it is a page you navigate to and edit (your category list), the same
   kind of thing Week/Stats/Plan/Tracker are, not an account-level action.
-  The avatar menu is now account/utility only: theme toggle, Export
-  backup, Export CSV, Settings, Sign out, sync status.
+  The avatar menu is now account/utility only: theme toggle, Settings,
+  Sign out, sync status. (Export backup/CSV moved again shortly after -
+  see the Import backup section below - so this list is smaller still.)
 
 **Regression caught and fixed in the same pass:** a leftover delegated
 `document` click listener from before Edit a day/Week/More existed still
@@ -1442,6 +1443,51 @@ a second/third view of the same double-fire would have looked identical
 on screen; only counting the calls exposed it. Worth remembering next time
 an old id gets reintroduced into a live element: grep for every reference
 to that id before assuming a fresh `addEventListener` is the only wiring.
+
+### Import backup, and Backup moves into Settings, still v24
+
+Export backup existed with no way to load the file back in. Mark asked for
+the import side, and separately asked whether Export backup/CSV belonged
+under Settings rather than in the avatar menu once there would be three of
+them. Both landed together: **Backup** is now its own section in Settings
+(Export CSV, Export backup, Import backup), above Data Management; the
+avatar menu lost both export rows and is down to theme, Settings, sign out,
+sync status.
+
+**Import merges into the profile you already have open - it does not
+create a separate restored one.** The obvious design would restore into a
+fresh profile and leave the original untouched, but this app hides
+multiple profiles rather than exposing a switcher (see "Profiles are
+hidden, not removed" in `renderAvatarMenu()`) - a second profile created by
+import would be reachable by nobody, ever. A restore nobody can see is not
+a restore. Merging avoids that trap and is just as safe a different way:
+channels are matched by name and reused rather than duplicated, and
+sessions/day notes are only ever ADDED, never replacing or deleting a
+record already there.
+
+**Plans and dayplans (templates) are deliberately left out of the import,
+though the export still captures them.** Your current templates are live
+and in use; restoring old ones back over them risked changing something
+you did not touch, for a lower-value win than the sessions themselves -
+templates are regenerable by hand, a day of tracked time is not. The
+backup file is still a complete historical record if a template ever
+needs to be manually rebuilt from it.
+
+Backup format bumped to `formatVersion: 2` - v1 only captured profile,
+sessions, and day notes, so restoring one landed every session on a
+channel that no longer existed anywhere ("(deleted)" everywhere). v2 adds
+channels, plans, and dayplans to the export. `importDataBackup()` still
+accepts a v1 file (no `formatVersion` field) - it just cannot rebuild
+channels that were never captured, and says so in the confirm prompt
+before importing.
+
+Verified: all 3 script blocks parse; a seeded round-trip (export a test
+profile's channels+sessions, re-import that same file into itself) landed
+exactly as designed - sessions doubled (additive, expected), channels held
+steady at the same count (matched by name, not duplicated); an unreadable
+file and a validly-shaped-but-wrong JSON file each surfaced the right toast
+and changed nothing; all three new Settings buttons and the trimmed avatar
+menu wired correctly - zero console/window errors throughout.
 
 ---
 
