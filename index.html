@@ -4462,6 +4462,12 @@ let adhDate=null, adhOrigStage=null;
    nothing here can shadow or be shadowed by it.
    ===================================================================== */
 let weekEditorDate=null, weekEditorOrigStage=null;
+/* A device preference, not data tied to any one week: "I only want 8-6" or
+   "I want the full 24 hours" persists across visits until changed. null
+   means auto-fit the week's own data, which is the default the first time. */
+const WEEK_WIN_KEY="dtt-week-window";
+function loadWeekWindow(){ try{ const raw=localStorage.getItem(WEEK_WIN_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; } }
+function saveWeekWindow(o){ try{ localStorage.setItem(WEEK_WIN_KEY,JSON.stringify(o)); }catch(e){} }
 function mondayOf(dk){
   const d=new Date(dayStartTs(dk));
   const day=d.getDay();                       /* 0=Sun..6=Sat */
@@ -4490,15 +4496,23 @@ async function renderWeekEditor(){
   const allSessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));
   const weekSessions=liveSessions(allSessions).filter(s=>days.includes(s.date));
 
-  /* The window is whatever the week actually needed, same idea as the Day
-     Editor's own rail - not a fixed 5am-10pm nobody asked for. */
-  let startHour=8, endHour=18;
-  if(weekSessions.length){
-    startHour=Math.min(8,...weekSessions.map(s=>new Date(s.startTs).getHours()));
-    endHour=Math.max(18,...weekSessions.map(s=>{ const e=new Date(tlEndOf(s)); return e.getHours()+((e.getMinutes()||e.getSeconds())?1:0); }));
-    endHour=Math.min(24,endHour);
+  /* Auto-fit the week's own data unless the user has set an explicit window -
+     "I only want 8-6" or "give me the full day" - which then persists until
+     they change it again, same idea as the Day Editor's own rail otherwise. */
+  const winPref=loadWeekWindow();
+  let startHour, endHour, increment;
+  if(winPref){
+    startHour=winPref.start; endHour=winPref.end; increment=winPref.increment||30;
+  } else {
+    startHour=8; endHour=18;
+    if(weekSessions.length){
+      startHour=Math.min(8,...weekSessions.map(s=>new Date(s.startTs).getHours()));
+      endHour=Math.max(18,...weekSessions.map(s=>{ const e=new Date(tlEndOf(s)); return e.getHours()+((e.getMinutes()||e.getSeconds())?1:0); }));
+      endHour=Math.min(24,endHour);
+    }
+    increment=30;
   }
-  const increment=30;
+  if(endHour<=startHour) endHour=Math.min(24,startHour+1);
 
   const d0=new Date(dayStartTs(days[0])), d6=new Date(dayStartTs(days[6]));
   const rangeLabel=d0.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+
@@ -4510,7 +4524,7 @@ async function renderWeekEditor(){
   for(let h=startHour;h<endHour;h++){
     for(let m=0;m<60;m+=increment){
       const label=fmtHourMin(h,m,fmt);
-      timeHtml+=`<div style="padding:4px 6px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:9px;height:34px;overflow:hidden;font-weight:600;color:var(--ink2);white-space:nowrap">${label}</div>`;
+      timeHtml+=`<div style="padding:4px 6px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;height:44px;overflow:hidden;font-weight:600;color:var(--ink2);white-space:nowrap">${label}</div>`;
       days.forEach((dk,di)=>{
         const dayStart=dayStartTs(dk);
         const blockStart=dayStart+(h*60+m)*60000, blockEnd=blockStart+increment*60000;
@@ -4522,19 +4536,19 @@ async function renderWeekEditor(){
              line in an 84px column left almost nothing for either, and the
              two together needed more height than the row had - stacking
              gives each its own line within the same 34px box. */
-          const noteBit=s.note?'<div style="font-size:8px;color:var(--ink2);line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
-            escapeHtml(s.note.length>14?s.note.slice(0,14)+'…':s.note)+'</div>':'';
+          const noteBit=s.note?'<div style="font-size:10px;color:var(--ink2);line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+            escapeHtml(s.note.length>16?s.note.slice(0,16)+'…':s.note)+'</div>':'';
           title=ch.label+(s.note?' — '+s.note:'');
           cellHtml='<div style="display:flex;flex-direction:column;align-items:center;gap:1px;max-width:100%;overflow:hidden">'+
-            '<span style="display:inline-block;padding:2px 5px;background:'+ch.color+'22;border:1px solid '+ch.color+'66;'+
-            'border-radius:3px;font-size:9px;color:'+ch.color+';font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+            '<span style="display:inline-block;padding:2px 6px;background:'+ch.color+'22;border:1px solid '+ch.color+'66;'+
+            'border-radius:4px;font-size:11px;color:'+ch.color+';font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
             escapeHtml(ch.label)+'</span>'+noteBit+'</div>';
         } else if(hits.length>1){
           const names=hits.map(s=>{ const c=state.channels.find(x=>x.id===s.channelId); return c?c.label:'?'; });
           title=names.join(', ');
-          cellHtml='<span style="font-size:9px;color:var(--accent);font-weight:700">'+hits.length+' activities</span>';
+          cellHtml='<span style="font-size:11px;color:var(--accent);font-weight:700">'+hits.length+' activities</span>';
         }
-        dayHtml[di]+=`<div style="padding:2px 6px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:4px;height:34px;overflow:hidden" title="${escapeHtml(title)}">${cellHtml}</div>`;
+        dayHtml[di]+=`<div style="padding:2px 6px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:4px;height:44px;overflow:hidden" title="${escapeHtml(title)}">${cellHtml}</div>`;
       });
     }
   }
@@ -4548,31 +4562,48 @@ async function renderWeekEditor(){
   const totalRows=Object.entries(totals).sort((a,b)=>b[1]-a[1]).map(([chId,ms])=>{
     const ch=state.channels.find(x=>x.id===chId)||{label:'(deleted)',color:'#64748b'};
     const pct=totalMs>0?Math.round(ms/totalMs*100):0;
-    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0">
-      <span style="width:9px;height:9px;border-radius:50%;background:${ch.color};flex:none"></span>
-      <span style="flex:1;font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ch.label)}</span>
-      <span style="font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums">${fmtDurShort(ms)} · ${pct}%</span>
+    return `<div style="display:flex;align-items:center;gap:9px;padding:7px 0">
+      <span style="width:11px;height:11px;border-radius:50%;background:${ch.color};flex:none"></span>
+      <span style="flex:1;font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ch.label)}</span>
+      <span style="font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums">${fmtDurShort(ms)} · ${pct}%</span>
     </div>`;
   }).join('') || '<div class="hint">No time tracked this week yet.</div>';
 
-  const dayColsCss='repeat(7,minmax(84px,1fr))';
+  const hourOpt=(sel,from,to)=>{let o='';for(let h=from;h<=to;h++){
+    o+='<option value="'+h+'"'+(h===sel?' selected':'')+'>'+fmtHourMin(h,0,fmt)+'</option>';}return o;};
+  const incrOpt=sel=>[15,30,60].map(v=>'<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+' min</option>').join('');
+  const winSelCss='font-size:16px;background:var(--field);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:7px 8px';
+
+  const railW=68, dayColMin=108;
+  const dayColsCss='repeat(7,minmax('+dayColMin+'px,1fr))';
   stage.innerHTML=`<div style="display:flex;flex-direction:column;height:100%">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0">
         <button class="btn sm" id="wkPrev">&lsaquo;</button>
-        <h2 style="margin:0;font-size:14px;font-weight:700;white-space:nowrap">${rangeLabel}</h2>
+        <h2 style="margin:0;font-size:16px;font-weight:700;white-space:nowrap">${rangeLabel}</h2>
         <button class="btn sm" id="wkNext">&rsaquo;</button>
       </div>
       <button class="btn sm${isCurrentWeek?'':' pri'}" id="wkThisWeek"${isCurrentWeek?' disabled style="opacity:.4"':''}>This week</button>
     </div>
     <div style="flex:1;overflow:auto;padding:12px">
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px">
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Window</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Starts
+            <select id="wkWinStart" style="width:100%;margin-top:4px;${winSelCss}">${hourOpt(startHour,0,23)}</select></label>
+          <label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Ends
+            <select id="wkWinEnd" style="width:100%;margin-top:4px;${winSelCss}">${hourOpt(endHour,1,24)}</select></label>
+          <label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Slot
+            <select id="wkWinIncr" style="width:100%;margin-top:4px;${winSelCss}">${incrOpt(increment)}</select></label>
+        </div>
+      </div>
       <div style="overflow-x:auto">
-        <div style="min-width:${60+7*84}px">
-          <div style="display:grid;grid-template-columns:56px ${dayColsCss};gap:0;background:var(--bg);border:1px solid var(--line);border-radius:8px 8px 0 0;overflow:hidden">
-            <div style="padding:6px 4px;background:var(--panel2);font-weight:700;font-size:9px;text-transform:uppercase;border-bottom:1px solid var(--line);border-right:1px solid var(--line);display:flex;align-items:center;justify-content:center">Time</div>
-            ${dayLabels.map(d=>`<div style="padding:6px 4px;background:${d.isToday?'var(--accent)22':'var(--panel2)'};font-weight:700;font-size:10px;border-bottom:1px solid var(--line);text-align:center;color:${d.isToday?'var(--accent)':'var(--ink)'}">${d.short}<div style="font-size:9px;font-weight:600;color:var(--ink2)">${d.num}</div></div>`).join('')}
+        <div style="min-width:${railW+7*dayColMin}px">
+          <div style="display:grid;grid-template-columns:${railW}px ${dayColsCss};gap:0;background:var(--bg);border:1px solid var(--line);border-radius:8px 8px 0 0;overflow:hidden">
+            <div style="padding:7px 4px;background:var(--panel2);font-weight:700;font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--line);border-right:1px solid var(--line);display:flex;align-items:center;justify-content:center">Time</div>
+            ${dayLabels.map(d=>`<div style="padding:7px 4px;background:${d.isToday?'var(--accent)22':'var(--panel2)'};font-weight:700;font-size:13px;border-bottom:1px solid var(--line);text-align:center;color:${d.isToday?'var(--accent)':'var(--ink)'}">${d.short}<div style="font-size:11px;font-weight:600;color:var(--ink2)">${d.num}</div></div>`).join('')}
           </div>
-          <div id="wkGrid" style="display:grid;grid-template-columns:56px ${dayColsCss};gap:0;background:var(--bg);border:1px solid var(--line);border-top:none">
+          <div id="wkGrid" style="display:grid;grid-template-columns:${railW}px ${dayColsCss};gap:0;background:var(--bg);border:1px solid var(--line);border-top:none">
             <div style="border-right:1px solid var(--line)">${timeHtml}</div>
             ${dayHtml.map(h=>`<div>${h}</div>`).join('')}
           </div>
@@ -4590,6 +4621,18 @@ async function renderWeekEditor(){
   document.getElementById("wkNext").addEventListener("click",()=>weekGoto(shiftDateKey(monKey,7)));
   const twb=document.getElementById("wkThisWeek");
   if(twb) twb.addEventListener("click",()=>weekGoto(todayKey()));
+  ["wkWinStart","wkWinEnd","wkWinIncr"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.addEventListener("change",()=>{
+      saveWeekWindow({
+        start:parseInt(document.getElementById("wkWinStart").value,10),
+        end:parseInt(document.getElementById("wkWinEnd").value,10),
+        increment:parseInt(document.getElementById("wkWinIncr").value,10)
+      });
+      renderWeekEditor();
+    });
+  });
 }
 
 async function openPlanAdherence(dk){const stage=document.querySelector('.app .stage');/* Tapping Tracker while already on Tracker must not capture the tracker as the thing Home returns to - the same trap openCombinedSummary() hit. */if(!document.getElementById("adhTime")||adhOrigStage===null) adhOrigStage=stage.innerHTML;adhDate=dk||todayKey();await renderPlanAdherence();}

@@ -1251,6 +1251,20 @@ Not yet done: no editing on this page (read-only, matching "let's see how it
 looks" framing) and increment is a fixed 30 minutes, not the per-plan window
 work from earlier this session.
 
+### Week view: bigger type, and a Window control, still v24
+
+Every size in the first pass was too small (9-11px, 34px rows) - bumped
+across the board (12-16px, 44px rows), re-verified the note-under-chip stack
+still clips cleanly at the new sizes rather than just eyeballing it.
+
+Added a Window control - Starts / Ends / Slot - above the grid, matching the
+Day window control already on the Plan page. `loadWeekWindow()` /
+`saveWeekWindow()` persist it in `localStorage` (`dtt-week-window`), because
+this is a device preference ("I only want 8-6," "give me the full day"), not
+data tied to any one week. Unset, the grid still auto-fits the week's own
+data exactly as before; the first change to any of the three selects switches
+it to an explicit, persisted window from then on.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
