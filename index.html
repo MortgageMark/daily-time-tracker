@@ -395,10 +395,6 @@
     <div class="sect-title">Preferences</div>
     <div class="row"><div class="grow">Time format</div><select id="hourFmt"><option value="12">12-hour</option><option value="24">24-hour</option></select></div>
     <div class="row"><div class="grow">Button size</div><select id="btnSize"><option value="normal" selected>Normal</option><option value="compact">Compact</option><option value="spacious">Spacious</option></select></div>
-    <div class="sect-title">Planner</div>
-    <div class="row"><div class="grow">Start time</div><select id="plannerStart"><option value="6">6 AM</option><option value="7">7 AM</option><option value="8" selected>8 AM</option><option value="9">9 AM</option></select></div>
-    <div class="row"><div class="grow">End time</div><select id="plannerEnd"><option value="16">4 PM</option><option value="17">5 PM</option><option value="18" selected>6 PM</option><option value="19">7 PM</option><option value="20">8 PM</option></select></div>
-    <div class="row"><div class="grow">Increment</div><select id="plannerIncr"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="60">60 min</option></select></div>
     <div class="sect-title">Data</div>
     <div class="row"><div class="grow"><b>Export CSV</b><div class="hint">Download every session for this profile as a spreadsheet.</div></div><button class="btn sm" id="exportCsvBtn">Export</button></div>
     <div class="sect-title">Account</div>
@@ -728,15 +724,15 @@ function toRow(store,r){
   if(store==="profiles")return {id:r.id,name:r.name,hour_fmt:r.hourFmt||"12",confirm_end:(r.confirmEnd!=="0")};
   if(store==="channels")return {id:r.id,profile_id:r.profileId,label:r.label,color:r.color,sort_order:r.order||0,archived:!!r.archived,parent_channel_id:r.parentChannelId||null,tier:r.tier||null,drip:r.drip||null,urgency:r.urgency||null,importance:r.importance||null,joy:r.joy||null,drain:r.drain||null};
   if(store==="sessions")return {id:r.id,profile_id:r.profileId,channel_id:r.channelId,start_ts:new Date(r.startTs).toISOString(),end_ts:r.endTs?new Date(r.endTs).toISOString():null,duration_seconds:r.endTs?Math.round((r.endTs-r.startTs)/1000):null,business_date:r.date,voided:!!r.voided,revision:r.revision||0};
-  if(store==="plans")return {id:r.id,profile_id:r.profileId,name:r.name,schedule:r.schedule||{},sort_order:r.order||0};
-  if(store==="dayplans")return {id:r.id,profile_id:r.profileId,date:r.date,plan_id:r.planId||null,plan_name:r.planName||null,schedule:r.schedule||{},edited:!!r.edited,day_type:r.dayType||null};
+  if(store==="plans")return {id:r.id,profile_id:r.profileId,name:r.name,schedule:r.schedule||{},sort_order:r.order||0,start_hour:r.startHour==null?null:r.startHour,end_hour:r.endHour==null?null:r.endHour,increment_minutes:r.increment==null?null:r.increment};
+  if(store==="dayplans")return {id:r.id,profile_id:r.profileId,date:r.date,plan_id:r.planId||null,plan_name:r.planName||null,schedule:r.schedule||{},edited:!!r.edited,day_type:r.dayType||null,start_hour:r.startHour==null?null:r.startHour,end_hour:r.endHour==null?null:r.endHour,increment_minutes:r.increment==null?null:r.increment};
 }
 function fromRow(store,row){
   const u=row.updated_at?Date.parse(row.updated_at):now();
   if(store==="profiles")return {id:row.id,name:row.name,hourFmt:row.hour_fmt||"12",confirmEnd:row.confirm_end?"1":"0",_u:u,_dirty:false};
   if(store==="channels")return {id:row.id,profileId:row.profile_id,label:row.label,color:row.color,order:row.sort_order||0,archived:!!row.archived,parentChannelId:row.parent_channel_id||null,tier:row.tier||null,drip:row.drip||null,urgency:row.urgency||null,importance:row.importance||null,joy:row.joy||null,drain:row.drain||null,_u:u,_dirty:false};
-  if(store==="plans")return {id:row.id,profileId:row.profile_id,name:row.name,schedule:row.schedule||{},order:row.sort_order||0,_u:u,_dirty:false};
-  if(store==="dayplans")return {id:row.id,profileId:row.profile_id,date:row.date,planId:row.plan_id||null,planName:row.plan_name||null,schedule:row.schedule||{},edited:!!row.edited,dayType:row.day_type||null,_u:u,_dirty:false};
+  if(store==="plans")return {id:row.id,profileId:row.profile_id,name:row.name,schedule:row.schedule||{},order:row.sort_order||0,startHour:row.start_hour==null?null:row.start_hour,endHour:row.end_hour==null?null:row.end_hour,increment:row.increment_minutes==null?null:row.increment_minutes,_u:u,_dirty:false};
+  if(store==="dayplans")return {id:row.id,profileId:row.profile_id,date:row.date,planId:row.plan_id||null,planName:row.plan_name||null,schedule:row.schedule||{},edited:!!row.edited,dayType:row.day_type||null,startHour:row.start_hour==null?null:row.start_hour,endHour:row.end_hour==null?null:row.end_hour,increment:row.increment_minutes==null?null:row.increment_minutes,_u:u,_dirty:false};
   if(store==="sessions")return {id:row.id,profileId:row.profile_id,channelId:row.channel_id,startTs:Date.parse(row.start_ts),endTs:row.end_ts?Date.parse(row.end_ts):null,durMs:row.end_ts?(Date.parse(row.end_ts)-Date.parse(row.start_ts)):0,date:row.business_date,voided:!!row.voided,revision:row.revision||0,_u:u,_dirty:false};
 }
 /* Stores that round-trip to Supabase. plans/dayplans need the tables from
@@ -776,7 +772,7 @@ function noteMissingTable(store,error){
    new fields. So on that error the new columns are stripped and the push is
    retried, and the full set is retried periodically in case the migration
    lands later. Same shape as the missing-table handling above. */
-const OPTIONAL_COLUMNS={channels:["tier","drip","urgency","importance","joy","drain"],dayplans:["day_type"]};
+const OPTIONAL_COLUMNS={channels:["tier","drip","urgency","importance","joy","drain"],dayplans:["day_type","start_hour","end_hour","increment_minutes"],plans:["start_hour","end_hour","increment_minutes"]};
 const missingRemoteColumns=new Map();
 const MISSING_COLUMN_RETRY_MS=10*60*1000;
 function columnsSkipped(store){
@@ -2534,7 +2530,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=23;
+const APP_RELEASE=24;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -2993,9 +2989,6 @@ function initializeEventListeners(){
   const btnSize=document.getElementById("btnSize");if(btnSize)btnSize.addEventListener("change",async e=>{state.profile.btnSize=e.target.value;await saveLocal("profiles",state.profile);applyButtonSize(e.target.value);});
 
   // Planner settings
-  const plannerStart=document.getElementById("plannerStart");if(plannerStart)plannerStart.addEventListener("change",e=>{planState.startHour=parseInt(e.target.value);});
-  const plannerEnd=document.getElementById("plannerEnd");if(plannerEnd)plannerEnd.addEventListener("change",e=>{planState.endHour=parseInt(e.target.value);});
-  const plannerIncr=document.getElementById("plannerIncr");if(plannerIncr)plannerIncr.addEventListener("change",e=>{planState.increment=parseInt(e.target.value);});
 
   // Channel editor
   const addChannelBtn=document.getElementById("addChannelBtn");if(addChannelBtn)addChannelBtn.addEventListener("click",()=>openChannelEditor(null));
@@ -3140,10 +3133,6 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
         <div class="sect-title">Preferences</div>
         <div class="row"><div class="grow">Time format</div><select id="hourFmt"><option value="12">12-hour</option><option value="24">24-hour</option></select></div>
         <div class="row"><div class="grow">Button size</div><select id="btnSize"><option value="normal" selected>Normal</option><option value="compact">Compact</option><option value="spacious">Spacious</option></select></div>
-        <div class="sect-title">Planner</div>
-        <div class="row"><div class="grow">Start time</div><select id="plannerStart"><option value="6">6 AM</option><option value="7">7 AM</option><option value="8" selected>8 AM</option><option value="9">9 AM</option></select></div>
-        <div class="row"><div class="grow">End time</div><select id="plannerEnd"><option value="16">4 PM</option><option value="17">5 PM</option><option value="18" selected>6 PM</option><option value="19">7 PM</option><option value="20">8 PM</option></select></div>
-        <div class="row"><div class="grow">Increment</div><select id="plannerIncr"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="60">60 min</option></select></div>
         <div class="sect-title">Data Management</div>
         <div class="row"><div class="grow"><b>Restore Deleted Days</b><div class="hint" id="deletedDaysCount"></div></div><button class="btn sm" id="restoreDeletedBtn" style="display:none">Restore</button></div>
         <div class="row"><div class="grow"><b>Delete Date Range</b><div class="hint">Remove all data from a specific date range.</div></div><button class="btn sm warn" id="deleteDateRangeBtn">Delete Range</button></div>
@@ -3153,7 +3142,7 @@ function openSettings(){const app=document.querySelector('.app');const stage=app
       </div>
     </div>
   </div>
-`;window.closeSettings=()=>{stage.innerHTML=origStage;renderGrid();};document.getElementById("hourFmt").value=state.profile.hourFmt||"12";document.getElementById("btnSize").value=state.profile.btnSize||"normal";document.getElementById("plannerStart").value=planState.startHour;document.getElementById("plannerEnd").value=planState.endHour;document.getElementById("plannerIncr").value=planState.increment;document.getElementById("closeSettingsBtn").addEventListener("click",()=>{window.closeSettings();});
+`;window.closeSettings=()=>{stage.innerHTML=origStage;renderGrid();};document.getElementById("hourFmt").value=state.profile.hourFmt||"12";document.getElementById("btnSize").value=state.profile.btnSize||"normal";document.getElementById("closeSettingsBtn").addEventListener("click",()=>{window.closeSettings();});
   const restoreDeletedBtn=document.getElementById("restoreDeletedBtn");
   if(restoreDeletedBtn)restoreDeletedBtn.addEventListener("click",restoreDeletedDays);
   const deleteDateRangeBtn=document.getElementById("deleteDateRangeBtn");
@@ -3994,6 +3983,25 @@ function openAdjustModal(session){editingSession=session;const c=state.channels.
 
 /* Day Planner */
 const timeBlocks=[{start:8,end:12,label:"8am—12pm"},{start:12,end:17,label:"12pm—5pm"},{start:17,end:21,label:"5pm—9pm"}];
+/* The planning window belongs to the plan, not the app: a Tuesday can start
+   earlier than a Thursday. Templates carry it, a materialised day inherits a
+   copy, and whatever is being drawn supplies its own. planState holds the
+   ACTIVE window so every existing reader below needs no change - each render
+   sets it from the record it is about to draw. */
+const PLAN_WINDOW_DEFAULT={startHour:8,endHour:18,increment:30};
+function planWindow(rec){
+  const r=rec||{}, d=PLAN_WINDOW_DEFAULT;
+  const num=(v,f)=>{ const n=parseInt(v,10); return isNaN(n)?f:n; };
+  const w={startHour:num(r.startHour,d.startHour),endHour:num(r.endHour,d.endHour),
+           increment:num(r.increment,d.increment)};
+  if(w.endHour<=w.startHour) w.endHour=Math.min(24,w.startHour+1);   /* never an empty grid */
+  return w;
+}
+function applyPlanWindow(rec){
+  const w=planWindow(rec);
+  planState.startHour=w.startHour; planState.endHour=w.endHour; planState.increment=w.increment;
+  return w;
+}
 let planState={startHour:8,endHour:18,increment:30,schedule:{},plans:[],selectedPlanIdx:0,nextPlanId:1};let draggedChannel=null;async function openDayPlanner(){
   const app=document.querySelector('.app');
   const stage=app.querySelector('.stage');
@@ -4033,9 +4041,11 @@ async function ensureDayPlan(date){
   const sel=await idbGet("selected_plan",date);
   if(sel&&sel.profileId===state.profileId&&sel.planId) src=(planState.plans||[]).find(p=>p.id===sel.planId)||null;
   if(!src) src=weekdayTemplate(date);
+  const w0=planWindow(src);
   const dp={ id:dayPlanKey(date), profileId:state.profileId, date:date,
              planId:src?src.id:null, planName:src?src.name:null,
-             schedule:src?JSON.parse(JSON.stringify(src.schedule||{})):{}, edited:false };
+             schedule:src?JSON.parse(JSON.stringify(src.schedule||{})):{}, edited:false,
+             startHour:w0.startHour, endHour:w0.endHour, increment:w0.increment };
   /* Never lose a non-working flag that was set before the day materialised. */
   if(existing&&existing.dayType) dp.dayType=existing.dayType;
   await saveLocal("dayplans",dp);
@@ -4064,9 +4074,11 @@ async function applyTemplateToToday(planId){
   const date=todayKey();
   const cur=await idbGet("dayplans",dayPlanKey(date));
   if(cur&&cur.edited&&!await uiConfirm("Today has edits that are not saved to any template. Replacing it with "+src.name+" will discard them. Continue?")) return;
+  const w1=planWindow(src);
   const fresh={ id:dayPlanKey(date), profileId:state.profileId, date:date,
                 planId:src.id, planName:src.name,
-                schedule:JSON.parse(JSON.stringify(src.schedule||{})), edited:false };
+                schedule:JSON.parse(JSON.stringify(src.schedule||{})), edited:false,
+                startHour:w1.startHour, endHour:w1.endHour, increment:w1.increment };
   await saveLocal("dayplans",fresh);
   await saveLocal("selected_plan",{date:date,profileId:state.profileId,planId:src.id});
   planState.today=fresh;
@@ -4079,6 +4091,8 @@ async function saveTodayToTemplate(){
   if(!tpl){ toast("Today is not linked to a template"); return; }
   if(!await uiConfirm("Save today into the template "+tpl.name+"? Every future day that uses it will change.")) return;
   tpl.schedule=JSON.parse(JSON.stringify(dp.schedule||{}));
+  const dw=planWindow(dp);
+  tpl.startHour=dw.startHour; tpl.endHour=dw.endHour; tpl.increment=dw.increment;
   await saveLocal("plans",tpl);
   dp.edited=false; await saveLocal("dayplans",dp);
   await renderPlanPageUI();
@@ -4088,9 +4102,11 @@ async function resetTodayToTemplate(){
   const dp=planState.today; if(!dp||!dp.planId) return;
   if(!await uiConfirm("Discard today's edits and reload it from its template?")) return;
   const src=(planState.plans||[]).find(p=>p.id===dp.planId); if(!src) return;
+  const w2=planWindow(src);
   const fresh={ id:dayPlanKey(dp.date), profileId:state.profileId, date:dp.date,
                 planId:src.id, planName:src.name,
-                schedule:JSON.parse(JSON.stringify(src.schedule||{})), edited:false };
+                schedule:JSON.parse(JSON.stringify(src.schedule||{})), edited:false,
+                startHour:w2.startHour, endHour:w2.endHour, increment:w2.increment };
   await saveLocal("dayplans",fresh);
   planState.today=fresh;
   await renderPlanPageUI();
@@ -4146,7 +4162,11 @@ async function renderPlanPageUI(){
   if(planState.selectedPlanIdx>=planState.plans.length) planState.selectedPlanIdx=0;
 
   const isMobile=window.innerWidth<768;
-  const startHour=planState.startHour||8, endHour=planState.endHour||18, increment=planState.increment||30;
+  /* Whatever is on screen supplies the window, so a template with an early
+     start draws an early grid without touching any other template. */
+  const winRec=planState.mode==="today"?planState.today:planState.plans[planState.selectedPlanIdx];
+  const pw=applyPlanWindow(winRec);
+  const startHour=pw.startHour, endHour=pw.endHour, increment=pw.increment;
   const hours=[];
   for(let h=startHour;h<endHour;h++){
     for(let m=0;m<60;m+=increment){
@@ -4224,6 +4244,25 @@ async function renderPlanPageUI(){
     html+=`</div></div>`;
   }
 
+  const hourOpt=(sel,from,to)=>{let o="";for(let h=from;h<=to;h++){
+    const hr=h%12||12, ap=h<12?"AM":"PM", lbl=(h===24?"12 AM":hr+" "+ap);
+    o+='<option value="'+h+'"'+(h===sel?" selected":"")+'>'+lbl+'</option>';}return o;};
+  const incrOpt=sel=>[15,30,60].map(v=>'<option value="'+v+'"'+(v===sel?" selected":"")+'>'+v+' min</option>').join("");
+  const winSelCss="width:100%;margin-top:4px;padding:8px;background:var(--field);border:1px solid var(--line);color:var(--ink);border-radius:6px;font-size:16px";
+  html+='<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px">'+
+    '<label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Day window</label>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Starts'+
+        '<select id="planWinStart" style="'+winSelCss+'">'+hourOpt(startHour,0,23)+'</select></label>'+
+      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Ends'+
+        '<select id="planWinEnd" style="'+winSelCss+'">'+hourOpt(endHour,1,24)+'</select></label>'+
+      '<label style="flex:1;min-width:104px;font-size:12px;color:var(--ink2)">Slot'+
+        '<select id="planWinIncr" style="'+winSelCss+'">'+incrOpt(increment)+'</select></label>'+
+    '</div>'+
+    '<div class="hint" style="margin-top:8px">'+
+      (isToday?"Applies to today only.":"Saved on this template, so each day can run to its own hours.")+
+    '</div></div>';
+
   html+=`<div><label style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Channels &mdash; drag onto a slot, or tap a slot</label>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px">`;
   (state.channels||[]).filter(c=>!c.archived&&!c.parentChannelId).forEach(ch=>{
@@ -4232,6 +4271,24 @@ async function renderPlanPageUI(){
   html+=`</div></div></div>`;
 
   stage.innerHTML=html;
+
+  /* Written straight onto the record being edited - the template, or today's
+     materialised day - then re-rendered so the grid redraws at the new size. */
+  const winTargets={planWinStart:"startHour",planWinEnd:"endHour",planWinIncr:"increment"};
+  Object.keys(winTargets).forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.addEventListener("change",async e=>{
+      const rec=planState.mode==="today"?planState.today:planState.plans[planState.selectedPlanIdx];
+      if(!rec) return;
+      rec[winTargets[id]]=parseInt(e.target.value,10);
+      const w=planWindow(rec);
+      rec.startHour=w.startHour; rec.endHour=w.endHour; rec.increment=w.increment;
+      if(planState.mode==="today"){ rec.edited=true; await saveLocal("dayplans",rec); }
+      else await saveLocal("plans",rec);
+      await renderPlanPageUI();
+    });
+  });
 
   const applySel=document.getElementById("applyTplSelect");
   if(applySel) applySel.addEventListener("change",syncApplyTodayBtn);
@@ -4316,7 +4373,7 @@ let adhDate=null, adhOrigStage=null;
    close the tracker back into the tracker - the trap the Summary hit. */
 async function openPlanAdherence(dk){const stage=document.querySelector('.app .stage');/* Tapping Tracker while already on Tracker must not capture the tracker as the thing Home returns to - the same trap openCombinedSummary() hit. */if(!document.getElementById("adhTime")||adhOrigStage===null) adhOrigStage=stage.innerHTML;adhDate=dk||todayKey();await renderPlanAdherence();}
 function adhGoto(dk){adhDate=dk;renderPlanAdherence();}
-async function renderPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=adhOrigStage;const today=adhDate;const dayKey=adhDate;let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const _ad=new Date(dayStartTs(dayKey));const dayName=_ad.toLocaleDateString('en-US',{weekday:'short'});const dateStr=_ad.toLocaleDateString('en-US',{month:'short',day:'numeric'});const isAdhToday=dayKey===todayKey();const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0"><button class="btn sm" id="adhPrev">&lsaquo;</button><input type="date" id="adhDateInput" value="${dayKey}" style="font-size:16px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:6px 8px"><button class="btn sm" id="adhNext">&rsaquo;</button><div style="font-size:12px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px">${dayName}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} &mdash; Adherence</h2></div><div style="display:flex;align-items:center;gap:8px;margin-left:auto"><button class="btn sm${isAdhToday?'':' pri'}" id="adhToday"${isAdhToday?' disabled style="opacity:.4"':''}>Today</button><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",()=>openDayEditor(adhDate));}const ap=document.getElementById("adhPrev");if(ap)ap.addEventListener("click",()=>adhGoto(shiftDateKey(dayKey,-1)));const an=document.getElementById("adhNext");if(an)an.addEventListener("click",()=>adhGoto(shiftDateKey(dayKey,1)));const ai=document.getElementById("adhDateInput");if(ai)ai.addEventListener("change",()=>{if(ai.value)adhGoto(ai.value);});const at=document.getElementById("adhToday");if(at)at.addEventListener("click",()=>adhGoto(todayKey()));const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));renderAdheranceComparison(plan,today,sessions);}/* ===== daily scoring =====
+async function renderPlanAdherence(){const app=document.querySelector('.app');const stage=app.querySelector('.stage');const origStage=adhOrigStage;const today=adhDate;const dayKey=adhDate;let plan=null;const dayRec=await idbGet("dayplans",state.profileId+"|"+dayKey);if(dayRec&&dayRec.schedule){ plan={name:(dayRec.planName||"Today")+(dayRec.edited?" (edited)":""),schedule:dayRec.schedule}; }else{ const selPlan=await idbGet("selected_plan",dayKey);if(selPlan&&selPlan.planId&&selPlan.profileId===state.profileId){const plans=await idbAll("plans","profile",IDBKeyRange.only(state.profileId));plan=plans.find(p=>p.id===selPlan.planId)||null;} }const _ad=new Date(dayStartTs(dayKey));const dayName=_ad.toLocaleDateString('en-US',{weekday:'short'});const dateStr=_ad.toLocaleDateString('en-US',{month:'short',day:'numeric'});const isAdhToday=dayKey===todayKey();const planName=plan?plan.name:'No Plan';stage.innerHTML=`<div style="display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--glass)"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0"><button class="btn sm" id="adhPrev">&lsaquo;</button><input type="date" id="adhDateInput" value="${dayKey}" style="font-size:16px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:6px 8px"><button class="btn sm" id="adhNext">&rsaquo;</button><div style="font-size:12px;font-weight:800;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px">${dayName}</div><h2 style="margin:0;font-size:14px;font-weight:700">${planName} &mdash; Adherence</h2></div><div style="display:flex;align-items:center;gap:8px;margin-left:auto"><button class="btn sm${isAdhToday?'':' pri'}" id="adhToday"${isAdhToday?' disabled style="opacity:.4"':''}>Today</button><button class="btn pri" id="trackerEditBtn" style="padding:8px 14px;font-weight:700">Edit Sessions</button></div></div><div style="display:flex;flex-direction:column"><div style="display:grid;grid-template-columns:60px 1fr 1fr 80px;gap:0;background:var(--bg);border:1px solid var(--line);height:auto"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel2);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Time</div><div id="adhTime"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Planned</div><div id="adhPlan"></div></div><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Actual</div><div id="adhActual"></div></div><div style="display:flex;flex-direction:column;flex:0 0 auto"><div style="padding:6px 8px;background:var(--panel2);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--line);flex-shrink:0;min-height:32px;display:flex;align-items:center;justify-content:center">Match</div><div id="adhMatch"></div></div></div></div></div><div id="trackerFooter" style="padding:12px;background:var(--panel2);border-top:1px solid var(--line);font-size:13px;font-weight:700;text-align:center;color:var(--ink)"></div></div>`;window.closePlanAdherence=()=>{stage.innerHTML=origStage;renderGrid();};const editBtn=document.getElementById("trackerEditBtn");if(editBtn){editBtn.addEventListener("click",()=>openDayEditor(adhDate));}const ap=document.getElementById("adhPrev");if(ap)ap.addEventListener("click",()=>adhGoto(shiftDateKey(dayKey,-1)));const an=document.getElementById("adhNext");if(an)an.addEventListener("click",()=>adhGoto(shiftDateKey(dayKey,1)));const ai=document.getElementById("adhDateInput");if(ai)ai.addEventListener("change",()=>{if(ai.value)adhGoto(ai.value);});const at=document.getElementById("adhToday");if(at)at.addEventListener("click",()=>adhGoto(todayKey()));const sessions=await idbAll("sessions","profile",IDBKeyRange.only(state.profileId));/* The grid must match this day's own hours, not whatever the Plan page last drew. */applyPlanWindow(dayRec);renderAdheranceComparison(plan,today,sessions);}/* ===== daily scoring =====
    Two independent measures, because they answer different questions:
 
      Timing  - did you do the planned channel in the planned block.
