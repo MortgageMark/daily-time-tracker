@@ -1502,6 +1502,30 @@ anywhere, and would be a real risk - close the tab before hitting a "Save"
 that was actually decorative and a user would reasonably conclude they'd
 lost their change, when they had not.
 
+### Bottombar goes responsive: 4 on phone, all 6 on tablet/desktop, still v24
+
+More existed purely because a phone-width bar can't fit six labeled
+buttons - it was never the ideal, just the tradeoff. Once there's room,
+there's no reason to keep the extra tap.
+
+Added three more permanent buttons to the bar - `btnWeek`/`btnStats`/
+`btnChannels` - visible only at `min-width:640px` (this file's existing
+mobile breakpoint, reused rather than adding a second, inconsistent one).
+Below it they're `display:none` and `btnMore` takes their place, exactly
+as before; above it `btnMore` is the one hidden. Both button sets and
+their listeners exist in the DOM/JS at all times - CSS alone decides which
+set is visible, so there's no JS breakpoint-detection, no re-wiring on
+resize, and the More popup logic is untouched, just unreachable above
+640px because its only trigger is hidden.
+
+Verified: all 3 script blocks parse; scripted checks at 375px (phone) show
+Dashboard/Plan/Tracker/More with Week/Stats/Channels hidden, and More's
+popup still opens correctly; at desktop width all six show and More is
+hidden, and clicking each of the three new direct buttons calls the right
+function with the right arguments - zero errors either width. No
+duplicate top-level function declarations beyond the pre-existing
+documented one.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
