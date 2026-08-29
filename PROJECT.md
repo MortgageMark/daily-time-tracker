@@ -1540,6 +1540,49 @@ stays as the floor. Verified: all three script blocks parse; all six
 buttons measure identically at desktop width, all four measure identically
 at phone width.
 
+### Three small fixes: header wrapping x2, and Perfect Week's missing weekends, still v24
+
+- **Week and Tracker headers** split the prev/next arrows onto two rows on
+  a phone-width screen once the text between them did not fit. Week's
+  range label was word-form ("Aug 24 - Aug 30, 2026"); now numeric ("8/24
+  - 8/30/26"), and both headers wrap `[prev][date][next]` in their own
+  `flex-wrap:nowrap` group so the arrows can never separate from what is
+  between them regardless of text length in the future either - the
+  day-name/title text wraps onto its own line below instead.
+- **Perfect Week's Saturday and Sunday had no template** for any profile
+  created before Perfect Week existed - the original seed in `loadPlans()`
+  only ever created Monday-Friday plus "Custom". `backfillAssignedWeekdays()`
+  (already run every time Plan loads) now creates a blank, ordinarily-
+  editable template named after the day for whichever weekday is still
+  unclaimed after its existing name-match pass - self-healing on the next
+  visit, no migration needed, and it is a ordinary plan afterward: rename
+  it, reassign a different template to that day, or delete it, same as
+  any other.
+
+Verified: all 3 script blocks parse; a seeded profile carrying the old
+five-plan default set (no Saturday/Sunday) came out of `loadPlans()` with
+both created and correctly assigned, reloading did not duplicate them,
+Perfect Week drew real editable slot grids for both, and reassigning
+Saturday to an existing template worked exactly like reassigning any other
+day. Both headers keep their prev/next arrows on one row at phone width -
+zero console/window errors throughout.
+
+**Process note, not a code change:** cleanup after testing this session
+had been local-only (`idbGet`/`idbPut` deletes against this dev tab's
+IndexedDB). That is not enough - `saveLocal()` marks every record dirty and
+schedules a real sync push, so profiles/channels/sessions created while
+testing against a signed-in session land in the real Supabase tables, and
+the periodic pull brings them right back into IndexedDB after a purely
+local delete. Four synthetic profiles (`test-profile-1`, `import-test-
+profile`, `final-review-profile`, `hdrfix-profile`, none of them Mark's -
+all obviously hand-picked ids, not `uid()` output) had accumulated in
+production across the session this way and were found and removed
+directly from Supabase while writing this section - verified against both
+Supabase and the local store afterward, four real profiles (My Time,
+Regional, Personal, Me) confirmed untouched. Going forward, testing
+against a signed-in session needs a Supabase-side cleanup pass too, not
+just local IndexedDB deletes.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
