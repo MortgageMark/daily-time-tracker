@@ -1211,6 +1211,21 @@ square around just the icon - not the date text, which Mark asked to leave
 alone - reads as an icon button on its own, the way the rest of the app's
 controls do.
 
+### Day Editor: two columns, notes inline, still v24
+
+`buildTimeline()` now returns a grid of two siblings sharing one clock: the
+existing `#tlWrap` timeline unchanged on the left (`1.5fr`), a `note` input per
+block on the right (`1fr`), each positioned with the same `tlY()` math as its
+block so the rows line up exactly. Editing a note no longer requires opening
+the block sheet - type in the row, blur, saved. The sheet still has its own
+note field too; both write the same `sessions.note`.
+
+Same `h>=24` cutoff the block label already uses gates whether a row gets an
+input at all - below that a 16px input has nowhere to go without swallowing
+the next row, and 16px is non-negotiable on iOS (Landmines: text inputs zoom
+the page below that). Zoom in for notes on a crowded block, same answer as
+everywhere else on this screen.
+
 ---
 
 *Written 2026-08-26 by Claude (Opus 5) after the v1–v3 session.*
