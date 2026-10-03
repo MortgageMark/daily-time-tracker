@@ -104,7 +104,7 @@
   .profile-btn .av{width:26px;height:26px;border-radius:50%; display:grid; place-items:center; font-size:12px; color:#fff; font-weight:800}
   .sync{display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:700; padding:6px 11px; border-radius:999px; border:1px solid var(--line)}
   .sync .d{width:8px;height:8px;border-radius:50%}
-  .sync.synced .d{background:var(--good)} .sync.syncing .d{background:var(--accent); animation:pulse 1s infinite} .sync.offline .d{background:var(--warn)} .sync.pending .d{background:var(--warn)}
+  .sync.synced .d{background:var(--good)} .sync.syncing .d{background:var(--accent); animation:pulse 1s infinite} .sync.offline .d{background:var(--warn)} .sync.pending .d{background:var(--warn)} .sync.error .d,.sync.auth .d{background:var(--bad)} .sync{cursor:pointer;white-space:nowrap} .sync.error,.sync.auth{border-color:var(--bad)} .sync.offline,.sync.pending{border-color:var(--warn)} @media(max-width:599px){.sync{padding:5px 9px;font-size:11px;gap:5px}}
 
   .stage{flex:1; overflow:auto; padding:20px}
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--tile-min),1fr)); gap:16px; max-width:1500px; margin:0 auto; position:relative; min-height:400px}
@@ -383,7 +383,7 @@
       <div id="topStatus" class="status-pill idle" style="cursor:pointer"><span class="d"></span><span id="topStatusTxt">Idle</span></div>
     </div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
-      <div class="sync offline" id="syncPill" style="display:none;@media(min-width:600px){display:flex;}"><span class="d"></span><span id="syncTxt">Connecting…</span></div>
+      <div class="sync offline" id="syncPill" role="button" tabindex="0" title="Tap to sync now"><span class="d"></span><span id="syncTxt">Connecting…</span></div>
       <button id="avatarBtn" style="width:36px;height:36px;border-radius:50%;background:var(--accent);color:white;border:none;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center"></button>
     </div>
   </div>
@@ -728,9 +728,35 @@ async function saveLocal(store,rec,dirty=true){ if(dirty){rec._dirty=true; rec._
    SYNC ENGINE  (local-first; durable dirty-flag outbox in IndexedDB)
    ===================================================================== */
 let syncState="offline", syncTimer=null, pulling=false;
-function setSync(s,n){ syncState=s; const pill=document.getElementById("syncPill"),txt=document.getElementById("syncTxt");const isMobile=window.innerWidth<600;
-  pill.className="sync "+s; const map={synced:"Synced",syncing:"Syncing…",offline:"Offline — saved here",pending:(n||"")+" pending"}; txt.textContent=isMobile?"":map[s]||s; updatePendingCount(); }
-async function updatePendingCount(){ const cnt=document.getElementById("pendingCount"); if(!cnt)return; const dirty=await dirtyRecords(); const num=dirty.length; cnt.textContent=num?"●"+num+' pending':'Synced'; }
+let lastSyncAt=0, lastSyncError="";
+function setSync(s,n,detail){
+  syncState=s;
+  if(s==="synced"){ lastSyncAt=now(); lastSyncError=""; }
+  if(detail!==undefined) lastSyncError=detail||"";
+  renderSyncPill();
+}
+/* The pill is the single place that says whether this device is safe: online or
+   not, signed in or not, and how many edits have not reached the cloud yet. */
+async function renderSyncPill(){
+  const pill=document.getElementById("syncPill"),txt=document.getElementById("syncTxt");
+  if(!pill||!txt) return;
+  let num=0; try{ num=(await dirtyRecords()).length; }catch(e){}
+  const s=syncState, unsynced=num?(num+" unsynced"):"";
+  const map={
+    synced:"Synced", syncing:"Syncing\u2026",
+    offline:"Offline"+(unsynced?" \u00b7 "+unsynced:""),
+    pending:(num||"")+" pending",
+    error:"Sync problem"+(unsynced?" \u00b7 "+unsynced:""),
+    auth:"Sign in to sync"+(unsynced?" \u00b7 "+unsynced:"")
+  };
+  pill.className="sync "+s;
+  txt.textContent=map[s]||s;
+  let tip=lastSyncAt?("Last synced "+new Date(lastSyncAt).toLocaleTimeString()):"Not synced yet this session";
+  if(lastSyncError) tip=lastSyncError+"\n"+tip;
+  pill.title=tip+"\nTap to sync now";
+  updatePendingCount();
+}
+async function updatePendingCount(){ const cnt=document.getElementById("pendingCount"); if(!cnt)return; const dirty=await dirtyRecords(); const num=dirty.length; cnt.textContent=num?"\u25cf"+num+' pending':'Synced'; }
 
 function toRow(store,r){
   if(store==="profiles")return {id:r.id,name:r.name,hour_fmt:r.hourFmt||"12",confirm_end:(r.confirmEnd!=="0")};
@@ -894,11 +920,19 @@ async function refreshFromCloud(){
   location.reload();
 }
 
+let syncRunning=false;
 async function runSync(){
+  if(syncRunning) return;
+  syncRunning=true;
+  try{ await runSyncInner(); }
+  catch(e){ console.warn("sync failed",e); setSync("error",null,String((e&&e.message)||e)); }
+  finally{ syncRunning=false; }
+}
+async function runSyncInner(){
   if(!db){ return; }   /* 15s timer can fire before openDB() resolves */
   if(!navigator.onLine){ setSync("offline"); return; }
   const { data:sess } = await SB.auth.getSession();
-  if(!sess || !sess.session){ setSync("offline"); return; }
+  if(!sess || !sess.session){ setSync("auth"); return; }
   const dirty=await dirtyRecords();
   if(dirty.length) setSync("syncing"); else if(syncState!=="synced") setSync("syncing");
 
@@ -937,7 +971,8 @@ async function runSync(){
       staleConflictAsked=false;
     }
   }
-  // PUSH
+  // PUSH - one bad record must not hold back the rest, so failures are collected
+  let pushFailed=0, firstPushError="";
   for(const {store,rec} of dirty){
     if(tableSkipped(store)) continue;
     try{
@@ -950,7 +985,7 @@ async function runSync(){
       if(error) throw error;
       rec._dirty=false; if(data&&data.updated_at) rec._u=Date.parse(data.updated_at);
       await idbPut(store,rec);
-    }catch(e){ console.warn("push failed",store,rec.id,e.message||e); setSync("pending",(await dirtyRecords()).length); return; }
+    }catch(e){ console.warn("push failed",store,rec.id,e.message||e); pushFailed++; if(!firstPushError) firstPushError=store+": "+(e.message||e); }
   }
   // PULL
   await pullRemote();
@@ -961,7 +996,8 @@ async function runSync(){
     toast("Two timers were running on different devices — kept "+merged.kept);
   }
   const rem=(await dirtyRecords()).length;
-  setSync(rem?"pending":"synced", rem);
+  if(pushFailed) setSync("error",rem,firstPushError);
+  else setSync(rem?"pending":"synced", rem, "");
 }
 
 async function pullRemote(){
@@ -5356,9 +5392,19 @@ async function enterApp(){
 
 /* ===== sync triggers ===== */
 window.addEventListener("online",()=>{toast("Back online");runSync();});
-window.addEventListener("offline",()=>setSync("offline"));
+window.addEventListener("offline",()=>{ setSync("offline"); toast("You're offline - changes are saved on this device"); });
+{ const pill=document.getElementById("syncPill");
+  if(pill){ const go=()=>{ if(!navigator.onLine){ toast("Offline - will sync when you're back online"); setSync("offline"); return; } toast("Syncing\u2026"); runSync(); };
+    pill.addEventListener("click",e=>{ e.stopPropagation(); go(); });
+    pill.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } }); } }
 setInterval(()=>{ if(navigator.onLine) runSync(); },15000); // periodic push+pull
-document.addEventListener("visibilitychange",()=>{if(!document.hidden){renderGrid();updateStatus();if(navigator.onLine)runSync();}});
+document.addEventListener("visibilitychange",()=>{
+  /* Leaving the app (switching to another device's turn, locking the screen):
+     push right now rather than waiting for the next 15s tick. */
+  if(document.hidden){ if(navigator.onLine) runSync(); return; }
+  renderGrid();updateStatus();if(navigator.onLine)runSync();
+});
+window.addEventListener("pagehide",()=>{ if(navigator.onLine) runSync(); });
 
 /* ===== boot ===== */
 function hashParam(h,k){
