@@ -863,7 +863,6 @@ function scheduleSync(){ if(syncTimer)return; syncTimer=setTimeout(()=>{syncTime
    conflict. A genuinely dormant device is days or weeks stale - nowhere near
    this line. */
 const STALE_CONFLICT_MS=5*60*1000;
-let staleConflictAsked=false;
 
 async function remoteUpdatedAt(store,ids){
   const map={};
@@ -906,6 +905,16 @@ async function discardLocalEdits(items){
   }
 }
 
+/* Safety net for automatic conflict resolution: the local copy that lost is
+   stored (newest 200 kept) under meta "replacedEdits" rather than dropped. */
+async function logReplacedEdits(items){
+  try{
+    const cur=await idbGet("meta","replacedEdits");
+    const list=((cur&&cur.v)||[]).concat(items.map(({store,rec})=>({at:now(),store,rec})));
+    await idbPut("meta",{k:"replacedEdits",v:list.slice(-200)});
+  }catch(e){ console.warn("could not log replaced edits",e); }
+}
+
 /* Replaces everything on this device with the cloud copy. The safe way to
    reset a stale browser: sign-out cannot do this job because it syncs first,
    which is the very push being avoided. */
@@ -936,39 +945,19 @@ async function runSyncInner(){
   const dirty=await dirtyRecords();
   if(dirty.length) setSync("syncing"); else if(syncState!=="synced") setSync("syncing");
 
-  /* Never let an out-of-date device silently overwrite newer data. */
+  /* Never let an out-of-date device overwrite newer data - and never ask.
+     Where the cloud copy of a record is newer than this device's edit, the
+     newer one wins (the cloud's, usually written on the other device). The
+     replaced local copy is kept in a recoverable log, so nothing is lost
+     even in the rare case the older edit was the one that mattered. */
   if(dirty.length){
     const stale=await findStaleConflicts(dirty);
     if(stale.length){
-      if(staleConflictAsked){ setSync("pending",dirty.length); return; }
-      staleConflictAsked=true;
-      const stamps=stale.map(d=>d.rec._u||0).filter(Boolean);
-      const when=stamps.length?new Date(Math.min.apply(null,stamps)).toLocaleString():"an unknown date";
-      const choice=await uiChoice({
-        title:"This device is out of date",
-        message:"This browser has "+stale.length+" change(s) last edited around "+when+
-                ", but newer versions of the same records are already in the cloud.\n\n"+
-                "Uploading them would overwrite that newer data everywhere.",
-        choices:[
-          {label:"Use the cloud version",value:"cloud"},
-          {label:"Decide later",value:"later"},
-          {label:"Upload this device anyway",value:"local",danger:true}
-        ]
-      });
-      if(choice==="cloud"){
-        await discardLocalEdits(stale);
-        await pullRemote();
-        staleConflictAsked=false;
-        const left=(await dirtyRecords()).length;
-        setSync(left?"pending":"synced",left);
-        toast("Using the cloud version");
-        return;
-      }
-      if(choice!=="local"){ setSync("pending",dirty.length); return; }
-      /* "Upload anyway": restamp so these rows legitimately win, rather than
-         pushing them with a timestamp that will look stale again next sync. */
-      for(const {store,rec} of stale){ rec._u=now(); await idbPut(store,rec); }
-      staleConflictAsked=false;
+      await logReplacedEdits(stale);
+      await discardLocalEdits(stale);
+      await pullRemote();
+      toast("Another device had newer changes - kept those");
+      return runSyncInner();   /* push whatever is still genuinely ours */
     }
   }
   // PUSH - one bad record must not hold back the rest, so failures are collected
