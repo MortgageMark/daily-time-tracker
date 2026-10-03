@@ -1671,6 +1671,15 @@ async function renderDayEditor(){
     });
     grp.appendChild(zwrap);
   }
+  if(!isFuture){
+    const fb=document.createElement("button");
+    fb.className="btn sm"+(tlFullDay?" pri":"");
+    fb.style.cssText="padding:5px 8px;font-size:12px;flex:none";
+    fb.textContent="24h";
+    fb.title=tlFullDay?"Showing the whole day - tap to return to the working day":"Show the whole day, midnight to midnight";
+    fb.addEventListener("click",()=>{ tlFullDay=!tlFullDay; renderDayEditor(); });
+    grp.appendChild(fb);
+  }
   head.appendChild(grp);
   head.appendChild(todayBtn);
   root.appendChild(head);
@@ -1810,6 +1819,9 @@ const TL_EDGE_ADD_MS=3600000;  /* most a + adds beyond the first or last block *
 const TL_PAD=34;               /* rail headroom, so an edge + is never clipped */
 
 let tlRangeCur=null, tlSessions=[], tlFmt=null, tlDk=null;
+/* "24h": draw the whole day, so time before the planned start (or after its end)
+   can be added and dragged to. Remembered for the session only. */
+let tlFullDay=false;
 /* A finger down on a block before it is known to be a tap or a drag. */
 let tlPress=null;
 
@@ -1824,6 +1836,7 @@ function tlRange(dk,sess){
     s=Math.min(s,a.getHours());
     e=Math.max(e,b.getHours()+((b.getMinutes()||b.getSeconds())?1:0));
   });
+  if(tlFullDay){ s=0; e=24; }
   s=Math.max(0,Math.min(s,23));
   e=Math.min(24,Math.max(e,s+4));
   const base=dayStartTs(dk);
@@ -2103,7 +2116,7 @@ function buildTimeline(dk,sess,fmt){
       wrap.appendChild(tlEdgeAdd(dk,le,Math.min(nowCap,le+TL_EDGE_ADD_MS),tlY(le)+6,"Add time after "+fmtClock(le,fmt)));
     }
   } else {
-    const st=Math.max(dayLo,tlRangeCur.startTs), en=Math.min(nowCap,st+TL_EDGE_ADD_MS);
+    const st=Math.max(dayLo,tlRangeCur.startTs,dayLo+planState.startHour*3600000), en=Math.min(nowCap,st+TL_EDGE_ADD_MS);
     if(en>st) wrap.appendChild(tlEdgeAdd(dk,st,en,tlY(st)+6,"Add time"));
   }
 
@@ -2527,7 +2540,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=26;
+const APP_RELEASE=27;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
