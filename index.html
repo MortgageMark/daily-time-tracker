@@ -695,6 +695,16 @@ function idbGet(s,k){return new Promise((res,rej)=>{
 /* ===== helpers ===== */
 const uid=()=>(Date.now().toString(36)+Math.random().toString(36).slice(2,9));
 const now=()=>Date.now();
+/* Edit stamps (_u) are compared with the server's updated_at, so they use the
+   device clock corrected by the measured offset to the server clock. Session
+   start/end times the user sees still use the plain device clock. */
+let clockOffset=0, clockOffsetRtt=Infinity, clockOffsetKnown=false;
+const syncNow=()=>Date.now()+clockOffset;
+function noteServerTime(serverMs,t0,t1){
+  if(!serverMs||!isFinite(serverMs)) return;
+  const rtt=t1-t0; if(rtt<0||rtt>=clockOffsetRtt+250&&clockOffsetKnown) return;   /* keep the most precise sample */
+  if(rtt<=clockOffsetRtt){ clockOffset=serverMs-(t0+t1)/2; clockOffsetRtt=rtt; clockOffsetKnown=true; }
+}
 function pad(n){return String(n).padStart(2,"0");}
 function fmtDur(ms){if(ms<0)ms=0;const s=Math.floor(ms/1000);return Math.floor(s/3600)+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60);}
 function fmtDurShort(ms){const s=Math.floor(ms/1000);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h>0?h+"h "+pad(m)+"m":m+"m";}
@@ -722,7 +732,7 @@ let state={profileId:null,profiles:[],channels:[],profile:null};
 let running=null, undoStack=[], editingChanId=null, editingParentId=null;
 
 /* ===== local writes (mark dirty for sync) ===== */
-async function saveLocal(store,rec,dirty=true){ if(dirty){rec._dirty=true; rec._u=now();} await idbPut(store,rec); if(dirty) scheduleSync(); return rec; }
+async function saveLocal(store,rec,dirty=true){ if(dirty){rec._dirty=true; rec._u=syncNow();} await idbPut(store,rec); if(dirty) scheduleSync(); return rec; }
 
 /* =====================================================================
    SYNC ENGINE  (local-first; durable dirty-flag outbox in IndexedDB)
@@ -862,7 +872,9 @@ function scheduleSync(){ if(syncTimer)return; syncTimer=setTimeout(()=>{syncTime
    updated_at from the server's, so a few minutes of skew must never read as a
    conflict. A genuinely dormant device is days or weeks stale - nowhere near
    this line. */
-const STALE_CONFLICT_MS=5*60*1000;
+const STALE_CONFLICT_MS_UNSYNCED_CLOCK=5*60*1000;   /* clock offset not measured yet: allow generous skew */
+const STALE_CONFLICT_MS_SYNCED_CLOCK=15*1000;       /* offset measured: only real conflicts */
+const staleConflictMs=()=>clockOffsetKnown?STALE_CONFLICT_MS_SYNCED_CLOCK:STALE_CONFLICT_MS_UNSYNCED_CLOCK;
 
 async function remoteUpdatedAt(store,ids){
   const map={};
@@ -890,7 +902,7 @@ async function findStaleConflicts(dirty){
     recs.forEach(d=>{
       const remote=map[d.rec.id];
       if(remote===undefined) return;               /* not on the server yet - a genuine new row */
-      if(remote-(d.rec._u||0) > STALE_CONFLICT_MS) out.push(d);
+      if(remote-(d.rec._u||0) > staleConflictMs()) out.push(d);
     });
   }
   return out;
@@ -929,14 +941,19 @@ async function refreshFromCloud(){
   location.reload();
 }
 
-let syncRunning=false;
-async function runSync(){
-  if(syncRunning) return;
-  syncRunning=true;
-  try{ await runSyncInner(); }
-  catch(e){ console.warn("sync failed",e); setSync("error",null,String((e&&e.message)||e)); }
-  finally{ syncRunning=false; }
+let syncInflight=null, forceFullNext=false;
+function runSync(){
+  if(syncInflight) return syncInflight;
+  syncInflight=(async()=>{
+    try{ await runSyncInner(); return true; }
+    catch(e){ console.warn("sync failed",e); setSync("error",null,String((e&&e.message)||e)); return false; }
+    finally{ syncInflight=null; }
+  })();
+  return syncInflight;
 }
+/* A sync that is guaranteed to START now - one already in flight may have
+   pulled before the latest change on the other device. */
+async function syncFresh(){ if(syncInflight) await syncInflight; return runSync(); }
 async function runSyncInner(){
   if(!db){ return; }   /* 15s timer can fire before openDB() resolves */
   if(!navigator.onLine){ setSync("offline"); return; }
@@ -955,7 +972,7 @@ async function runSyncInner(){
     if(stale.length){
       await logReplacedEdits(stale);
       await discardLocalEdits(stale);
-      await pullRemote();
+      await pullRemote(true);
       toast("Another device had newer changes - kept those");
       return runSyncInner();   /* push whatever is still genuinely ours */
     }
@@ -965,7 +982,9 @@ async function runSyncInner(){
   for(const {store,rec} of dirty){
     if(tableSkipped(store)) continue;
     try{
+      const t0=Date.now();
       let { data, error } = await SB.from(store).upsert(rowForPush(store,rec)).select().single();
+      if(data&&data.updated_at) noteServerTime(Date.parse(data.updated_at),t0,Date.now());
       if(isMissingTable(error)){ noteMissingTable(store,error); continue; }
       if(isMissingColumn(error)&&OPTIONAL_COLUMNS[store]&&!columnsSkipped(store)){
         noteMissingColumn(store);
@@ -976,8 +995,9 @@ async function runSyncInner(){
       await idbPut(store,rec);
     }catch(e){ console.warn("push failed",store,rec.id,e.message||e); pushFailed++; if(!firstPushError) firstPushError=store+": "+(e.message||e); }
   }
-  // PULL
-  await pullRemote();
+  // PULL (a catch-up always re-reads everything, never just the recent changes)
+  const wantFull=forceFullNext; forceFullNext=false;
+  await pullRemote(wantFull);
   /* A pull is exactly when the other device's open session shows up. */
   const merged=await reconcileMultipleOpen();
   if(merged){
@@ -989,24 +1009,39 @@ async function runSyncInner(){
   else setSync(rem?"pending":"synced", rem, "");
 }
 
-async function pullRemote(){
-  if(pulling) return; pulling=true;
+const lastPullMs={}; let pullCount=0;
+const PULL_OVERLAP_MS=2*60*1000, FULL_PULL_EVERY=20;
+async function pullRemote(forceFull){
+  if(pulling) return false; pulling=true;
+  let ok=false;
   try{
+    pullCount++;
+    const full=!!forceFull||pullCount%FULL_PULL_EVERY===1;
+    const started={};
     for(const store of syncableStores()){
-      const { data, error } = await SB.from(store).select("*");
+      let q=SB.from(store).select("*");
+      const since=lastPullMs[store];
+      if(!full&&since) q=q.gte("updated_at",new Date(since-PULL_OVERLAP_MS).toISOString());
+      const { data, error } = await q;
       if(isMissingTable(error)){ noteMissingTable(store,error); continue; }
       if(error) throw error;
+      let newest=since||0;
       for(const row of (data||[])){
         const local=await idbGet(store,row.id);
         const remote=fromRow(store,row);
+        if(remote._u>newest) newest=remote._u;
         if(!local){ await idbPut(store,remote); }
         else if(!local._dirty && remote._u >= (local._u||0)){ await idbPut(store,remote); }
       }
+      started[store]=newest;
     }
+    Object.assign(lastPullMs,started);
     // refresh in-memory view
     if(state.profileId){ await reloadFromLocal(); }
+    ok=true;
   }catch(e){ console.warn("pull failed",e.message||e); }
   finally{ pulling=false; }
+  return ok;
 }
 
 /* ===== profile / channel loading ===== */
@@ -5374,24 +5409,55 @@ async function enterApp(){
   const last=await idbGet("meta","lastProfile"); const profs=await idbAll("profiles");
   const pid=(last&&profs.find(p=>p.id===last.v))?last.v:(profs[0]&&profs[0].id);
   if(pid) await loadProfile(pid);
-  setSync("syncing"); runSync();
+  setSync("syncing"); catchUp();
   /* After the app is on screen, and never allowed to break entry. */
   try{ showIntroOnce(); }catch(e){ console.warn("intro failed",e); }
 }
 
 /* ===== sync triggers ===== */
-window.addEventListener("online",()=>{toast("Back online");runSync();});
+/* Catch-up gate. When the app comes back after being away (or opens), the
+   timer buttons are locked behind a short "Catching up" screen until a fresh
+   full pull has landed, so nothing can be tapped against stale state. It only
+   appears if the sync takes more than a moment, gives up after GATE_MAX_MS,
+   and is skipped entirely when offline. */
+const GATE_AWAY_MS=20*1000, GATE_SHOW_AFTER_MS=250, GATE_MAX_MS=10*1000;
+let gateEl=null, gateBusy=false, hiddenAt=0;
+function gateOverlay(on){
+  if(on&&!gateEl){
+    gateEl=document.createElement("div");
+    gateEl.setAttribute("role","status");
+    gateEl.style.cssText="position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);color:#fff;font:700 15px system-ui,sans-serif;backdrop-filter:blur(2px)";
+    gateEl.textContent="Catching up with your other devices\u2026";
+    document.body.appendChild(gateEl);
+  } else if(!on&&gateEl){ gateEl.remove(); gateEl=null; }
+}
+async function catchUp(){
+  if(gateBusy||!db||!navigator.onLine) return;
+  gateBusy=true;
+  const showT=setTimeout(()=>gateOverlay(true),GATE_SHOW_AFTER_MS);
+  try{
+    forceFullNext=true;
+    const done=await Promise.race([
+      syncFresh().then(()=>true),
+      new Promise(r=>setTimeout(()=>r(false),GATE_MAX_MS))
+    ]);
+    if(!done) toast("Still syncing - check the sync indicator");
+  }catch(e){ console.warn("catch-up failed",e); }
+  finally{ clearTimeout(showT); gateOverlay(false); gateBusy=false; }
+}
+window.addEventListener("online",()=>{toast("Back online");catchUp();});
 window.addEventListener("offline",()=>{ setSync("offline"); toast("You're offline - changes are saved on this device"); });
 { const pill=document.getElementById("syncPill");
-  if(pill){ const go=()=>{ if(!navigator.onLine){ toast("Offline - will sync when you're back online"); setSync("offline"); return; } toast("Syncing\u2026"); runSync(); };
+  if(pill){ const go=()=>{ if(!navigator.onLine){ toast("Offline - will sync when you're back online"); setSync("offline"); return; } toast("Syncing\u2026"); syncFresh(); };
     pill.addEventListener("click",e=>{ e.stopPropagation(); go(); });
     pill.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } }); } }
-setInterval(()=>{ if(navigator.onLine) runSync(); },15000); // periodic push+pull
+setInterval(()=>{ if(navigator.onLine&&!document.hidden) runSync(); },8000);   // periodic push+pull while open
 document.addEventListener("visibilitychange",()=>{
-  /* Leaving the app (switching to another device's turn, locking the screen):
-     push right now rather than waiting for the next 15s tick. */
-  if(document.hidden){ if(navigator.onLine) runSync(); return; }
-  renderGrid();updateStatus();if(navigator.onLine)runSync();
+  /* Leaving the app: push right now rather than waiting for the next tick. */
+  if(document.hidden){ hiddenAt=now(); if(navigator.onLine) runSync(); return; }
+  renderGrid();updateStatus();
+  if(!navigator.onLine) return;
+  if(hiddenAt&&now()-hiddenAt>=GATE_AWAY_MS) catchUp(); else runSync();
 });
 window.addEventListener("pagehide",()=>{ if(navigator.onLine) runSync(); });
 
