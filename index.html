@@ -542,6 +542,36 @@ async function createDefaultChannels(profileId){
   }
 }
 
+
+async function createSampleWeek(profileId){
+  const channels=await idbAll("channels","profile",IDBKeyRange.only(profileId));
+  const chMap={};
+  channels.forEach(c=>chMap[c.label]=c.id);
+  
+  const today=new Date();
+  const sampleData=[
+    {day:-6,sessions:[{ch:"Break",start:"7:00",dur:30},{ch:"Sales",start:"7:30",dur:120},{ch:"Email",start:"9:30",dur:45},{ch:"Corporate",start:"10:15",dur:60},{ch:"Sales",start:"11:15",dur:90},{ch:"Break",start:"12:45",dur:60},{ch:"Sales",start:"13:45",dur:120},{ch:"Email",start:"15:45",dur:30},{ch:"Admin",start:"16:15",dur:45}]},
+    {day:-5,sessions:[{ch:"Sales",start:"8:00",dur:150},{ch:"Corporate",start:"10:30",dur:90},{ch:"Sales",start:"12:00",dur:120},{ch:"Break",start:"14:00",dur:30},{ch:"Email",start:"14:30",dur:45},{ch:"Sales",start:"15:15",dur:90}]},
+    {day:-4,sessions:[{ch:"Break",start:"7:30",dur:15},{ch:"Sales",start:"7:45",dur:180},{ch:"Admin",start:"11:45",dur:75},{ch:"Break",start:"13:00",dur:45},{ch:"Marketing",start:"13:45",dur:105},{ch:"Email",start:"15:30",dur:30}]},
+    {day:-3,sessions:[{ch:"Email",start:"8:00",dur:45},{ch:"Sales",start:"8:45",dur:135},{ch:"Corporate",start:"11:00",dur:120},{ch:"Sales",start:"13:00",dur:150},{ch:"Break",start:"15:30",dur:30},{ch:"Marketing",start:"16:00",dur:45}]},
+    {day:-2,sessions:[{ch:"Sales",start:"8:30",dur:160},{ch:"Corporate",start:"11:30",dur:60},{ch:"Break",start:"12:30",dur:60},{ch:"Marketing",start:"13:30",dur:105},{ch:"Email",start:"15:15",dur:30}]},
+    {day:-1,sessions:[{ch:"Break",start:"7:45",dur:20},{ch:"Sales",start:"8:05",dur:175},{ch:"Admin",start:"11:00",dur:90},{ch:"Sales",start:"12:30",dur:120},{ch:"Break",start:"14:30",dur:45},{ch:"Email",start:"15:15",dur:60}]},
+    {day:0,sessions:[{ch:"Sales",start:"8:00",dur:120},{ch:"Email",start:"10:00",dur:30},{ch:"Corporate",start:"10:30",dur:60},{ch:"Marketing",start:"11:30",dur:90}]}
+  ];
+  
+  for(const dayData of sampleData){
+    const d=new Date(today);d.setDate(d.getDate()+dayData.day);
+    const dateStr=d.toISOString().split('T')[0];
+    for(const sess of dayData.sessions){
+      const[h,m]=sess.start.split(':');
+      const startTs=new Date(d).setHours(parseInt(h),parseInt(m),0,0);
+      const endTs=startTs+sess.dur*60*1000;
+      const chId=chMap[sess.ch]||chMap["Sales"];
+      await saveLocal("sessions",{id:uid(),profileId:profileId,channelId:chId,startTs,endTs,durMs:sess.dur*60*1000,date:dateStr});
+    }
+  }
+}
+
 /* ===== IndexedDB ===== */
 const DB_NAME="dtt2", DB_VER=5; let db;
 function ensureObjectStores(){if(!db)return;try{const names=["profiles","channels","sessions","plans","dayplans","meta","selected_plan","day_notes"];for(const name of names){if(!db.objectStoreNames.contains(name)){console.warn(`Object store ${name} missing, incrementing DB version`);closeDatabase();setTimeout(()=>{const r=indexedDB.open(DB_NAME,DB_VER+1);r.onupgradeneeded=e=>{const d=e.target.result;for(const n of names)if(!d.objectStoreNames.contains(n)){const keyPath=n==="selected_plan"||n==="day_notes"?"date":(n==="meta"?"k":"id");d.createObjectStore(n,{keyPath:keyPath});}};r.onsuccess=e=>{db=e.target.result;};},100);return false;}}}catch(e){console.error("Error checking object stores:",e);}return true;}
@@ -1086,6 +1116,7 @@ async function seedIfEmpty(){
   const pid=uid();
   await saveLocal("profiles",{id:pid,name:"Me",hourFmt:"12",confirmEnd:"1"});
   await createDefaultChannels(pid);
+  await createSampleWeek(pid);
   await idbPut("meta",{k:"lastProfile",v:pid});
 }
 
