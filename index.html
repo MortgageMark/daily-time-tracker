@@ -2571,7 +2571,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=28;
+const APP_RELEASE=29;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -2846,21 +2846,15 @@ const IT_DEFAULT={work:60,rest:10,rounds:20};
 function itLoad(){ try{ const c=JSON.parse(localStorage.getItem(IT_KEY)||"null"); if(c&&c.work>0&&c.rest>=0&&c.rounds>0) return c; }catch(e){} return Object.assign({},IT_DEFAULT); }
 function itSave(c){ try{ localStorage.setItem(IT_KEY,JSON.stringify(c)); }catch(e){} }
 
-let itCtx=null, itKeepAlive=null, itWake=null;
+let itCtx=null, itWake=null;
 function itAudioUnlock(){      /* must run inside a tap */
   try{
-    if(navigator.audioSession) navigator.audioSession.type="playback";   /* iPhone: sound even with the silent switch on */
+    /* "ambient" mixes with whatever else is playing (Audible, music) instead of
+       pausing it. A looping <audio> element would take audio focus and cut the
+       other app off, so only Web Audio is used. */
+    if(navigator.audioSession) navigator.audioSession.type="ambient";
     if(!itCtx) itCtx=new (window.AudioContext||window.webkitAudioContext)();
     if(itCtx.state==="suspended") itCtx.resume();
-    if(!itKeepAlive){   /* a silent looping clip keeps the audio session open */
-      const sr=8000, n=sr, buf=new ArrayBuffer(44+n), v=new DataView(buf);
-      const w=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
-      w(0,"RIFF"); v.setUint32(4,36+n,true); w(8,"WAVEfmt "); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
-      v.setUint32(24,sr,true); v.setUint32(28,sr,true); v.setUint16(32,1,true); v.setUint16(34,8,true); w(36,"data"); v.setUint32(40,n,true);
-      for(let i=0;i<n;i++) v.setUint8(44+i,128);
-      itKeepAlive=new Audio(URL.createObjectURL(new Blob([buf],{type:"audio/wav"}))); itKeepAlive.loop=true; itKeepAlive.volume=0.01;
-    }
-    itKeepAlive.play().catch(()=>{});
   }catch(e){ console.warn("interval timer audio",e); }
 }
 function itTone(freq,start,dur,vol){
@@ -2979,7 +2973,6 @@ function openIntervalTimer(){
   document.addEventListener("visibilitychange",onVis);
   $("itClose").addEventListener("click",()=>{
     stop(false); document.removeEventListener("visibilitychange",onVis);
-    if(itKeepAlive) itKeepAlive.pause();
     ov.remove();
   });
   paint();
