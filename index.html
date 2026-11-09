@@ -2571,7 +2571,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=30;
+const APP_RELEASE=31;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -2842,17 +2842,18 @@ function renderMoreMenu(){
    computed from elapsed wall-clock time, never from counting ticks, so a
    throttled or briefly frozen page catches up instead of drifting. */
 const IT_KEY="itConfig";
-const IT_DEFAULT={work:60,rest:10,rounds:20};
-function itLoad(){ try{ const c=JSON.parse(localStorage.getItem(IT_KEY)||"null"); if(c&&c.work>0&&c.rest>=0&&c.rounds>0) return c; }catch(e){} return Object.assign({},IT_DEFAULT); }
+const IT_DEFAULT={work:60,rest:10,rounds:20,mode:"ambient"};
+const IT_MODES={ambient:"Play over the book",transient:"Lower the book briefly",playback:"Pause the book briefly",auto:"Phone default"};
+function itLoad(){ try{ const c=JSON.parse(localStorage.getItem(IT_KEY)||"null"); if(c&&c.work>0&&c.rest>=0&&c.rounds>0){ if(!IT_MODES[c.mode]) c.mode="ambient"; return c; } }catch(e){} return Object.assign({},IT_DEFAULT); }
 function itSave(c){ try{ localStorage.setItem(IT_KEY,JSON.stringify(c)); }catch(e){} }
 
 let itCtx=null, itWake=null;
-function itAudioUnlock(){      /* must run inside a tap */
+function itAudioUnlock(mode){      /* must run inside a tap */
   try{
     /* "ambient" mixes with whatever else is playing (Audible, music) instead of
        pausing it. A looping <audio> element would take audio focus and cut the
        other app off, so only Web Audio is used. */
-    if(navigator.audioSession) navigator.audioSession.type="ambient";
+    if(navigator.audioSession) navigator.audioSession.type=mode||itLoad().mode;
     if(!itCtx||itCtx.state==="closed") itCtx=new (window.AudioContext||window.webkitAudioContext)();
     if(itCtx.state!=="running") itCtx.resume();
   }catch(e){ console.warn("interval timer audio",e); }
@@ -2920,11 +2921,12 @@ function openIntervalTimer(){
       '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--muted)">Work (sec)<input id="itWork" type="number" min="1" inputmode="numeric" style="'+inp+'"></label>'+
       '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--muted)">Rest (sec)<input id="itRest" type="number" min="0" inputmode="numeric" style="'+inp+'"></label>'+
       '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--muted)">Rounds<input id="itRounds" type="number" min="1" inputmode="numeric" style="'+inp+'"></label>'+
+      '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--muted)">Beep mode<select id="itMode" style="'+inp+';width:auto">'+Object.keys(IT_MODES).map(k=>'<option value="'+k+'">'+IT_MODES[k]+'</option>').join("")+'</select></label>'+
     '</div>'+
     '<div style="font-size:12px;color:var(--muted);text-align:center;max-width:340px;margin-top:6px">Keep the screen on - it stays awake while this is running. Turn the volume up.</div>';
   document.body.appendChild(ov);
   const $=id=>ov.querySelector("#"+id);
-  $("itWork").value=cfg.work; $("itRest").value=cfg.rest; $("itRounds").value=cfg.rounds;
+  $("itMode").value=cfg.mode; $("itWork").value=cfg.work; $("itRest").value=cfg.rest; $("itRounds").value=cfg.rounds;
 
   const fmt=ms=>{ const s=Math.ceil(ms/1000); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); };
   const elapsed=()=>banked+(running?Date.now()-startedAt:0);
@@ -2932,6 +2934,7 @@ function openIntervalTimer(){
     cfg.work=Math.max(1,parseInt($("itWork").value)||60);
     cfg.rest=Math.max(0,parseInt($("itRest").value)||0);
     cfg.rounds=Math.max(1,parseInt($("itRounds").value)||1);
+    cfg.mode=$("itMode").value;
     itSave(cfg);
   }
   function paint(){
@@ -2955,10 +2958,10 @@ function openIntervalTimer(){
     paint();
   }
   function start(){
-    readCfg(); itAudioUnlock(); itWakeOn();
+    readCfg(); itAudioUnlock(cfg.mode); itWakeOn();
     if(finished||banked===0){ banked=0; finished=false; lastIdx=-1; itSound("go"); }
     startedAt=Date.now(); running=true; $("itGo").textContent="Pause"; $("itCfg").style.opacity=".4";
-    ["itWork","itRest","itRounds"].forEach(i=>$(i).disabled=true);
+    ["itWork","itRest","itRounds","itMode"].forEach(i=>$(i).disabled=true);
     clearInterval(tick); tick=setInterval(()=>{ onTick(); if(Date.now()%1000<100) itEnsureRunning(); },100); onTick(); audioStatus();
   }
   function stop(done){
@@ -2973,14 +2976,14 @@ function openIntervalTimer(){
     else start();
   });
   const audioStatus=()=>{ $("itAudio").textContent=itCtx?("Audio: "+itCtx.state+(running?"":" - tap Test sound to check it can be heard")):"Audio: not started - tap Test sound"; };
-  $("itTest").addEventListener("click",()=>{ itAudioUnlock(); setTimeout(()=>{ itSound("ding"); audioStatus(); },150); });
+  $("itTest").addEventListener("click",()=>{ readCfg(); itAudioUnlock(cfg.mode); setTimeout(()=>{ itSound("ding"); audioStatus(); },150); });
   $("itReset").addEventListener("click",()=>{
     stop(false); banked=0; finished=false; lastIdx=-1;
     $("itGo").textContent="Start"; $("itCfg").style.opacity="1";
-    ["itWork","itRest","itRounds"].forEach(i=>$(i).disabled=false);
+    ["itWork","itRest","itRounds","itMode"].forEach(i=>$(i).disabled=false);
     readCfg(); paint();
   });
-  ["itWork","itRest","itRounds"].forEach(i=>$(i).addEventListener("change",()=>{ readCfg(); paint(); }));
+  ["itWork","itRest","itRounds","itMode"].forEach(i=>$(i).addEventListener("change",()=>{ readCfg(); paint(); }));
   const onVis=()=>{ if(!document.hidden&&running){ itWakeOn(); onTick(); } };   /* wake lock is dropped when the page is hidden */
   document.addEventListener("visibilitychange",onVis);
   $("itClose").addEventListener("click",()=>{
