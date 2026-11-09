@@ -2571,7 +2571,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=29;
+const APP_RELEASE=30;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -2853,9 +2853,18 @@ function itAudioUnlock(){      /* must run inside a tap */
        pausing it. A looping <audio> element would take audio focus and cut the
        other app off, so only Web Audio is used. */
     if(navigator.audioSession) navigator.audioSession.type="ambient";
-    if(!itCtx) itCtx=new (window.AudioContext||window.webkitAudioContext)();
-    if(itCtx.state==="suspended") itCtx.resume();
+    if(!itCtx||itCtx.state==="closed") itCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(itCtx.state!=="running") itCtx.resume();
   }catch(e){ console.warn("interval timer audio",e); }
+}
+/* Another app starting or stopping audio can leave the context "suspended" or
+   "interrupted" on iOS, which plays silence. Called before every sound and on a
+   heartbeat while the timer runs. */
+function itEnsureRunning(){
+  try{
+    if(!itCtx||itCtx.state==="closed"){ itCtx=new (window.AudioContext||window.webkitAudioContext)(); }
+    if(itCtx.state!=="running") itCtx.resume();
+  }catch(e){}
 }
 function itTone(freq,start,dur,vol){
   const o=itCtx.createOscillator(), g=itCtx.createGain();
@@ -2867,12 +2876,12 @@ function itTone(freq,start,dur,vol){
 /* "ding": bright two-note bell. "go": short higher beep. "done": three dings. */
 function itSound(kind){
   try{
-    if(!itCtx) return; if(itCtx.state==="suspended") itCtx.resume();
-    const t=itCtx.currentTime+0.02;
-    if(kind==="go"){ itTone(1320,t,0.18,0.5); }
+    itEnsureRunning(); if(!itCtx) return;
+    const t=itCtx.currentTime+0.05;
+    if(kind==="go"){ itTone(1320,t,0.25,0.9); }
     else{
       const reps=kind==="done"?3:1;
-      for(let i=0;i<reps;i++){ itTone(1047,t+i*0.5,0.9,0.7); itTone(1568,t+i*0.5,0.9,0.5); }
+      for(let i=0;i<reps;i++){ itTone(1047,t+i*0.6,1.0,1.0); itTone(1568,t+i*0.6,1.0,0.8); itTone(523,t+i*0.6,1.0,0.6); }
     }
     if(navigator.vibrate) navigator.vibrate(kind==="go"?[120]:kind==="done"?[300,150,300,150,300]:[300]);
   }catch(e){}
@@ -2905,7 +2914,8 @@ function openIntervalTimer(){
     '<div id="itPhase" style="font-size:30px;font-weight:900;letter-spacing:2px">READY</div>'+
     '<div id="itClock" style="font-size:clamp(72px,26vw,150px);font-weight:900;font-variant-numeric:tabular-nums;line-height:1">1:00</div>'+
     '<div id="itRound" style="font-size:18px;font-weight:700;color:var(--ink2)">Round 0 of '+cfg.rounds+'</div>'+
-    '<div style="display:flex;gap:10px;margin-top:8px"><button id="itGo" class="btn pri" style="min-width:130px;font-size:18px">Start</button><button id="itReset" class="btn" style="font-size:18px">Reset</button></div>'+
+    '<div style="display:flex;gap:10px;margin-top:8px"><button id="itGo" class="btn pri" style="min-width:130px;font-size:18px">Start</button><button id="itReset" class="btn" style="font-size:18px">Reset</button><button id="itTest" class="btn" style="font-size:18px">Test sound</button></div>'+
+    '<div id="itAudio" style="font-size:12px;color:var(--muted)"></div>'+
     '<div id="itCfg" style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:14px">'+
       '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--muted)">Work (sec)<input id="itWork" type="number" min="1" inputmode="numeric" style="'+inp+'"></label>'+
       '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--muted)">Rest (sec)<input id="itRest" type="number" min="0" inputmode="numeric" style="'+inp+'"></label>'+
@@ -2949,7 +2959,7 @@ function openIntervalTimer(){
     if(finished||banked===0){ banked=0; finished=false; lastIdx=-1; itSound("go"); }
     startedAt=Date.now(); running=true; $("itGo").textContent="Pause"; $("itCfg").style.opacity=".4";
     ["itWork","itRest","itRounds"].forEach(i=>$(i).disabled=true);
-    clearInterval(tick); tick=setInterval(onTick,100); onTick();
+    clearInterval(tick); tick=setInterval(()=>{ onTick(); if(Date.now()%1000<100) itEnsureRunning(); },100); onTick(); audioStatus();
   }
   function stop(done){
     if(running) banked+=Date.now()-startedAt;
@@ -2962,6 +2972,8 @@ function openIntervalTimer(){
     else if(finished){ banked=0; finished=false; lastIdx=-1; start(); }
     else start();
   });
+  const audioStatus=()=>{ $("itAudio").textContent=itCtx?("Audio: "+itCtx.state+(running?"":" - tap Test sound to check it can be heard")):"Audio: not started - tap Test sound"; };
+  $("itTest").addEventListener("click",()=>{ itAudioUnlock(); setTimeout(()=>{ itSound("ding"); audioStatus(); },150); });
   $("itReset").addEventListener("click",()=>{
     stop(false); banked=0; finished=false; lastIdx=-1;
     $("itGo").textContent="Start"; $("itCfg").style.opacity="1";
