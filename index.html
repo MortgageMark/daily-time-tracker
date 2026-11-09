@@ -2571,7 +2571,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=27;
+const APP_RELEASE=28;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -2836,6 +2836,155 @@ function renderMoreMenu(){
 }
 
 
+/* ===== Interval timer (avatar menu > Interval timer) =====
+   Self-contained: does not touch sessions, sync or the database. Work/rest
+   rounds with an audible ding, for exercise or stretching. Position is
+   computed from elapsed wall-clock time, never from counting ticks, so a
+   throttled or briefly frozen page catches up instead of drifting. */
+const IT_KEY="itConfig";
+const IT_DEFAULT={work:60,rest:10,rounds:20};
+function itLoad(){ try{ const c=JSON.parse(localStorage.getItem(IT_KEY)||"null"); if(c&&c.work>0&&c.rest>=0&&c.rounds>0) return c; }catch(e){} return Object.assign({},IT_DEFAULT); }
+function itSave(c){ try{ localStorage.setItem(IT_KEY,JSON.stringify(c)); }catch(e){} }
+
+let itCtx=null, itKeepAlive=null, itWake=null;
+function itAudioUnlock(){      /* must run inside a tap */
+  try{
+    if(navigator.audioSession) navigator.audioSession.type="playback";   /* iPhone: sound even with the silent switch on */
+    if(!itCtx) itCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(itCtx.state==="suspended") itCtx.resume();
+    if(!itKeepAlive){   /* a silent looping clip keeps the audio session open */
+      const sr=8000, n=sr, buf=new ArrayBuffer(44+n), v=new DataView(buf);
+      const w=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+      w(0,"RIFF"); v.setUint32(4,36+n,true); w(8,"WAVEfmt "); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+      v.setUint32(24,sr,true); v.setUint32(28,sr,true); v.setUint16(32,1,true); v.setUint16(34,8,true); w(36,"data"); v.setUint32(40,n,true);
+      for(let i=0;i<n;i++) v.setUint8(44+i,128);
+      itKeepAlive=new Audio(URL.createObjectURL(new Blob([buf],{type:"audio/wav"}))); itKeepAlive.loop=true; itKeepAlive.volume=0.01;
+    }
+    itKeepAlive.play().catch(()=>{});
+  }catch(e){ console.warn("interval timer audio",e); }
+}
+function itTone(freq,start,dur,vol){
+  const o=itCtx.createOscillator(), g=itCtx.createGain();
+  o.type="sine"; o.frequency.value=freq; o.connect(g); g.connect(itCtx.destination);
+  g.gain.setValueAtTime(0.0001,start); g.gain.exponentialRampToValueAtTime(vol,start+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001,start+dur);
+  o.start(start); o.stop(start+dur+0.05);
+}
+/* "ding": bright two-note bell. "go": short higher beep. "done": three dings. */
+function itSound(kind){
+  try{
+    if(!itCtx) return; if(itCtx.state==="suspended") itCtx.resume();
+    const t=itCtx.currentTime+0.02;
+    if(kind==="go"){ itTone(1320,t,0.18,0.5); }
+    else{
+      const reps=kind==="done"?3:1;
+      for(let i=0;i<reps;i++){ itTone(1047,t+i*0.5,0.9,0.7); itTone(1568,t+i*0.5,0.9,0.5); }
+    }
+    if(navigator.vibrate) navigator.vibrate(kind==="go"?[120]:kind==="done"?[300,150,300,150,300]:[300]);
+  }catch(e){}
+}
+async function itWakeOn(){ try{ if(navigator.wakeLock&&!itWake){ itWake=await navigator.wakeLock.request("screen"); itWake.addEventListener("release",()=>{ itWake=null; }); } }catch(e){} }
+function itWakeOff(){ try{ if(itWake) itWake.release(); }catch(e){} itWake=null; }
+
+/* Where are we after `ms` of running? */
+function itPosition(cfg,ms){
+  const w=cfg.work*1000, r=cfg.rest*1000, cycle=w+r;
+  const total=cfg.rounds*cycle-r;
+  if(ms>=total) return {phase:"done",round:cfg.rounds,left:0,idx:cfg.rounds*2};
+  const round=Math.floor(ms/cycle), within=ms-round*cycle;
+  if(within<w) return {phase:"work",round:round+1,left:w-within,idx:round*2};
+  return {phase:"rest",round:round+1,left:cycle-within,idx:round*2+1};
+}
+
+function openIntervalTimer(){
+  if(document.getElementById("itOverlay")) return;
+  const cfg=itLoad();
+  let startedAt=0, banked=0, running=false, tick=null, lastIdx=-1, finished=false;
+
+  const ov=document.createElement("div");
+  ov.id="itOverlay";
+  ov.style.cssText="position:fixed;inset:0;z-index:4000;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;overflow:auto";
+  const inp="width:84px;font-size:18px;text-align:center;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:8px";
+  ov.innerHTML=
+    '<button id="itClose" class="btn" style="position:absolute;top:14px;right:14px">Close</button>'+
+    '<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Interval timer</div>'+
+    '<div id="itPhase" style="font-size:30px;font-weight:900;letter-spacing:2px">READY</div>'+
+    '<div id="itClock" style="font-size:clamp(72px,26vw,150px);font-weight:900;font-variant-numeric:tabular-nums;line-height:1">1:00</div>'+
+    '<div id="itRound" style="font-size:18px;font-weight:700;color:var(--ink2)">Round 0 of '+cfg.rounds+'</div>'+
+    '<div style="display:flex;gap:10px;margin-top:8px"><button id="itGo" class="btn pri" style="min-width:130px;font-size:18px">Start</button><button id="itReset" class="btn" style="font-size:18px">Reset</button></div>'+
+    '<div id="itCfg" style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:14px">'+
+      '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--muted)">Work (sec)<input id="itWork" type="number" min="1" inputmode="numeric" style="'+inp+'"></label>'+
+      '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--muted)">Rest (sec)<input id="itRest" type="number" min="0" inputmode="numeric" style="'+inp+'"></label>'+
+      '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--muted)">Rounds<input id="itRounds" type="number" min="1" inputmode="numeric" style="'+inp+'"></label>'+
+    '</div>'+
+    '<div style="font-size:12px;color:var(--muted);text-align:center;max-width:340px;margin-top:6px">Keep the screen on - it stays awake while this is running. Turn the volume up.</div>';
+  document.body.appendChild(ov);
+  const $=id=>ov.querySelector("#"+id);
+  $("itWork").value=cfg.work; $("itRest").value=cfg.rest; $("itRounds").value=cfg.rounds;
+
+  const fmt=ms=>{ const s=Math.ceil(ms/1000); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); };
+  const elapsed=()=>banked+(running?Date.now()-startedAt:0);
+  function readCfg(){
+    cfg.work=Math.max(1,parseInt($("itWork").value)||60);
+    cfg.rest=Math.max(0,parseInt($("itRest").value)||0);
+    cfg.rounds=Math.max(1,parseInt($("itRounds").value)||1);
+    itSave(cfg);
+  }
+  function paint(){
+    const p=itPosition(cfg,elapsed());
+    const idle=!running&&banked===0;
+    if(idle){ $("itPhase").textContent="READY"; $("itClock").textContent=fmt(cfg.work*1000); $("itRound").textContent="Round 0 of "+cfg.rounds; ov.style.background="var(--bg)"; return; }
+    $("itPhase").textContent=p.phase==="work"?"WORK":p.phase==="rest"?"REST":"DONE ✓";
+    $("itClock").textContent=p.phase==="done"?"0:00":fmt(p.left);
+    $("itRound").textContent=p.phase==="done"?cfg.rounds+" rounds complete":"Round "+p.round+" of "+cfg.rounds;
+    ov.style.background=p.phase==="work"?"color-mix(in srgb,var(--good) 22%,var(--bg))":p.phase==="rest"?"color-mix(in srgb,var(--warn) 22%,var(--bg))":"var(--bg)";
+  }
+  function onTick(){
+    const p=itPosition(cfg,elapsed());
+    if(p.idx!==lastIdx){
+      /* One sound for the latest change only, so a stalled page does not
+         fire a burst of dings on wake. Work ending = ding; rest ending = go. */
+      if(lastIdx>=0){ itSound(p.phase==="done"?"done":p.phase==="rest"?"ding":"go"); }
+      lastIdx=p.idx;
+    }
+    if(p.phase==="done"&&!finished){ finished=true; stop(true); }
+    paint();
+  }
+  function start(){
+    readCfg(); itAudioUnlock(); itWakeOn();
+    if(finished||banked===0){ banked=0; finished=false; lastIdx=-1; itSound("go"); }
+    startedAt=Date.now(); running=true; $("itGo").textContent="Pause"; $("itCfg").style.opacity=".4";
+    ["itWork","itRest","itRounds"].forEach(i=>$(i).disabled=true);
+    clearInterval(tick); tick=setInterval(onTick,100); onTick();
+  }
+  function stop(done){
+    if(running) banked+=Date.now()-startedAt;
+    running=false; clearInterval(tick); tick=null; itWakeOff();
+    $("itGo").textContent=done?"Start":"Resume";
+    if(done) banked=banked;   /* keep the DONE screen until Reset */
+  }
+  $("itGo").addEventListener("click",()=>{
+    if(running){ stop(false); paint(); }
+    else if(finished){ banked=0; finished=false; lastIdx=-1; start(); }
+    else start();
+  });
+  $("itReset").addEventListener("click",()=>{
+    stop(false); banked=0; finished=false; lastIdx=-1;
+    $("itGo").textContent="Start"; $("itCfg").style.opacity="1";
+    ["itWork","itRest","itRounds"].forEach(i=>$(i).disabled=false);
+    readCfg(); paint();
+  });
+  ["itWork","itRest","itRounds"].forEach(i=>$(i).addEventListener("change",()=>{ readCfg(); paint(); }));
+  const onVis=()=>{ if(!document.hidden&&running){ itWakeOn(); onTick(); } };   /* wake lock is dropped when the page is hidden */
+  document.addEventListener("visibilitychange",onVis);
+  $("itClose").addEventListener("click",()=>{
+    stop(false); document.removeEventListener("visibilitychange",onVis);
+    if(itKeepAlive) itKeepAlive.pause();
+    ov.remove();
+  });
+  paint();
+}
+
 function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.innerHTML="";
   const profInitial=state.profile?state.profile.name[0].toUpperCase():"?";
   document.getElementById("avatarBtn").textContent=profInitial;
@@ -2856,6 +3005,7 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
     currentTheme()==="light"?"🌙":"☀️",
     currentTheme()==="light"?"Dark mode":"Light mode",
     ()=>toggleTheme(),null,true));
+  m.appendChild(avatarMenuItem("⏱️","Interval timer",()=>openIntervalTimer()));
   m.appendChild(avatarMenuItem("⚙️","Settings",()=>openSettings()));
 
   const sep2=document.createElement("div");sep2.style="height:1px;background:var(--line);margin:4px 0";m.appendChild(sep2);
