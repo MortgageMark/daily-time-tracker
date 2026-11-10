@@ -1139,6 +1139,27 @@ async function stopRunning(atTs){ if(!running)return null; const s=await idbGet(
        because at that length it is far more likely to be a forgotten timer
        than real work. */
 const LONG_SESSION_MS = 8*60*60*1000;
+const IDLE_ACTIVE_MS = 30*60*1000;   /* touched within this long = you are there */
+const LATE_CUTOFF_HOUR = 22;         /* a timer still running past midnight is assumed to have stopped by 10 PM */
+
+/* When did a person last touch this device? Used to tell a forgotten timer from
+   a long one. Kept in memory and (throttled) in localStorage so it survives the
+   app being closed. The baseline is read BEFORE the first tap of a visit, so
+   the tap that logs you in does not make an abandoned timer look attended. */
+let lastTouch=0, lastTouchSaved=0;
+try{ lastTouch=parseInt(localStorage.getItem("lastTouch")||"0",10)||0; }catch(e){}
+let touchBaseline={at:Date.now(),last:lastTouch};
+function noteTouch(){
+  lastTouch=Date.now();
+  if(lastTouch-lastTouchSaved>15000){ lastTouchSaved=lastTouch; try{ localStorage.setItem("lastTouch",String(lastTouch)); }catch(e){} }
+}
+["pointerdown","keydown","touchstart"].forEach(ev=>window.addEventListener(ev,noteTouch,{passive:true,capture:true}));
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){ try{ localStorage.setItem("lastTouch",String(lastTouch)); }catch(e){} }
+  else if(Date.now()-lastTouch>2*60*1000) touchBaseline={at:Date.now(),last:lastTouch};
+});
+/* For the first minute of a visit, judge by the baseline; after that, live. */
+function lastRealTouch(){ return Date.now()-touchBaseline.at<60000?touchBaseline.last:lastTouch; }
 let reconcilingSession = false;
 
 function endOfDay(ts){ const d=new Date(ts); d.setHours(23,59,59,999); return d.getTime(); }
@@ -1198,38 +1219,31 @@ async function reconcileOpenSession(open){
   try{
     const crossedMidnight = open.date!==todayKey();
     const elapsed = now()-open.startTs;
-    if(!crossedMidnight && elapsed<LONG_SESSION_MS) return;
+    /* Long sessions are fine - an all-afternoon event is real. Only one that is
+       still running after midnight is suspected of being forgotten. */
+    if(!crossedMidnight) return;
 
     let sess=open;
-    if(elapsed>=LONG_SESSION_MS){
+    /* Still running after midnight and nobody has touched the app for a while:
+       it was almost certainly forgotten. A long event is legitimate, so the
+       assumption is not "when you last tapped" but "it ended in the evening":
+       10 PM on the day it started, or later if the app was used later that
+       evening. Do not ask - say what was assumed and offer to change it. */
+    const touch=lastRealTouch();
+    if(now()-touch>=IDLE_ACTIVE_MS){
+      const dayEnd=endOfDay(sess.startTs);
+      const cutoff=dayStartTs(sess.date)+LATE_CUTOFF_HOUR*3600000;
+      const usedLate=(touch>sess.startTs&&touch<=dayEnd)?touch:0;
+      let end=Math.max(cutoff,usedLate);
+      if(end<=sess.startTs) end=Math.max(usedLate,sess.startTs+60*60000);   /* started after the cutoff */
+      end=Math.max(sess.startTs+60000,Math.min(end,dayEnd,now()));
+      sess.endTs=end; sess.durMs=end-sess.startTs;
+      await saveLocal("sessions",sess);
+      running=null; await updateTodayTotals(); renderAll();
       const ch=state.channels.find(c=>c.id===sess.channelId);
-      const choice=await uiChoice({
-        title:"Timer left running",
-        message:(ch?ch.label:"A channel")+" has been running for "+fmtDurShort(elapsed)+
-                ", since "+fmtClock(sess.startTs,state.profile&&state.profile.hourFmt)+" on "+sess.date+".\n\n"+
-                "That is long enough that it was probably left on by accident. Counting it "+
-                "would change that day's totals and its adherence score.",
-        choices:[
-          {label:"Keep all of it",value:"keep"},
-          {label:"Set the end time\u2026",value:"edit"},
-          {label:"Discard it",value:"discard",danger:true}
-        ]
-      });
-      if(choice==="discard"){
-        /* Zeroed rather than deleted on purpose: deletes do not propagate to
-           Supabase, so a deleted row can reappear on the next pull. A
-           zero-length session syncs correctly and contributes nothing. */
-        sess.endTs=sess.startTs; sess.durMs=0;
-        await saveLocal("sessions",sess);
-        running=null; await updateTodayTotals(); renderAll(); toast("Session discarded");
-        return;
-      }
-      if(choice==="edit" && await promptSessionEnd(sess)){
-        running=null; await updateTodayTotals(); renderAll();
-        return;
-      }
-      /* "Keep all of it", or a cancelled prompt: fall through and split it so
-         that at least it lands on the correct days. */
+      toastAction((ch?ch.label:"A timer")+" was still running after midnight - ended it at "+fmtClock(end,state.profile&&state.profile.hourFmt),
+        "Change",async()=>{ if(await promptSessionEnd(sess)){ running=null; await updateTodayTotals(); renderAll(); } },20000);
+      return;
     }
     sess=await splitSessionAcrossDays(sess);
     running={sessionId:sess.id,channelId:sess.channelId,startTs:sess.startTs};
@@ -2571,7 +2585,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=31;
+const APP_RELEASE=33;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
