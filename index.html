@@ -2652,7 +2652,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=34;
+const APP_RELEASE=35;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -3074,6 +3074,133 @@ function openIntervalTimer(){
   paint();
 }
 
+/* ===== Quick log (avatar menu > Quick log, or open /#quicklog) =====
+   Type or dictate what you did; the server turns it into entries, this screen
+   shows them, and nothing is saved until you confirm. Saved through the same
+   signed-in path as every other edit, so sync and conflict handling apply. */
+const QL_ENDPOINT="/.netlify/functions/quicklog";
+const QL_ERRORS={
+  not_signed_in:"Please sign in again.",
+  not_configured:"Quick log is not set up yet - it needs two settings in Netlify.",
+  no_api_key:"Quick log is not set up yet - it needs the Anthropic key in Netlify.",
+  not_allowed:"This account is not allowed to use Quick log.",
+  upstream:"Could not reach the assistant. Try again in a moment.",
+  no_result:"I could not read that. Try rephrasing it.",
+  empty:"Type what you did first."
+};
+function qlChannelOptions(){
+  return state.channels.filter(c=>!c.archived).sort((a,b)=>(a.order||0)-(b.order||0)).map(c=>{
+    const par=c.parentChannelId?state.channels.find(p=>p.id===c.parentChannelId):null;
+    return {id:c.id,label:c.label,parent:par?par.label:null};
+  });
+}
+function openQuickLog(){
+  if(document.getElementById("qlOverlay")) return;
+  const fmt=state.profile&&state.profile.hourFmt;
+  const ov=document.createElement("div");
+  ov.id="qlOverlay";
+  ov.style.cssText="position:fixed;inset:0;z-index:4000;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;padding:16px;gap:12px;overflow:auto";
+  ov.innerHTML=
+    '<div style="display:flex;align-items:center;gap:10px"><div style="font-size:18px;font-weight:800;flex:1">Quick log</div><button id="qlClose" class="btn">Close</button></div>'+
+    '<div style="font-size:13px;color:var(--muted)">Say what you did, with times. Example: &ldquo;Yesterday I finished at 2:30, then emails for 30 minutes, then calls for an hour and a half.&rdquo; Use the keyboard\'s microphone to dictate.</div>'+
+    '<textarea id="qlText" rows="5" style="width:100%;font-size:17px;background:var(--field);border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:12px" placeholder="What did you do?"></textarea>'+
+    '<div style="display:flex;gap:8px"><button id="qlGo" class="btn pri" style="flex:1;font-size:17px">Log it</button></div>'+
+    '<div id="qlMsg" style="font-size:14px;color:var(--ink2)"></div>'+
+    '<div id="qlPreview"></div>';
+  document.body.appendChild(ov);
+  const $=id=>ov.querySelector("#"+id);
+  const close=()=>ov.remove();
+  $("qlClose").addEventListener("click",close);
+  setTimeout(()=>$("qlText").focus(),50);
+
+  async function existingFor(dk){
+    return (await sessionsForDay(dk)).map(x=>{
+      const ch=state.channels.find(c=>c.id===x.channelId);
+      return {date:dk,start:tsToTimeInput(x.startTs),end:x.endTs?tsToTimeInput(x.endTs):"running",label:ch?ch.label:"?"};
+    });
+  }
+  async function submit(){
+    const text=$("qlText").value.trim();
+    if(!text){ $("qlMsg").textContent=QL_ERRORS.empty; return; }
+    $("qlGo").disabled=true; $("qlPreview").innerHTML=""; $("qlMsg").textContent="Working it out…";
+    try{
+      const tk=todayKey(), yk=shiftDateKey(tk,-1);
+      const { data:sess } = await SB.auth.getSession();
+      const tok=sess&&sess.session&&sess.session.access_token;
+      if(!tok){ $("qlMsg").textContent=QL_ERRORS.not_signed_in; return; }
+      const res=await fetch(QL_ENDPOINT,{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+tok},
+        body:JSON.stringify({text,today:tk,nowLocal:tsToTimeInput(now()),tz:(Intl.DateTimeFormat().resolvedOptions().timeZone)||"",
+          channels:qlChannelOptions(),existing:(await existingFor(yk)).concat(await existingFor(tk))})});
+      let out={}; try{ out=await res.json(); }catch(e){}
+      if(!res.ok){ $("qlMsg").textContent=QL_ERRORS[out.error]||("Something went wrong ("+res.status+")."); return; }
+      await showPreview(out);
+    }catch(e){ console.warn("quicklog",e); $("qlMsg").textContent="Could not reach Quick log. Check your connection."; }
+    finally{ $("qlGo").disabled=false; }
+  }
+  $("qlGo").addEventListener("click",submit);
+
+  async function showPreview(out){
+    const box=$("qlPreview"); box.innerHTML="";
+    if(out.question&&!(out.entries||[]).length){ $("qlMsg").textContent=out.question; return; }
+    if(!(out.entries||[]).length){ $("qlMsg").textContent="I did not find anything to add."; return; }
+    $("qlMsg").textContent="Check these, then add them:";
+    const opts=qlChannelOptions();
+    const taken={};   /* date -> sessions already there, plus entries accepted so far */
+    const rows=[];
+    for(const e of out.entries){
+      const dayLo=dayStartTs(e.date);
+      const s=/^\d{4}-\d{2}-\d{2}$/.test(e.date)?parseClockOnDay(dayLo,e.start):null, en=s===null?null:parseClockOnDay(dayLo,e.end);
+      let problem="";
+      if(s===null||en===null||en<=s) problem="Times not understood";
+      else if(en>now()) problem="In the future";
+      else {
+        if(!taken[e.date]) taken[e.date]=(await sessionsForDay(e.date)).map(x=>({s:x.startTs,e:tlEndOf(x),label:(state.channels.find(c=>c.id===x.channelId)||{}).label||"another entry"}));
+        const clash=taken[e.date].find(x=>x.s<en&&x.e>s);
+        if(clash) problem="Overlaps "+clash.label+" "+fmtClock(clash.s,fmt)+" - "+fmtClock(clash.e,fmt);
+        else taken[e.date].push({s,e:en,label:e.channel_guess||"this entry"});
+      }
+      rows.push({e,s,en,problem});
+    }
+    const list=document.createElement("div"); list.style.cssText="display:flex;flex-direction:column;gap:8px";
+    rows.forEach(r=>{
+      const row=document.createElement("div");
+      row.style.cssText="border:1px solid "+(r.problem?"var(--bad)":"var(--line)")+";border-radius:12px;padding:10px;background:var(--panel)";
+      const when=document.createElement("div"); when.style.cssText="font-weight:800";
+      when.textContent=r.problem&&r.s===null?(r.e.date+" "+r.e.start+" - "+r.e.end):(prettyDate(r.e.date)+"  "+fmtClock(r.s,fmt)+" - "+fmtClock(r.en,fmt)+"  ("+fmtDurShort(r.en-r.s)+")");
+      row.appendChild(when);
+      const sel=document.createElement("select");
+      sel.style.cssText="width:100%;margin-top:6px;font-size:16px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:8px";
+      sel.innerHTML='<option value="">Choose channel…</option>'+opts.map(o=>'<option value="'+o.id+'">'+(o.parent?o.parent+" › ":"")+o.label.replace(/</g,"&lt;")+'</option>').join("");
+      sel.value=opts.some(o=>o.id===r.e.channel_id)?r.e.channel_id:"";
+      row.appendChild(sel);
+      if(!sel.value&&r.e.channel_guess){ const g=document.createElement("div"); g.className="hint"; g.textContent='You said "'+r.e.channel_guess+'" - pick the channel.'; row.appendChild(g); }
+      if(r.e.note){ const n=document.createElement("div"); n.className="hint"; n.textContent="Note: "+r.e.note; row.appendChild(n); }
+      if(r.problem){ const p=document.createElement("div"); p.style.cssText="margin-top:6px;font-size:13px;font-weight:700;color:var(--bad)"; p.textContent=r.problem+" - will be skipped"; row.appendChild(p); }
+      r.sel=sel; list.appendChild(row);
+    });
+    box.appendChild(list);
+    const add=document.createElement("button");
+    add.className="btn pri"; add.style.cssText="width:100%;margin-top:12px;font-size:17px";
+    const refresh=()=>{ const n=rows.filter(r=>!r.problem&&r.sel.value).length; add.textContent=n?("Add "+n+(n===1?" entry":" entries")):"Choose a channel for each entry"; add.disabled=!n; };
+    rows.forEach(r=>r.sel.addEventListener("change",refresh)); refresh();
+    add.addEventListener("click",async()=>{
+      add.disabled=true; let n=0;
+      for(const r of rows){
+        if(r.problem||!r.sel.value) continue;
+        const rec={id:uid(),profileId:state.profileId,channelId:r.sel.value,startTs:r.s,endTs:r.en,durMs:r.en-r.s,date:dateKey(r.s),voided:false};
+        if(r.e.note) rec.note=r.e.note;
+        await saveLocal("sessions",rec); n++;
+      }
+      await updateTodayTotals(); renderAll();
+      if(dayEditorDate) await renderDayEditor();
+      toast(n+(n===1?" entry":" entries")+" added");
+      close();
+    });
+    box.appendChild(add);
+  }
+}
+window.addEventListener("hashchange",()=>{ if(location.hash==="#quicklog"&&appEntered){ history.replaceState(null,"",location.pathname+location.search); openQuickLog(); } });
+
 function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.innerHTML="";
   const profInitial=state.profile?state.profile.name[0].toUpperCase():"?";
   document.getElementById("avatarBtn").textContent=profInitial;
@@ -3094,6 +3221,7 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
     currentTheme()==="light"?"🌙":"☀️",
     currentTheme()==="light"?"Dark mode":"Light mode",
     ()=>toggleTheme(),null,true));
+  m.appendChild(avatarMenuItem("💬","Quick log",()=>openQuickLog()));
   m.appendChild(avatarMenuItem("⏱️","Interval timer",()=>openIntervalTimer()));
   m.appendChild(avatarMenuItem("⚙️","Settings",()=>openSettings()));
 
@@ -5695,6 +5823,8 @@ async function enterApp(){
   setSync("syncing"); catchUp();
   /* After the app is on screen, and never allowed to break entry. */
   try{ showIntroOnce(); }catch(e){ console.warn("intro failed",e); }
+  /* Home-screen shortcut: https://dailytimetracker.com/#quicklog */
+  if(location.hash==="#quicklog"){ history.replaceState(null,"",location.pathname+location.search); openQuickLog(); }
 }
 
 /* ===== sync triggers ===== */
