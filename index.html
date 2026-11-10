@@ -1625,16 +1625,17 @@ async function afterDayEdit(dk){
   await renderDayEditor();
 }
 function dayEditorGoto(dk){
-  dayEditorDate=dk; tlDrag=null;
+  dayEditorDate=dk; tlDrag=null; tlScrollToWork=true;
   renderDayEditor();
 }
 
 async function openDayEditor(dk){
   dayEditorDate=dk||todayKey();
+  tlScrollToWork=true;
   setTlZoom(1);
   tlDrag=null;
   const stage=document.querySelector(".app .stage");
-  stage.innerHTML='<div id="dayEditorRoot" style="display:flex;flex-direction:column;height:100%;overflow:hidden"></div>';
+  stage.innerHTML='<div id="dayEditorRoot" style="display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden"></div>';
   await renderDayEditor();
 }
 function closeDayEditor(){
@@ -1717,12 +1718,18 @@ async function renderDayEditor(){
     grp.appendChild(zwrap);
   }
   if(!isFuture){
+    const ab=document.createElement("button");
+    ab.className="btn sm pri"; ab.style.cssText="padding:5px 10px;font-size:12px;flex:none";
+    ab.textContent="+ Add";
+    ab.title="Add an entry with exact start and end times";
+    ab.addEventListener("click",()=>openAddEntrySheet(dk));
+    grp.appendChild(ab);
     const fb=document.createElement("button");
     fb.className="btn sm"+(tlFullDay?" pri":"");
     fb.style.cssText="padding:5px 8px;font-size:12px;flex:none";
     fb.textContent="24h";
     fb.title=tlFullDay?"Showing the whole day - tap to return to the working day":"Show the whole day, midnight to midnight";
-    fb.addEventListener("click",()=>{ tlFullDay=!tlFullDay; renderDayEditor(); });
+    fb.addEventListener("click",()=>{ tlFullDay=!tlFullDay; tlScrollToWork=true; try{ localStorage.setItem("tlFullDay",tlFullDay?"1":"0"); }catch(e){} renderDayEditor(); });
     grp.appendChild(fb);
   }
   head.appendChild(grp);
@@ -1732,7 +1739,7 @@ async function renderDayEditor(){
   /* ---------------- body ---------------- */
   const body=document.createElement("div");
   body.id="dayEditorBody";
-  body.style.cssText="flex:1;overflow-y:auto;padding:12px";
+  body.style.cssText="flex:1 1 0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:12px";
 
   /* Day type is built here but appended last: someone opening this screen is
      nearly always here to fix times, and marking a day off is the rare case. */
@@ -1830,7 +1837,18 @@ async function renderDayEditor(){
   }
   root.appendChild(body);
 
-  if(keepScroll) body.scrollTop=keepScroll;
+  if(tlScrollToWork&&!isFuture){ tlScrollToWork=false; tlScrollToFirstWork(body,sess,dk); }
+  else if(keepScroll) body.scrollTop=keepScroll;
+}
+/* Puts the first block (or the planned start, on an empty day) about an hour
+   below the top edge, so a 24h rail opens on the work, not on midnight. */
+function tlScrollToFirstWork(body,sess,dk){
+  const wrap=document.getElementById("tlWrap"); if(!wrap||!tlRangeCur) return;
+  const starts=(sess||[]).map(x=>x.startTs);
+  const focus=starts.length?Math.min.apply(null,starts):dayStartTs(dk)+planState.startHour*3600000;
+  const target=Math.max(tlRangeCur.startTs,focus-3600000);
+  const wrapTop=wrap.getBoundingClientRect().top-body.getBoundingClientRect().top+body.scrollTop;
+  body.scrollTop=Math.max(0,wrapTop+tlY(target)-TL_PAD);
 }
 function tsToTimeInput(ts){ const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
 
@@ -1866,7 +1884,11 @@ const TL_PAD=34;               /* rail headroom, so an edge + is never clipped *
 let tlRangeCur=null, tlSessions=[], tlFmt=null, tlDk=null;
 /* "24h": draw the whole day, so time before the planned start (or after its end)
    can be added and dragged to. Remembered for the session only. */
-let tlFullDay=false;
+let tlFullDay=true;
+try{ if(localStorage.getItem("tlFullDay")==="0") tlFullDay=false; }catch(e){}
+/* Set when the editor opens, changes day or toggles 24h: the next render scrolls
+   to where the work is instead of sitting at midnight. */
+let tlScrollToWork=true;
 /* A finger down on a block before it is known to be a tap or a drag. */
 let tlPress=null;
 
@@ -2402,6 +2424,51 @@ async function openGapSheet(dk,startTs,endTs,mode){
   openScrim("blockScrim");
 }
 
+/* Add an entry by typing its times - for "I did emails 2:30 to 3:00" - rather
+   than adding an hour at a time and dragging its edge. Never overlaps: two
+   channels cannot run at once, so a clash is reported instead of squeezed in. */
+async function openAddEntrySheet(dk){
+  tlEnsureSheet();
+  const fmt=state.profile&&state.profile.hourFmt;
+  const existing=await sessionsForDay(dk);
+  const dayLo=dayStartTs(dk), cap=dk===todayKey()?now():dayLo+86400000;
+  const lastEnd=existing.length?Math.max.apply(null,existing.map(tlEndOf)):dayLo+planState.startHour*3600000;
+  let startTs=Math.min(lastEnd,cap-30*60000); if(startTs<dayLo) startTs=dayLo;
+  const endTs=Math.min(startTs+30*60000,cap);
+  document.getElementById("blkTitle").textContent="Add an entry";
+  const body=document.getElementById("blkBody"); body.innerHTML="";
+  const row=document.createElement("div"); row.style.cssText="display:flex;gap:12px;margin:0 0 14px";
+  const mk=(label,ts)=>{
+    const l=document.createElement("label"); l.style.cssText="flex:1;font-size:12px;font-weight:700;color:var(--muted)";
+    l.textContent=label;
+    const i=document.createElement("input"); i.type="time"; i.value=tsToTimeInput(ts);
+    i.style.cssText="display:block;width:100%;margin-top:4px;font-size:18px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px";
+    l.appendChild(i); row.appendChild(l); return i;
+  };
+  const inStart=mk("Start",startTs), inEnd=mk("End",endTs);
+  body.appendChild(row);
+  const t=document.createElement("div"); t.className="sect-title"; t.style.margin="0 0 8px";
+  t.textContent="Channel"; body.appendChild(t);
+  const pool=await rankedChannelsForPicker(existing);
+  body.appendChild(tlChipRow(pool,null,async c=>{
+    const s=parseClockOnDay(dayLo,inStart.value), e=parseClockOnDay(dayLo,inEnd.value);
+    if(s===null||e===null||e<=s){ toast("End must be after start"); return; }
+    if(e>cap){ toast("That is in the future"); return; }
+    const clash=existing.find(x=>x.startTs<e&&tlEndOf(x)>s);
+    if(clash){
+      const cc=state.channels.find(k=>k.id===clash.channelId);
+      toast("Overlaps "+(cc?cc.label:"another entry")+" "+fmtClock(clash.startTs,fmt)+" - "+fmtClock(tlEndOf(clash),fmt));
+      return;
+    }
+    await saveLocal("sessions",{id:uid(),profileId:state.profileId,channelId:c.id,
+      startTs:s,endTs:e,durMs:e-s,date:dateKey(s),voided:false});
+    closeScrim("blockScrim");
+    await afterDayEdit(dk);
+    toast(fmtDurShort(e-s)+" added to "+c.label);
+  }));
+  openScrim("blockScrim");
+}
+
 async function openBlockSheet(dk,sn){
   tlEnsureSheet();
   const fresh=(await sessionsForDay(dk)).find(x=>x.id===sn.id)||sn;
@@ -2585,7 +2652,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=33;
+const APP_RELEASE=34;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
