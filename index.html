@@ -2560,7 +2560,10 @@ async function openBlockSheet(dk,sn){
   });
   acts.appendChild(del);
 
-  body.appendChild(acts);
+  /* At the top, under the times: on a phone the sheet is tall enough that
+     Delete at the bottom was off-screen and easy to miss. */
+  acts.style.margin="0 0 18px";
+  body.insertBefore(acts,when.nextSibling);
   openScrim("blockScrim");
 }
 
@@ -2652,7 +2655,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=36;
+const APP_RELEASE=37;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
