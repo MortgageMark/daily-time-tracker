@@ -42,12 +42,13 @@ const TOOL = {
           properties: {
             date: { type: "string", description: "YYYY-MM-DD, local date the entry happened on" },
             start: { type: "string", description: "HH:MM, 24-hour, local time" },
-            end: { type: "string", description: "HH:MM, 24-hour, local time" },
+            end: { type: "string", description: "HH:MM, 24-hour, local time. Empty string when ongoing is true." },
+            ongoing: { type: "boolean", description: "True if the person is doing this right now or is starting it now and it has no end yet (e.g. 'about to go into a meeting'). Then start is the time it begins (now unless they say otherwise) and end is an empty string." },
             channel_id: { type: ["string", "null"], description: "Exact id from the channel list, or null if no confident match" },
             channel_guess: { type: "string", description: "What the user called it" },
             note: { type: ["string", "null"], description: "Short detail such as a person or topic, max 60 characters, or null" }
           },
-          required: ["date", "start", "end", "channel_id", "channel_guess", "note"]
+          required: ["date", "start", "end", "ongoing", "channel_id", "channel_guess", "note"]
         }
       },
       question: { type: ["string", "null"], description: "One short question if the times cannot be determined, else null" }
@@ -84,9 +85,11 @@ export default async (req) => {
     "Use the existing entries to anchor: if the person says they finished at 2:30, the entry they refer to may already be listed. Do not re-create existing entries; output only new ones.",
     "Match each activity to a channel by its id from the list. Subcategories have a parent; prefer the most specific match. If no channel clearly matches, use null for channel_id and put what they said in channel_guess. Never invent ids.",
     "Entries must not overlap each other or the existing entries, and must not end in the future. If you cannot work out the times, return no entries and ask one short question.",
+    "If the person says they are starting something now, are about to do it, or are still doing it ('about to walk into a meeting for an hour', 'on a call now'), return that entry with ongoing=true, start=now (or the time they say) and end=''. At most one entry may be ongoing, and it must be the last in time. Do not invent an end from a stated duration for an ongoing entry.",
+    body.window && body.window.start ? "This is a periodic check-in. The person is reporting on the stretch from " + String(body.window.start) + " to " + String(body.window.end) + " on " + String(body.window.date) + ". Unless they say otherwise, what they describe happened in that stretch: if they describe one activity, it covers all of it; if several, split it in the order told, dividing the stretch sensibly when no times are given." : "",
     "Channels: " + JSON.stringify(channels),
     "Existing entries: " + JSON.stringify(existing)
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 
   let resp;
   try {
@@ -105,7 +108,7 @@ export default async (req) => {
   const use = (data.content || []).find((b) => b.type === "tool_use");
   if (!use || !use.input) return json({ error: "no_result" }, 502);
   const entries = (Array.isArray(use.input.entries) ? use.input.entries : []).map((e) => ({
-    date: String(e.date || ""), start: String(e.start || ""), end: String(e.end || ""),
+    date: String(e.date || ""), start: String(e.start || ""), end: String(e.end || ""), ongoing: !!e.ongoing,
     channel_id: e.channel_id ? String(e.channel_id) : null,
     channel_guess: String(e.channel_guess || ""),
     note: e.note ? String(e.note).slice(0, 60) : null

@@ -2655,7 +2655,7 @@ let toastT; /* ===== build version + update detection =====
 /* Human-facing release number. Bump this when cutting a release; the
    build stamp below is filled in automatically at deploy time. Together
    they read as "v3 - 2026.08.26 03:45". */
-const APP_RELEASE=37;
+const APP_RELEASE=38;
 const BUILD_ID="__BUILD_ID__";
 function buildIsStamped(){ return String(BUILD_ID).indexOf("__BUILD")!==0; }
 function fmtBuild(id){
@@ -3078,9 +3078,11 @@ function openIntervalTimer(){
 }
 
 /* ===== Quick log (avatar menu > Quick log, or open /#quicklog) =====
-   Type or dictate what you did; the server turns it into entries, this screen
-   shows them, and nothing is saved until you confirm. Saved through the same
-   signed-in path as every other edit, so sync and conflict handling apply. */
+   Type or dictate what you did - or are about to do; the server turns it into
+   entries, this screen shows them, and nothing is saved until you confirm.
+   Saved through the same signed-in path as every other edit, so sync and
+   conflict handling apply. The 15-minute audit below opens this same screen
+   every quarter hour, pre-scoped to the time since the last entry. */
 const QL_ENDPOINT="/.netlify/functions/quicklog";
 const QL_ERRORS={
   not_signed_in:"Please sign in again.",
@@ -3097,16 +3099,24 @@ function qlChannelOptions(){
     return {id:c.id,label:c.label,parent:par?par.label:null};
   });
 }
-function openQuickLog(){
+/* opts.audit: 15-minute check-in. opts.window {startTs,endTs}: the stretch of
+   time the person is being asked about. */
+function openQuickLog(opts){
+  opts=opts||{};
   if(document.getElementById("qlOverlay")) return;
   const fmt=state.profile&&state.profile.hourFmt;
+  const win=opts.window||null;
   const ov=document.createElement("div");
   ov.id="qlOverlay";
   ov.style.cssText="position:fixed;inset:0;z-index:4000;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;padding:16px;gap:12px;overflow:auto";
+  const intro=opts.audit&&win
+    ? "What did you do from <b>"+fmtClock(win.startTs,fmt)+"</b> to <b>"+fmtClock(win.endTs,fmt)+"</b>? Or what are you about to do? Use the keyboard’s microphone to talk."
+    : "Say what you did, with times. Example: &ldquo;Yesterday I finished at 2:30, then emails for 30 minutes, then calls for an hour and a half.&rdquo; Or what you are starting now: &ldquo;About to be in a meeting for an hour.&rdquo; Use the keyboard’s microphone to dictate.";
   ov.innerHTML=
-    '<div style="display:flex;align-items:center;gap:10px"><div style="font-size:18px;font-weight:800;flex:1">Quick log</div><button id="qlClose" class="btn">Close</button></div>'+
-    '<div style="font-size:13px;color:var(--muted)">Say what you did, with times. Example: &ldquo;Yesterday I finished at 2:30, then emails for 30 minutes, then calls for an hour and a half.&rdquo; Use the keyboard\'s microphone to dictate.</div>'+
-    '<textarea id="qlText" rows="5" style="width:100%;font-size:17px;background:var(--field);border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:12px" placeholder="What did you do?"></textarea>'+
+    '<div style="display:flex;align-items:center;gap:10px"><div style="font-size:18px;font-weight:800;flex:1">'+(opts.audit?"15-minute check-in":"Quick log")+'</div><button id="qlClose" class="btn">'+(opts.audit?"Skip":"Close")+'</button></div>'+
+    '<div style="font-size:14px;color:var(--ink2)">'+intro+'</div>'+
+    '<div id="qlChips" style="display:flex;gap:8px;flex-wrap:wrap"></div>'+
+    '<textarea id="qlText" rows="'+(opts.audit?3:5)+'" style="width:100%;font-size:17px;background:var(--field);border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:12px" placeholder="What did you do?"></textarea>'+
     '<div style="display:flex;gap:8px"><button id="qlGo" class="btn pri" style="flex:1;font-size:17px">Log it</button></div>'+
     '<div id="qlMsg" style="font-size:14px;color:var(--ink2)"></div>'+
     '<div id="qlPreview"></div>';
@@ -3122,6 +3132,36 @@ function openQuickLog(){
       return {date:dk,start:tsToTimeInput(x.startTs),end:x.endTs?tsToTimeInput(x.endTs):"running",label:ch?ch.label:"?"};
     });
   }
+  const labelOf=id=>{ const c=state.channels.find(k=>k.id===id); return c?c.label:"?"; };
+
+  /* One-tap answers for the check-in: "same as what I was doing". */
+  async function addChips(){
+    if(!opts.audit||!win) return;
+    const box=$("qlChips");
+    const today=await sessionsForDay(todayKey());
+    const seen=[]; today.slice().sort((a,b)=>tlEndOf(b)-tlEndOf(a)).forEach(x=>{ if(seen.indexOf(x.channelId)<0) seen.push(x.channelId); });
+    if(running){
+      const b=document.createElement("button"); b.className="btn pri"; b.textContent="Still on "+labelOf(running.channelId);
+      b.addEventListener("click",()=>{ toast("Keeping "+labelOf(running.channelId)+" running"); close(); });
+      box.appendChild(b);
+    }
+    seen.filter(id=>!running||id!==running.channelId).slice(0,3).forEach(id=>{
+      const b=document.createElement("button"); b.className="btn"; b.textContent=labelOf(id);
+      b.title="Log the whole stretch as "+labelOf(id);
+      b.addEventListener("click",async()=>{
+        b.disabled=true;
+        const ex=await sessionsForDay(dateKey(win.startTs));
+        const clash=ex.find(x=>x.startTs<win.endTs&&tlEndOf(x)>win.startTs&&x.id!==(running&&running.sessionId));
+        if(clash){ $("qlMsg").textContent="That overlaps something already logged - type it instead."; b.disabled=false; return; }
+        await saveLocal("sessions",{id:uid(),profileId:state.profileId,channelId:id,startTs:win.startTs,endTs:win.endTs,durMs:win.endTs-win.startTs,date:dateKey(win.startTs),voided:false});
+        await updateTodayTotals(); renderAll();
+        toast(fmtDurShort(win.endTs-win.startTs)+" added to "+labelOf(id)); close();
+      });
+      box.appendChild(b);
+    });
+  }
+  addChips();
+
   async function submit(){
     const text=$("qlText").value.trim();
     if(!text){ $("qlMsg").textContent=QL_ERRORS.empty; return; }
@@ -3133,6 +3173,7 @@ function openQuickLog(){
       if(!tok){ $("qlMsg").textContent=QL_ERRORS.not_signed_in; return; }
       const res=await fetch(QL_ENDPOINT,{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+tok},
         body:JSON.stringify({text,today:tk,nowLocal:tsToTimeInput(now()),tz:(Intl.DateTimeFormat().resolvedOptions().timeZone)||"",
+          window:win?{date:dateKey(win.startTs),start:tsToTimeInput(win.startTs),end:tsToTimeInput(win.endTs)}:null,
           channels:qlChannelOptions(),existing:(await existingFor(yk)).concat(await existingFor(tk))})});
       let out={}; try{ out=await res.json(); }catch(e){}
       if(!res.ok){ $("qlMsg").textContent=QL_ERRORS[out.error]||("Something went wrong ("+res.status+")."); return; }
@@ -3147,34 +3188,43 @@ function openQuickLog(){
     if(out.question&&!(out.entries||[]).length){ $("qlMsg").textContent=out.question; return; }
     if(!(out.entries||[]).length){ $("qlMsg").textContent="I did not find anything to add."; return; }
     $("qlMsg").textContent="Check these, then add them:";
-    const opts=qlChannelOptions();
-    const taken={};   /* date -> sessions already there, plus entries accepted so far */
-    const rows=[];
+    const opts2=qlChannelOptions();
+    const taken={};   /* date -> closed sessions already there, plus entries accepted so far */
+    const rows=[]; let ongoingTaken=false;
     for(const e of out.entries){
-      const dayLo=dayStartTs(e.date);
-      const s=/^\d{4}-\d{2}-\d{2}$/.test(e.date)?parseClockOnDay(dayLo,e.start):null, en=s===null?null:parseClockOnDay(dayLo,e.end);
+      const okDate=/^\d{4}-\d{2}-\d{2}$/.test(e.date);
+      const dayLo=okDate?dayStartTs(e.date):0;
+      const ongoing=!!e.ongoing;
+      const s=okDate?parseClockOnDay(dayLo,e.start):null;
+      const en=ongoing?null:(s===null?null:parseClockOnDay(dayLo,e.end));
       let problem="";
-      if(s===null||en===null||en<=s) problem="Times not understood";
-      else if(en>now()) problem="In the future";
+      if(s===null||(!ongoing&&(en===null||en<=s))) problem="Times not understood";
+      else if(s>now()+60000) problem="That start is in the future";
+      else if(!ongoing&&en>now()) problem="In the future";
+      else if(ongoing&&ongoingTaken) problem="Only one timer can run at a time";
       else {
-        if(!taken[e.date]) taken[e.date]=(await sessionsForDay(e.date)).map(x=>({s:x.startTs,e:tlEndOf(x),label:(state.channels.find(c=>c.id===x.channelId)||{}).label||"another entry"}));
-        const clash=taken[e.date].find(x=>x.s<en&&x.e>s);
+        if(!taken[e.date]) taken[e.date]=(await sessionsForDay(e.date)).filter(x=>x.endTs).map(x=>({s:x.startTs,e:x.endTs,label:(state.channels.find(c=>c.id===x.channelId)||{}).label||"another entry"}));
+        const hi=ongoing?s+1:en;
+        const clash=taken[e.date].find(x=>x.s<hi&&x.e>s);
         if(clash) problem="Overlaps "+clash.label+" "+fmtClock(clash.s,fmt)+" - "+fmtClock(clash.e,fmt);
+        else if(ongoing) ongoingTaken=true;
         else taken[e.date].push({s,e:en,label:e.channel_guess||"this entry"});
       }
-      rows.push({e,s,en,problem});
+      rows.push({e,s,en,ongoing,problem});
     }
     const list=document.createElement("div"); list.style.cssText="display:flex;flex-direction:column;gap:8px";
     rows.forEach(r=>{
       const row=document.createElement("div");
       row.style.cssText="border:1px solid "+(r.problem?"var(--bad)":"var(--line)")+";border-radius:12px;padding:10px;background:var(--panel)";
       const when=document.createElement("div"); when.style.cssText="font-weight:800";
-      when.textContent=r.problem&&r.s===null?(r.e.date+" "+r.e.start+" - "+r.e.end):(prettyDate(r.e.date)+"  "+fmtClock(r.s,fmt)+" - "+fmtClock(r.en,fmt)+"  ("+fmtDurShort(r.en-r.s)+")");
+      when.textContent=r.s===null?(r.e.date+" "+r.e.start+" - "+r.e.end)
+        :r.ongoing?(prettyDate(r.e.date)+"  starts "+fmtClock(r.s,fmt)+" - timer keeps running")
+        :(prettyDate(r.e.date)+"  "+fmtClock(r.s,fmt)+" - "+fmtClock(r.en,fmt)+"  ("+fmtDurShort(r.en-r.s)+")");
       row.appendChild(when);
       const sel=document.createElement("select");
       sel.style.cssText="width:100%;margin-top:6px;font-size:16px;background:var(--field);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:8px";
-      sel.innerHTML='<option value="">Choose channel…</option>'+opts.map(o=>'<option value="'+o.id+'">'+(o.parent?o.parent+" › ":"")+o.label.replace(/</g,"&lt;")+'</option>').join("");
-      sel.value=opts.some(o=>o.id===r.e.channel_id)?r.e.channel_id:"";
+      sel.innerHTML='<option value="">Choose channel…</option>'+opts2.map(o=>'<option value="'+o.id+'">'+(o.parent?o.parent+" › ":"")+o.label.replace(/</g,"&lt;")+'</option>').join("");
+      sel.value=opts2.some(o=>o.id===r.e.channel_id)?r.e.channel_id:"";
       row.appendChild(sel);
       if(!sel.value&&r.e.channel_guess){ const g=document.createElement("div"); g.className="hint"; g.textContent='You said "'+r.e.channel_guess+'" - pick the channel.'; row.appendChild(g); }
       if(r.e.note){ const n=document.createElement("div"); n.className="hint"; n.textContent="Note: "+r.e.note; row.appendChild(n); }
@@ -3187,22 +3237,70 @@ function openQuickLog(){
     const refresh=()=>{ const n=rows.filter(r=>!r.problem&&r.sel.value).length; add.textContent=n?("Add "+n+(n===1?" entry":" entries")):"Choose a channel for each entry"; add.disabled=!n; };
     rows.forEach(r=>r.sel.addEventListener("change",refresh)); refresh();
     add.addEventListener("click",async()=>{
-      add.disabled=true; let n=0;
+      add.disabled=true; let n=0, started=null;
       for(const r of rows){
         if(r.problem||!r.sel.value) continue;
+        if(r.ongoing){ started=r; continue; }          /* the running timer goes last, so it ends up current */
         const rec={id:uid(),profileId:state.profileId,channelId:r.sel.value,startTs:r.s,endTs:r.en,durMs:r.en-r.s,date:dateKey(r.s),voided:false};
         if(r.e.note) rec.note=r.e.note;
         await saveLocal("sessions",rec); n++;
       }
+      if(started){
+        const t=running?Math.max(started.s,running.startTs+1000):started.s;
+        await startSessionOnChannel(started.sel.value,Math.min(t,now())); n++;
+        if(started.e.note){ const rec=await idbGet("sessions",running.sessionId); if(rec){ rec.note=started.e.note; await saveLocal("sessions",rec); } }
+      }
       await updateTodayTotals(); renderAll();
       if(dayEditorDate) await renderDayEditor();
-      toast(n+(n===1?" entry":" entries")+" added");
+      toast(n+(n===1?" entry":" entries")+" added"+(started?" - timer started":""));
       close();
     });
     box.appendChild(add);
   }
 }
 window.addEventListener("hashchange",()=>{ if(location.hash==="#quicklog"&&appEntered){ history.replaceState(null,"",location.pathname+location.search); openQuickLog(); } });
+
+/* ===== 15-minute audit =====
+   While the app is open and visible, a chime and the check-in screen appear on
+   every quarter hour (:00 :15 :30 :45) between 6 AM and 9 PM. If the app was
+   away when a mark passed, ONE check-in appears on return, covering the whole
+   gap - never a pile of them. A web page cannot ring while it is closed or the
+   phone is locked, so this is for the screen that stays on (the iPad). */
+const AUDIT_KEY="auditOn", AUDIT_LAST_KEY="auditLastMark", AUDIT_MS=15*60000;
+let auditOn=false, auditLastMark=0;
+try{ auditOn=localStorage.getItem(AUDIT_KEY)==="1"; auditLastMark=parseInt(localStorage.getItem(AUDIT_LAST_KEY)||"0",10)||0; }catch(e){}
+const auditMarkOf=ts=>Math.floor(ts/AUDIT_MS)*AUDIT_MS;
+function auditSaveMark(m){ auditLastMark=m; try{ localStorage.setItem(AUDIT_LAST_KEY,String(m)); }catch(e){} }
+function auditSetOn(v){
+  auditOn=!!v;
+  try{ localStorage.setItem(AUDIT_KEY,auditOn?"1":"0"); }catch(e){}
+  if(auditOn){
+    itAudioUnlock("ambient");                       /* inside the tap, so the chime is allowed */
+    auditSaveMark(auditMarkOf(now()));              /* first check-in is the NEXT quarter hour */
+    toast("15-minute audit on - next check-in at "+fmtClock(auditMarkOf(now())+AUDIT_MS,state.profile&&state.profile.hourFmt));
+  } else toast("15-minute audit off");
+}
+async function auditCheck(){
+  if(!auditOn||!state.profileId||document.hidden) return;
+  if(document.getElementById("qlOverlay")||document.getElementById("itOverlay")) return;
+  const t=now(), m=auditMarkOf(t);
+  if(m<=auditLastMark) return;
+  auditSaveMark(m);
+  const hr=new Date(t).getHours();
+  if(hr<6||hr>=21) return;
+  const today=(await sessionsForDay(todayKey())).filter(x=>x.endTs);
+  const lastEnd=today.length?Math.max.apply(null,today.map(x=>x.endTs)):0;
+  let startTs=(lastEnd&&lastEnd<t-60000&&lastEnd>t-3*3600000)?lastEnd:m-AUDIT_MS;
+  if(running) startTs=Math.max(startTs,running.startTs);
+  startTs=Math.max(startTs,dayStartTs(todayKey()));
+  if(t-startTs<60000) return;
+  try{ itSound("ding"); }catch(e){}
+  openQuickLog({audit:true,window:{startTs,endTs:t}});
+}
+setInterval(auditCheck,15000);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) setTimeout(auditCheck,800); });
+/* After a reload the chime is blocked until the first tap; unlock then. */
+window.addEventListener("pointerdown",()=>{ if(auditOn) itAudioUnlock("ambient"); },{once:true,capture:true});
 
 function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.innerHTML="";
   const profInitial=state.profile?state.profile.name[0].toUpperCase():"?";
@@ -3225,6 +3323,7 @@ function renderAvatarMenu(){const m=document.getElementById("avatarMenu");m.inne
     currentTheme()==="light"?"Dark mode":"Light mode",
     ()=>toggleTheme(),null,true));
   m.appendChild(avatarMenuItem("💬","Quick log",()=>openQuickLog()));
+  m.appendChild(avatarMenuItem("🔔","15-minute audit: "+(auditOn?"On":"Off"),()=>auditSetOn(!auditOn)));
   m.appendChild(avatarMenuItem("⏱️","Interval timer",()=>openIntervalTimer()));
   m.appendChild(avatarMenuItem("⚙️","Settings",()=>openSettings()));
 
